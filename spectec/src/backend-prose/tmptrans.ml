@@ -1,8 +1,10 @@
 open Util.Source
 open El
 
-let ast2ir = function
-  | e -> Print.string_of_exp e |> failwith
+let translate_expr e = match e.it with
+  | Ast.VarE s -> Ir.NameE (N s.it)
+  | Ast.ParenE ({ it = SeqE [{it=AtomE (Atom "\"CONST\"");_}]; _ }, false) -> Ir.YetE ""
+  | _ -> Print.structured_string_of_exp e |> failwith
 
 (* 1. Handle lhs of reduction rules *)
 
@@ -19,7 +21,7 @@ let assert_type e res =
 let pop left res = match left.it with
   | Ast.SeqE(es) -> hds es |> List.iter (fun e ->
     assert_type e res;
-    (*res := !res @ [PopI (Some (ast2ir e))]*)
+    res := !res @ [PopI (Some (translate_expr e))]
   )
   | Ast.ParenE({it = Ast.SeqE({it = Ast.AtomE(Atom "LABEL_"); _} :: _); at = _}, _) ->
     res := !res @ [YetI "Bubble-up semantics."]
@@ -41,6 +43,9 @@ let handle_reduction_group red_group acc =
       ""
       red_group
   in
+
+  (* DEBUG *)
+  print_endline name;
 
   let res = ref [] in
 
