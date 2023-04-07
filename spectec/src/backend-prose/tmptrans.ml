@@ -1,90 +1,92 @@
 open Util.Source
-open El
+open Il
 
-let translate_expr e = match e.it with
+(*let translate_expr e = match e.it with
   | Ast.VarE s -> Ir.NameE (N s.it)
   | Ast.ParenE ({ it = SeqE [{it=AtomE (Atom "\"CONST\"");_}]; _ }, false) -> Ir.YetE ""
-  | _ -> Print.structured_string_of_exp e |> failwith
+  | _ -> Print.structured_string_of_exp e |> failwith*)
 
-(* 1. Handle lhs of reduction rules *)
+(** Translate il to ir **)
 
-let hds l = l |> List.rev |> List.tl
+(* `Ast.exp` -> `Ir.Expr` *)
+let translate_expr exp = match exp.it with
+  | _ -> Ir.YetE (Print.string_of_exp exp)
 
-let assert_type e res =
-  match e.it with
-  (* ({CONST I32 c}) *)
-  | Ast.ParenE({it = Ast.SeqE({it = (Ast.AtomE (Atom "CONST")); _} :: {it = (Ast.AtomE (Atom "I32")); _}  :: _); _}, _) ->
-      res := !res @ [Ir.AssertI "Due to validation, a value of value type i32 is on the top of the stack"]
+(* `Ast.exp` -> `Ir.AssertI` *)
+let translate_assert exp = match exp.it with
+  | Ast.CaseE (
+    Atom "CONST",
+    { it = TupE({ it = CaseE (Atom "I32", _, _); _ } :: _); _ },
+    _
+  ) ->
+      Ir.AssertI
+        "Due to validation, a value of value type i32 is on the top of the stack"
   | _ ->
-      res := !res @ [Ir.AssertI "Due to validation, a value is on the top of the stack"]
+      Ir.AssertI "Yet"
+      (*Ir.AssertI "Due to validation, a value is on the top of the stack"*)
 
-let pop left res = match left.it with
-  | Ast.SeqE(es) -> hds es |> List.iter (fun e ->
-    assert_type e res;
-    res := !res @ [PopI (Some (translate_expr e))]
-  )
-  | Ast.ParenE({it = Ast.SeqE({it = Ast.AtomE(Atom "LABEL_"); _} :: _); at = _}, _) ->
-    res := !res @ [YetI "Bubble-up semantics."]
-  | _ -> ()
+(* `Ast.exp` -> `Ir.instr list` *)
+let translate_pop exp = match exp.it with
+  | Ast.ListE exps ->
+      List.rev exps
+      |> List.tl
+      |> List.fold_left
+        (fun acc e -> translate_assert e :: Ir.PopI (Some (translate_expr e)) :: acc)
+        []
+  | Ast.CatE (_e1, _e2) -> [Ir.YetI "Bubble-up semantics."]
+  | _ -> failwith "Unreachable"
 
-let string_of_destructed (left, right, prems) =
-  let filter_nl xs = List.filter_map (function Ast.Nl -> None | Ast.Elem x -> Some x) xs in
-  let map_nl_list f xs = List.map f (filter_nl xs) in
-  Print.string_of_exp left ^
-  " ~> " ^
-  Print.string_of_exp right ^
-  String.concat "" (map_nl_list (fun x -> "\n    -- " ^ Print.string_of_premise x) prems)
-
-let handle_reduction_group red_group acc =
-  (* assert: every redunction rule in red_group has same lhs *)
-  let name =
-    List.fold_left
-      (fun inner_acc red -> inner_acc ^ string_of_destructed red ^ "\n")
-      ""
-      red_group
-  in
-
+(* `reduction_relation list` -> `Backend-prose.Ir.Program` *)
+let translate_reduction acc rels =
   (* DEBUG *)
-  print_endline name;
+  let (name, lhs, _rhs, _prems) = List.hd rels in
 
-  let res = ref [] in
+  let pop_instrs = match lhs.it with
+    (* z; lhs *)
+    | Ast.MixE (
+      [[]; [Ast.Semicolon]; []],
+      {it=Ast.TupE ({it=Ast.VarE {it="z"; _ }; _ } :: exp :: []); _}
+    ) -> translate_pop exp
+    | _ -> translate_pop lhs in
 
-  let (left, _, _) = List.hd red_group in
-  let left = match left.it with
-    | Ast.InfixE(_, Semicolon, left) -> left
-    | _ -> left
-  in
-  pop left res;
+  Ir.Program (name, pop_instrs) :: acc
 
-  Ir.Program (name, !res) :: acc
+(** Temporarily convert `Ast.RuleD` into `reduction_relation` **)
 
-(* if r is a reduction rule, desturct it into triplet of (lhs, rhs, premises) *)
-let destruct_as_rule r = match r.it with
-  | Ast.RuleD(name, _, e, prems) -> (match e.it with
-    | Ast.InfixE(left, SqArrow, right) ->
-      if String.starts_with ~prefix:"Step_" name.it then
-        Some (left, right, prems)
-      else
-        None
-    | _ -> None)
-  | _ -> None
+type reduction_relation = (string * Ast.exp * Ast.exp * Ast.premise list)
 
-let rec group_by f = function
+let name_of_rule rule = 
+  let Ast.RuleD (id1, _, _, _, _) = rule.it in
+  String.split_on_char '-' id1.it |> List.hd
+
+let rule2rel rule =
+  let Ast.RuleD (id, _, _, exp, prems) = rule.it in
+  match exp.it with
+    | Ast.TupE (lhs :: rhs :: []) -> (id.it, lhs, rhs, prems)
+    | _ -> failwith "Unreachable"
+
+(* group reduction rules that have same name *)
+let rec group = function
   | [] -> []
-  | [x] -> [[x]]
-  | hd :: tl ->
-    let pred x = (f hd  = f x) in
-    let (l, r) = List.partition pred tl in
-    (hd :: l) :: (group_by f r)
+  | h :: t ->
+    let (reduction_group, rem) =
+      List.partition
+        (fun rule -> name_of_rule h = name_of_rule rule)
+        t in
+    List.map rule2rel (h :: reduction_group) :: (group rem)
 
+let extract_reductions acc def = match def.it with
+  | Ast.RelD(id, _, _, rules, _)
+    when String.starts_with ~prefix:"Step_" id.it -> group rules :: acc
+  | _ -> acc
+
+(** Entry **)
+
+(* `Ast.script` -> `Ir.Program` *)
 let translate el =
-  (* Filter and destruct redctions only *)
-  let reductions = el |> List.filter_map destruct_as_rule in
+  (* extract reduction rules from dsl *)
+  let reductions: reduction_relation list list =
+    List.fold_left extract_reductions [] el
+    |> List.flatten in
 
-  (* Group reductions by lefthand side *)
-  let reduction_groups = group_by (fun (left, _, _) ->
-    Print.string_of_exp left
-  ) reductions in
-
-  (* Handle each redction group *)
-  List.fold_right handle_reduction_group reduction_groups []
+  List.fold_left translate_reduction [] reductions

@@ -80,8 +80,14 @@ let () =
     );
     if !odst = "" && !dsts = [] then (
       log "Prose Generation...";
-      let programs = Backend_prose.Tmptrans.translate el in
-      List.map Backend_prose.Print.string_of_program programs |> List.iter print_endline
+      let dsl2ir = true in
+      if dsl2ir then
+        let programs = Backend_prose.Tmptrans.translate il in
+        List.map Backend_prose.Print.string_of_program programs
+          |> List.iter print_endline
+      else
+        let prose = Backend_prose.Translate.translate el in
+        print_endline prose
     );
     log "Complete."
   with

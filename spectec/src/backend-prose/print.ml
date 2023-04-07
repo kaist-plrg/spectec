@@ -249,7 +249,7 @@ let rec string_of_expr = function
   | ConstE (n1, n2) ->
       sprintf "the value %s.CONST %s" (string_of_name n1) (string_of_expr n2)
   | RefNullE n -> sprintf "the value ref.null %s" (string_of_name n)
-  | YetE s -> sprintf "YetE: %s" s
+  | YetE s -> sprintf "YetE (%s)" s
 
 and string_of_cond = function
   | NotC c -> sprintf "not %s" (string_of_cond c)
@@ -265,7 +265,7 @@ and string_of_cond = function
         (string_of_expr e2)
   | PartOfC _ -> failwith "Invalid case"
   | TopC s -> sprintf "the top of the stack is %s" s 
-  | YetC s -> sprintf "YetC: %s" s
+  | YetC s -> sprintf "YetC (%s)" s
 
 let make_index index depth =
   index := !index + 1;
