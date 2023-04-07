@@ -80,7 +80,7 @@ let () =
     );
     if !odst = "" && !dsts = [] then (
       log "Prose Generation...";
-      let dsl2ir = true in
+      let dsl2ir = false in
       if dsl2ir then
         let programs = Backend_prose.Tmptrans.translate il in
         List.map Backend_prose.Print.string_of_program programs
