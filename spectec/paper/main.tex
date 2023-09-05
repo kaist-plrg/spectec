@@ -1,0 +1,129 @@
+\documentclass[acmsmall,review,screen]{acmart}
+
+%% TODO during camera-ready
+%% copyright
+\setcopyright{acmcopyright}
+\copyrightyear{2024}
+\acmYear{2024}
+\acmDOI{XXXXXXX.XXXXXXX}
+
+%% conference information
+\acmConference[PLDI'24]{Make sure to enter the correct conference title from
+your rights confirmation emai}{June 03--05, 2018}{Woodstock, NY}
+\acmPrice{15.00}
+\acmISBN{978-1-4503-XXXX-X/18/06}
+
+%% macros with packages
+\input{macros}
+
+%% start document
+\begin{document}
+
+%% title information
+\title{Extracting executable prose specification from formal semantics of Web Assembly }
+
+\author{Anonymous Author(s)}
+
+%% authors
+%
+% \author{Dongjun Youn}
+% \email{f52985@kaist.ac.kr}
+% \orcid{0000-0002-5766-2035}
+% \affiliation{%
+%   \institution{KAIST}
+%   \city{Daejeon}
+%   \country{South Korea}
+% }
+%
+% \author{Wonho Shin}
+% \email{???@kaist.ac.kr}
+% \orcid{????-????-???-????}
+% \affiliation{%
+%   \institution{KAIST}
+%   \city{Daejeon}
+%   \country{South Korea}
+% }
+% \author{Jaehyun Lee}
+% \email{???@kaist.ac.kr}
+% \orcid{????-????-????-????}
+% \affiliation{%
+%   \institution{KAIST}
+%   \city{Daejeon}
+%   \country{South Korea}
+% }
+%
+% \author{Sukyoung Ryu}
+% \email{sryu.cs@kaist.ac.kr}
+% \orcid{0000-0002-0019-9772}
+% \affiliation{%
+%   \institution{KAIST}
+%   \city{Daejeon}
+%   \country{South Korea}
+% }
+
+%% abstract
+\input{0-abstract}
+
+%% TODO http://dl.acm.org/ccs.cfm during camera ready
+% \begin{CCSXML}
+% <ccs2012>
+%  <concept>
+%   <concept_id>10010520.10010553.10010562</concept_id>
+%   <concept_desc>Computer systems organization~Embedded systems</concept_desc>
+%   <concept_significance>500</concept_significance>
+%  </concept>
+%  <concept>
+%   <concept_id>10010520.10010575.10010755</concept_id>
+%   <concept_desc>Computer systems organization~Redundancy</concept_desc>
+%   <concept_significance>300</concept_significance>
+%  </concept>
+%  <concept>
+%   <concept_id>10010520.10010553.10010554</concept_id>
+%   <concept_desc>Computer systems organization~Robotics</concept_desc>
+%   <concept_significance>100</concept_significance>
+%  </concept>
+%  <concept>
+%   <concept_id>10003033.10003083.10003095</concept_id>
+%   <concept_desc>Networks~Network reliability</concept_desc>
+%   <concept_significance>100</concept_significance>
+%  </concept>
+% </ccs2012>
+% \end{CCSXML}
+%
+% \ccsdesc[500]{Computer systems organization~Embedded systems}
+% \ccsdesc[300]{Computer systems organization~Redundancy}
+% \ccsdesc{Computer systems organization~Robotics}
+% \ccsdesc[100]{Networks~Network reliability}
+\keywords{
+  WebAssembly,
+  language specification,
+  executable prose,
+  DSL,
+}
+
+\maketitle
+
+%% body of the paper
+\input{1-intro}
+\input{2-background}
+\input{3-al}
+\input{4-dsl2al}
+\input{5-eval}
+\input{6-related}
+\input{7-conclusion}
+
+%% TODO during the camera ready
+%% acknowledgements
+% \begin{acks}
+% This work was supported by National Research Foundation of
+% Korea (NRF) (Grants NRF-2017R1A2B3012020 and 2017M3C4A7068177).
+
+%% bibliography style
+\bibliographystyle{ACM-Reference-Format}
+
+%% the bibliography file.
+\balance
+\bibliography{ref}
+
+\end{document}
+\endinput
