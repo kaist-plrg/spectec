@@ -20,7 +20,7 @@ the abstract machine, with the precise effects being specified by reduction
 rules within the operational semantics.
 
 The official WebAssembly specification~\cite{wasmspec} meticulously documents
-the execution semantics using the LaTex framework, presenting them in two
+the execution semantics using the LaTeX framework, presenting them in two
 complementary yet equivalent forms: prose and formal notation. Prose notation
 provides a stepwise, algorithmic description of WebAssembly's execution
 semantics, offering explicit guidance on the operations to be executed on
@@ -30,8 +30,8 @@ instructions operate.  In contrast, formal notation articulates these semantics
 through mathematical, declarative rules. This formal representation closely
 resembles the original operational semantics, comprising reduction rules that
 correspond to each WebAssembly instruction. The dual representation serves to
-cater to both human comprehension and machine processing, ensuring clarity and
-correctness within the language specification.
+cater to comprehension of both language implementers and designers, ensuring
+clarity and correctness within the language specification.
 
 \begin{figure}
   \centering
@@ -100,11 +100,11 @@ manual specification composition. Given Wasm's planned extensions, addressing
 this challenge becomes increasingly critical.
 
 In response to the challenges of crafting precise specifications manually, a
-promising approach has emerged in the form of Wasm-DSL (WebAssembly Domain
-Specific Language). Wasm-DSL presents a domain-specific language tailored to
+promising approach has emerged in the form of $\dsl$ (WebAssembly Domain
+Specific Language). $\dsl$ presents a domain-specific language tailored to
 describing the execution semantics of WebAssembly. This innovative language is
 designed to bridge the gap between high-level descriptions and concrete
-documentation. The key advantage of Wasm-DSL lies in its ability to offer a
+documentation. The key advantage of $\dsl$ lies in its ability to offer a
 clear, visually aligned representation of the operational semantics of
 WebAssembly that is easy to read and write. By defining the semantics of
 WebAssembly operations in this specialized language as a front-end and then
@@ -112,17 +112,17 @@ compiling to both formal and prose notation as back-ends, documenting the
 specification becomes a more streamlined process, potentially reducing the
 burden of manual specification writing and enhancing accuracy.
 
-The process of generating a formal notation specification from Wasm-DSL is
-relatively straightforward. Since both Wasm-DSL and formal specifications adopt
+The process of generating a formal notation specification from $\dsl$ is
+relatively straightforward. Since both $\dsl$ and formal specifications adopt
 a declarative approach based on mathematical reduction rules, the translation
-from Wasm-DSL to formal notation can be achieved through a single, linear scan
+from $\dsl$ to formal notation can be achieved through a single, linear scan
 of the DSL. This one-to-one correspondence minimizes the risk of generating a
 specification that deviates from the intended execution semantics outlined in
 DSL. Even in cases where discrepancies arise, they can be readily identified
 and rectified.
 
 Generating prose notation specification, however, presents a distinct and
-intricate challenge. In contrast to Wasm-DSL, prose notation entails an
+intricate challenge. In contrast to $\dsl$, prose notation entails an
 algorithmic, step-by-step description of execution semantics. The transition
 between these two styles is not straightforward, as it necessitates the mapping
 of declarative statements to algorithmic prose while ensuring consistency with
@@ -175,17 +175,17 @@ systematically verify its alignment with the formal notation stands as a
 substantial research endeavor.
 
 In response to these challenges, we propose a novel solution: Algorithmic
-Language (AL), an executable language that closely resembles the structure and
+Language ($\al$), an executable language that closely resembles the structure and
 style of prose notation. Our approach seeks to automate and enhance the process
 of generating prose descriptions from the formal semantics described in
-Wasm-DSL. We achieve this in two pivotal steps. First, we establish an
-automated pipeline for the extraction of AL from Wasm-DSL. Subsequently, we
-generate prose descriptions by stringifying the extracted AL. We also identify
+$\dsl$. We achieve this in two pivotal steps. First, we establish an
+automated pipeline for the extraction of $\al$ from $\dsl$. Subsequently, we
+generate prose descriptions by stringifying the extracted $\al$. We also identify
 the challenges encountered during the process including the animation problem
 previously mentioned, and suggest the effective, lightweight solutions for
 them. Furthermore, to underscore the correctness and reliability of the
-extracted prose, we have developed an interpreter for AL which enables
-automatic and rigorous testing of the behavior described by the extracted AL
+extracted prose, we have developed an interpreter for $\al$ which enables
+automatic and rigorous testing of the behavior described by the extracted $\al$
 against the official WebAssembly test suite. Our results confirm the
 consistency and accuracy of our methodology, boasting a 100\% pass rate across
 official WebAssembly tests, thereby validating the fidelity of the extracted
@@ -195,10 +195,10 @@ In summary, this paper offers the following key contributions:
 
 \begin{itemize}
 \item We provide a formal definition of the syntax and semantics of
-Algorithmic Language (AL), an executable language designed to resemble prose
+Algorithmic Language ($\al$), an executable language designed to resemble prose
 specification.
 \item We present an automated method for extracting prose descriptions from
-the execution semantics of Wasm described in Wasm-DSL, substantially mitigating
+the execution semantics of Wasm described in $\dsl$, substantially mitigating
 the identified challenges during the process.
 \item We establish the correctness and reliability of our automatically
 extracted prose descriptions by subjecting them to comprehensive testing
@@ -206,9 +206,9 @@ against the official Wasm test suite.
 \end{itemize}
 
 The subsequent sections of this paper will delve into the specifics of our
-methodology, detailing the creation of AL, the extraction process and the
-challenges, the development of the AL interpreter, and the comprehensive
+methodology, detailing the creation of $\al$, the extraction process and the
+challenges, the development of the $\al$ interpreter, and the comprehensive
 testing framework employed. Through this exploration, we aim to not only
 address the challenges associated with prose notation in Wasm, but also explore
-the potential of AL as a transformative tool for enhancing the accuracy and
+the potential of $\al$ as a transformative tool for enhancing the accuracy and
 efficiency of programming language specifications in general.
