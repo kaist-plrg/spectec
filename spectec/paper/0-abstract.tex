@@ -2,19 +2,24 @@
 WebAssembly (Wasm) is a versatile binary instruction format enabling
 high-performance code execution across diverse environments. As Wasm gains
 momentum with continuous feature enhancements, the specification of its
-execution semantics becomes pivotal. Wasm-DSL has emrged as an innovative
-approach to streamline the meticulous documentation process: Wasm-DSL is used
-as front-end language to define semantics and automatically generate both
-formal and prose notations as back-ends. While generating formal notations is
+execution semantics becomes pivotal.  The introduction of WebAssembly Domain
+Specific Language ($\dsl$) has emerged as an innovative approach to streamline
+the meticulous documentation process.  $\dsl$ serves as a front-end language
+for defining semantics, and both formal and prose specifications are
+automatically generated as back-ends.  While generating formal notations is
 relatively straightforward, the challenge of generating accurate and consistent
 prose notations arises due to the fundamental disparity between prose and
 formal notations.
 
-This paper presents Algorithmic Language (AL), an executable language designed
-to resemble prose, automating the generation of precise prose descriptions. AL
-is extracted from Wasm-DSL, and a comprehensive testing framework validates its
-correctness.  This approach addresses the challenges posed by manual
-specification composition and offers a transformative solution for enhancing
-the accuracy and efficiency of programming language specifications.
+This paper introduces Algorithmic Language ($\al$), an executable language
+designed to resemble prose specification, and presents an automated methodology
+for extracting prose descriptions from $\dsl$. We identify challenges
+during the process such as the "animation problem" and demonstrate how we
+mitigate them. The extracted prose descriptions are rigorously tested against
+the official WebAssembly test suite using an $\al$ interpreter, achieving a
+100\% pass rate. \inred{This work not only addresses challenges in prose
+notation for Wasm but also demonstrates the potential of $\al$ as a tool for
+enhancing the precision and efficiency of programming language specifications
+in general.}
 \end{abstract}
 
