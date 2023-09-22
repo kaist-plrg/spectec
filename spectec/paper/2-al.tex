@@ -1,0 +1,125 @@
+\section{AL}\label{sec:al}
+
+This section explains about syntax and semantics of AL.
+\footnote{Note that this is NOT a syntax and sematics of WebAssembly, but rather,
+syntax and semantics of prose notation of WebAssembly Specification}
+
+\subsection{syntax}
+
+This section describes the syntax of AL.
+
+\begin{minipage}{0.5\textwidth}
+$$
+\begin{array}{@{}lrrl@{}}
+& \mathsf{p} &::=& {\mathsf{A}^\ast} \\
+& \mathsf{A} &::=& \mathsf{algorithm}~\mathit{f}~({\mathit{e}^\ast})~\{{\mathsf{i}^\ast}\} \\
+& \mathsf{i} &::=& \mathsf{if}~\mathit{c}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
+\mathsf{either}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
+\mathsf{assert}~\mathit{c} \\ &&|&
+\mathsf{push}~\mathit{e} \\ &&|&
+\mathsf{pop}~\mathit{e} \\ &&|&
+\mathsf{popall}~\mathit{e}~\mathit{c} \\ &&|&
+\mathsf{peek}~\mathit{e}~\mathit{c} \\ &&|&
+\mathsf{let}~\mathit{e}~\mathit{e} \\ &&|&
+\mathsf{call}~{\mathit{e}^?}~\mathit{f}~{\mathit{e}^\ast}~\{{({\mathit{x}^\ast} ; \mathit{iter})^\ast}\} \\ &&|&
+\mathsf{trap} \\ &&|&
+\mathsf{nop} \\ &&|&
+\mathsf{return}~{\mathit{e}^?} \\ &&|&
+\mathsf{execute}~\mathit{e} \\ &&|&
+\mathsf{jumpin}~\mathit{e} \\ &&|&
+\mathsf{jumpout} \\ &&|&
+\mathsf{getfirst}~\mathit{e}~\mathit{c} \\ &&|&
+\mathsf{replace}~\mathit{e}~\mathit{p}~\mathit{e} \\ &&|&
+\mathsf{append}~\mathit{e}~\mathit{e} \\ &&|&
+\mathsf{appendlist}~\mathit{e}~\mathit{e} \\
+& \mathit{c} &::=& \sim\mathit{c} \\ &&|&
+\mathit{c}(\wedge)\mathit{c} \\ &&|&
+\mathit{e}(<)\mathit{e} \\ &&|&
+!\mathit{e} \\ &&|&
+\mathit{e}<:\mathit{s} \\ &&|&
+\mathsf{valid}~\mathit{e} \\
+\end{array}
+$$
+\end{minipage}
+\begin{minipage}{0.5\textwidth}
+$$
+\begin{array}{@{}lrrl@{}}
+& \mathit{e} &::=& \mathit{n} \\ &&|&
+\mathit{s} \\ &&|&
+\mathit{op}(\mathit{e^\ast}) \\ &&|&
+\mathit{e}^\ast \\ &&|&
+\mathit{e}^\mathit{e} \\ &&|&
+\mathit{e}::\mathit{e} \\ &&|&
+|\mathit{e}| \\ &&|&
+\{{(\mathit{text} \rightarrow \mathit{e})^\ast}\} \\ &&|&
+\mathit{e}[\mathit{p}] \\ &&|&
+\mathit{e}[\mathit{p}^\ast:+=\mathit{e}] \\ &&|&
+\mathit{e}[\mathit{p}^\ast:=\mathit{e}] \\ &&|&
+\mathit{s}(\mathit{e}^\ast) \\ &&|&
+\mathit{e}^? \\ &&|&
+(\mathit{e},\mathit{e}) \\ &&|&
+\mathit{x} \\ &&|&
+\mathit{e}^{\{\mathit{x}^\ast\}~\mathit{iter}} \\
+& \mathit{iter} &::=& \mathsf{?} \\ &&|&
+\mathsf{\ast} \\ &&|&
+\mathsf{+} \\ &&|&
+{(\mathit{x}<)}^?~\mathit{e} \\
+& \mathit{p} &::=& [\mathit{e}] \\ &&|&
+[\mathit{e}:\mathit{e}] \\ &&|&
+.\mathit{s} \\
+\end{array}
+$$
+\end{minipage}
+
+Metavariable
+$\mathsf{p}$ ranges over a program,
+$\mathsf{A}$ ranges over an algorithm,
+$\mathsf{i}$ ranges over an instruction,
+$\mathit{c}$ ranges over a condition,
+$\mathit{e}$ ranges over an expression,
+$\mathit{iter}$ ranges over an iter-expression,
+$\mathit{p}$ ranges over a path,
+$\mathit{n}$ ranges over an integer,
+$\mathit{s}$ ranges over a string,
+$\mathit{x}$ ranges over a variable name.
+and
+$\mathit{f}$ ranges over a function name.
+
+An AL program $\mathsf{p}$ constists of algorithms $\mathsf{A}^\ast$.  An
+algorithm $\mathsf{A}$ has its name $\mathit{f}$, parameters
+${\mathit{e}^\ast}$, and its body instructions ${\mathit{i}^\ast}$.  There are
+various types of instructions including familiar push/pop instructions. The
+instructions are designed in a way that it resembles the prose statements
+appearing in the official specification.  For example, the prose `2. Pop the
+value val from the stack` in Fig~\ref{fig:prosespec1} corresponds to the following
+instruction: $\mathsf{pop} \mathit{val}$. There are also various kinds of
+conditions and expressions.
+\subsection{semantics}
+
+This section describes the semantics of AL. It is based on an abstract machine
+that models the program state, which consists of a stack and a store. An
+algorithm is a entry point of an execution. One can execute a algorithm of the
+program by calling it.  When an algorithm is called, the body instructions of
+the algorithm are interpreted sequentially.
+
+Interpreting one instruction may alter the internal program state of the
+abstract machine, and the exact effect of each instruction is described using
+semantics rule.
+
+Figure ???  illustrate the rules for interpreting each
+kind of instruction.
+\inred{TODO: Write semantics of AL instructions in more detail. REQUIRED: Actually finish formalizing the semantics of AL.}
+
+Conditions are calculated into a
+boolean value, and the expressions are evaluated into a value.
+
+Figure ??? illustrate the rules for calculating each kind of condition in
+big-step semantics. \inred{TODO: Explain semantics of AL conditions in more detail.}
+
+Figure ??? illustrate the rules for evaluating each kind of expression in big-step
+semantics. \inred{TODO: Write semantics of AL expressions in more detail.}
+
+Note that both calculating conditions and evaluating expressions are pure and
+do not have any side-effect on the program state.
+
+
