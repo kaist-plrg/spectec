@@ -31,10 +31,10 @@ Note that both of lhs and rhs for both rules are omitting the state expression,
 and thus we notate it by using $\bot$.
 
 The high-level interpretation of a reduction rule $r = (lhs, rhs, prem*)$ should be straightforward:
-when the current configuration of the program mathces \textit{lhs} and all \textit{prem}s are
+when the current configuration of the program matches \textit{lhs} and all \textit{prem}s are
 evaluated to be true, then alter the program configuration into \textit{rhs}.
 
-A helper function $\helperW \in \helpersW = NAME \times E^\ast \times E \times \premsW^\ast$ is a quadraple of
+A helper function $\helperW \in \helpersW = NAME \times E^\ast \times E \times \premsW^\ast$ is a quadruple of
 the name, parameters \textit{params}, a return expressions \textit{ret}, and a finite sequences of premises \textit{prem}*.
 
 \textbf{Example.} \inred{TODO: Give a example of a helper function}
@@ -70,17 +70,17 @@ their target Wasm instruction, and helper functions are grouped based on their n
 As a result, multiple groups are formed. Each group is transformed into a single algorithm,
 $\mathsf{A}$. The transformed algorithms are collected into a single AL program, which is the
 final output of this transformation system. This AL then can be stringified into a
-prose notation to be rendered in the specification document, or can be coupled with the AL interpreter to form a Wasm interpreter.
+prose notation specification document, or can be coupled with the AL interpreter to form a Wasm interpreter.
 
 Figure~\ref{fig:grouptrans} shows the detail of group transformer, a component of the Figure~\ref{fig:overview}.
 The input is either a group of reduction rules \textit{r}, or a group of helper functions \textit{h}.
 The output is a single algorithm.
 Due to the fundamental difference between mathematical rules and algorithm,
 directly transforming into an algorithm is a non-trivial task.
-Therefore, the process is divided into two steps: first preprocess the DSL so that
+Therefore, the process is divided into two steps: first pre-process DSL so that
 it becomes more suitable for transformation, and then transform it into an algorithm.
 As a first step, a group of definitions are first transformed into a different but equivalent group of definitions,
-so that the new transfomred group of definitions satisfies certain \textit{preconditions}.
+so that the new transformed group of definitions satisfies certain \textit{preconditions}.
 The preconditions are there to help generate AL algorithms with more ease.
 If the input group already satisfies the precondition, then this transformation will keep the input intact.
 Secondly, Then new group of definition is transformed into AL.
@@ -109,7 +109,7 @@ r_2 = (..., [... \text{(BR l+1)} ...]),  (..., ...), []
 The intention here is that `br l` instruction should be applied with different rule,
 depending on whether l is 0 or not.
 Note that the both rules do not have any premise. The condition check is implicitly assumed to be
-done when mathcing the current configuration with LHS.
+done when matching the current configuration with LHS.
 
 The following is the result of unification:
 \[
@@ -118,23 +118,23 @@ r_1' = (..., [... \text{(BR t)} ...]),  (..., ...), [t = 0]
 \[
 r_2' = (..., [... \text{(BR t)} ...]),  (..., ...), [t = l + 1]
 \]
-The temorary variable t is introduced for both rules, replacing 0 of the first rule and
+The temporary variable t is introduced for both rules, replacing 0 of the first rule and
 l+1 of the second rule. In order to denote what the temporary variable originally was
-in each rules, new premise is added, denoting t eqauls 0 in the first rule, and l+1 in the second rule.
+in each rules, new premise is added, denoting t equals 0 in the first rule, and l+1 in the second rule.
 
 \inred{
-  TODO: Explain algorithm/methd of animation: walking two AST's simultaneoausly.
+  TODO: Explain algorithm/method of animation: walking two AST's simultaneously.
 }
 
 
 \textbf{2. Animation}
 
-There are two problems that makes the transformation of premises into AL challenging.
+There are two problems that makes it challenging to transform premises into AL.
 First, if a given premise is an equality expression, then it may work as either a simple condition or
 a binding of a new variable, and this should be inferred. More formally, it is required to
 correctly find out where each free variable is getting bound. Second, the order
 of premises can be permutated in an arbitrary order. This is problematic for
-generating algorithm, since the exact order of steps are crucial in the algortihm.
+generating algorithm, since the exact order of steps are crucial in the algorithm.
 
 Animation is a step that addresses these two challanges. Its goal is to infer
 the bound variables and the order of each premise.
@@ -151,7 +151,7 @@ Proof: \inred{TODO}
 
 This theorem implies that there is no trivial method for solving this problem.
 One obvious solution to this kind of problem is probably using a SMT solver such as Z3, since
-this probelm is fundamentally a constraint problem.
+this problem is fundamentally a constraint problem.
 However, using such a heavy tool seems to be a bit over-engineering for this rather small input.
 Instead, we decided to use a simple yet effective approach.
 We reduce the problem into a exact cover problem\footnote{Note that the direction is opposite with
@@ -200,7 +200,7 @@ Output: An algorithm $\mathsf{A}$
 \inred{TODO: Pretty print algorithm 1}
 
 
-After the group is tranformed, the next step is to
+After the group is transformed, the next step is to
 change each group into an algorithm. Algorithm 1 depicts the pseudocode of the transformation
 of group of reduction rules into an algorithm.
 First, the lhs of this reduction rule group is extracted on line 1, and is transformed into
