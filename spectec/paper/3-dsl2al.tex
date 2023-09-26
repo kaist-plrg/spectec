@@ -1,17 +1,20 @@
-\section{Translating Wasm-DSL into AL}\label{sec:translate}
+\section{Transformation of Wasm-DSL into AL}\label{sec:translate}
 
-In this section, we describe the translation process of Wasm-DSL into AL.
-
+In this section, we describe the transformation process of Wasm-DSL into AL.
 Wasm-DSL can express whole standard of the WebAssembly, including not only
 execution semantics but also syntax and validation rules.
-Since generating prose from execution semantics is the main goal of this paper,
-we will only focus on how execution semantics of Wasm is expressed using Wasm-DSL, but not syntax or validation.
+Since the main goal of this paper is to generate prose from execution semantics byt not syntax or validation,
+we will focus on how only execution semantics of Wasm is expressed using Wasm-DSL.
+
+\subsection{Notations}
 
 Two kinds of \textit{definitions} are needed to express the execution semantics of Wasm:
 reduction rules and auxiliary helper functions.
-
-\subsection{Notations}
 Here, we formally define the notations for the reduction rules and the auxiliary helper functions.
+
+First, assume that the set of DSL expressions $E$ and boolean expressions $B \subset E$ are given.
+DSL expressions are basic building building blocks of DSL, including number, identifiers,
+function calls, pairs, operations between them, etc. \inred{How much detail is needed for DSL expressions?}
 
 A reduction rule $\ruleW \in \rulesW = \configsW \times \configsW \times \premsW^\ast$ is a triplet of a
 configuration \textit{lhs}, a configuration \textit{rhs}, and a finite sequences of premises \textit{prem}*.
@@ -34,13 +37,43 @@ The high-level interpretation of a reduction rule $r = (lhs, rhs, prem*)$ should
 when the current configuration of the program matches \textit{lhs} and all \textit{prem}s are
 evaluated to be true, then alter the program configuration into \textit{rhs}.
 
-A helper function $\helperW \in \helpersW = NAME \times E^\ast \times E \times \premsW^\ast$ is a quadruple of
+A helper function $\helperW \in \helpersW = Id \times E^\ast \times E \times \premsW^\ast$ is a quadruple of
 the name, parameters \textit{params}, a return expressions \textit{ret}, and a finite sequences of premises \textit{prem}*.
 
-\textbf{Example.} \inred{TODO: Give a example of a helper function}
+\textbf{Example.} `default` is an auxiliary helper function that takes a Wasm type as an input, and yields
+the default Wasm value (usually zero) of that type as an output. The following is the
+DSL that represents the two cases for this function:
+
+\inred{TODO: Pretty print this}
+
+-------------------------
+
+\texttt{
+def \$default\_(t) = (CONST I32 0)
+}
+
+\texttt{
+-- if t = I32
+}
+
+\texttt{
+def \$default\_(t) = (CONST I64 0)
+}
+
+\texttt{
+-- if t = I64
+}
+
+-------------------------
+
+When the type `I32` is given, `CONST I32 0` should be returned,
+and when the type `I64` is given, `CONST I64` should be returned.
+These definitions will be parsed into the following:
+\[h_1=\text{"default\_"}, [t], \text{(CONST I32 0)}, [t = \text{I32}]\]
+\[h_2=\text{"default\_"}, [t], \text{(CONST I64 0)}, [t = \text{I64}]\]
+
 
 \subsection{Transformation}
-In this section, we describe the transformation of \dsl~into \al.
 
 \begin{figure}
   \centering
@@ -59,17 +92,20 @@ In this section, we describe the transformation of \dsl~into \al.
   \label{fig:trans}
 \end{figure}
 
-
+In this section, we describe the transformation of \dsl~into \al.
 Figure~\ref{fig:overview} shows the whole system of transforming DSL into an \al~program.
 The input of the system is the \dsl~document,
 and the output of the system is a single \al~program $\mathsf{p}$.
 The input undergoes the following process of transformation.
 First, the input DSL is parsed into a set of definitions: either a reduction rule or a
-helper function. Then, the definitions are grouped. Reduction rules are grouped based on
+helper function. Then, the definitions are grouped.
+A group represents the set of definitions that should be bundled and transformed
+into a single algorithm together.
+Reduction rules are grouped based on
 their target Wasm instruction, and helper functions are grouped based on their names.
 As a result, multiple groups are formed. Each group is transformed into a single algorithm,
 $\mathsf{A}$. The transformed algorithms are collected into a single AL program, which is the
-final output of this transformation system. This AL then can be stringified into a
+final output of this transformation system. This AL program then can be stringified into a
 prose notation specification document, or can be coupled with the AL interpreter to form a Wasm interpreter.
 
 Figure~\ref{fig:grouptrans} shows the detail of group transformer, a component of the Figure~\ref{fig:overview}.
@@ -79,21 +115,25 @@ Due to the fundamental difference between mathematical rules and algorithm,
 directly transforming into an algorithm is a non-trivial task.
 Therefore, the process is divided into two steps: first pre-process DSL so that
 it becomes more suitable for transformation, and then transform it into an algorithm.
-As a first step, a group of definitions are first transformed into a different but equivalent group of definitions,
-so that the new transformed group of definitions satisfies certain \textit{preconditions}.
-The preconditions are there to help generate AL algorithms with more ease.
+As a first step, a group of definitions are first pre-processed into a
+different group of definitions in semantics-preserving manner,
+so that the new pre-processed group of definitions satisfies certain \textit{preconditions}.
+The preconditions will be helpful when generating AL algorithms.
 If the input group already satisfies the precondition, then this transformation will keep the input intact.
 Secondly, Then new group of definition is transformed into AL.
 How the AL is generated slightly differ based on whether the group is a reduction rule group or a helper function
 group, but they are both based on the following fundamental approach.
 % Should I explain AL -> AL?
 
-\subsubsection{DSL->DSL transformation}
+~
 
-There are two major steps for transforming DSL into DSL: 1. LHS/Parameter unification and
-2. animation.
+\subsubsection{\textbf{DSL->DSL preprocessing}}~
 
-\textbf{1. LHS / Parameter Unification}
+The first step of the transformation is to pre-process DSL into a one that meets certain preconditions.
+There are two major preprocessing: 1. Unification and
+2. Animation.
+
+\textbf{1. Unification}
 
 Unification is a step that makes all LHS (for reduction rule) or parameters
 (for helper functions) identical within the group.
@@ -106,8 +146,8 @@ r_1 = (..., [... \text{(BR 0)} ...]),  (..., ...), []
 \[
 r_2 = (..., [... \text{(BR l+1)} ...]),  (..., ...), []
 \]
-The intention here is that `br l` instruction should be applied with different rule,
-depending on whether l is 0 or not.
+The intention here is that `BR l` instruction should be applied with different rule,
+depending on whether $l$ is 0 or not.
 Note that the both rules do not have any premise. The condition check is implicitly assumed to be
 done when matching the current configuration with LHS.
 
@@ -118,9 +158,9 @@ r_1' = (..., [... \text{(BR t)} ...]),  (..., ...), [t = 0]
 \[
 r_2' = (..., [... \text{(BR t)} ...]),  (..., ...), [t = l + 1]
 \]
-The temporary variable t is introduced for both rules, replacing 0 of the first rule and
-l+1 of the second rule. In order to denote what the temporary variable originally was
-in each rules, new premise is added, denoting t equals 0 in the first rule, and l+1 in the second rule.
+The temporary variable $t$ is introduced for both rules, replacing 0 of the first rule and
+$l+1$ of the second rule. In order to denote what the temporary variable originally was
+in each rules, new premise is added, denoting $t$ equals 0 in the first rule, and $l+1$ in the second rule.
 
 \inred{
   TODO: Explain algorithm/method of animation: walking two AST's simultaneously.
@@ -142,12 +182,80 @@ After animation, each premise is tagged with what variables it is binding
 such that every variables are bound exactly once, and premises are ordered in a way that
 all of unbound variables in each premise is already bound by the previous premises.
 
-We have discovered that this solving the animation problem is in fact NP-hard.
-We prove it by reduction from a known NP-hard problem, an exact cover problem.
+Let's look at the BR example again:
+\[
+r_1' = (..., [... \text{(BR t)} ...]),  (..., ...), [t = 0]
+\]
+\[
+r_2' = (..., [... \text{(BR t)} ...]),  (..., ...), [t = l + 1]
+\]
+In the first rule, the premise t = 0 is the equality check.
+In the second rule, on the other hand, the premise $t = l+1$ is actually a binding of $l$ with a new value.
+Therefore, the animation process will preserve the first rule as it is, but will change the
+second rule into the following:
+\[
+r_2'' = (..., [... \text{(BR t)} ...]),  (..., ...), [l + 1 \leftarrow t]
+\]
+which clearly indicates that the new variable $l$ is a new variable.
+The effect of premise ordering is not illustrated in this example, but
+if there were some additional premises that contains the variable $l$, then
+the animation process will make sure that the premise $(l + 1 \leftarrow t)$ will be
+placed before them.
 
-Theorem: Animation problem is NP-hard.
+We have discovered that solving the animation problem is in fact NP-hard.
+This is especially because a single premise can bind more than two variables at once, as in
+$(x,y) \leftarrow p$.
+We prove it by reduction from a known NP-hard problem, the \textit{exact cover} problem.
 
-Proof: \inred{TODO}
+\textbf{Definition.} Partition: Given a set $X$, a collection of subsets $P \subset 2^X$ is a partition of $X$ iff
+1. The union of all sets in $P$ is $X$,
+2. All sets in $P$ are pairwise disjoint.
+
+For example, $P$ = \{\{a,b\}, \{c,d\}, \{e\}\} is a partition of the set $X$ = \{a, b, c, d, e\},
+since 1. the union of all sets is X, and 2. any pair of subsets are disjoint.
+
+\textbf{Definition.} Exact cover problem: Given a set $X$ and a collection of subsets $S \subset 2^X$,
+exact cover problem is a decision problem to determine if there exists a partition $P$ which is a
+subcolelction of S.
+
+For example, consider a collection $S = \{\{a,b\}, \{b,c\}, \{c,d,e\}\}$.
+One of it's subcollection, $\{\{a,b\}, \{c,d,e\}\} \subset S$ is a partition of $X$,
+so the answer to the problem is YES.
+On the other hand, given a collection $S' = \{\{a,b\}, \{b,c\}, \{c,d\}, \{d,e\}\}$,
+no any subcollection of $S'$ is a partition of $X$\footnote{It can be easily
+verified by the parity. The union of any subcollection would have even number
+of elements, while it is required to be 5.}, so the answer to the problem is
+NO.
+
+Exact cover problem is a well-known NP-complete problem and is one of Karp's 21 NP-complete problems[?].
+Therefore, we can prove that animation problem is NP-hard, if we reduce Exact cover problem
+into animation problem in polynomial time.
+
+\textbf{Theorem}: Animation problem is NP-hard.
+
+\textbf{Proof}: Let's assume we are given a exact-cover problem with a set $X$ and a
+collection of its subset, $S \subset 2^X$. Let n be size of $S$.
+Let $S_i = \{x_{i1}, x_{i2}, ..., x_{ij}\}$ be the i-th subset of S.
+Now, consider the reduction rule $(lhs, rhs, prems)$ where
+$lhs$ is $\top, [val_n, val_{n-1}, ..., val_1]$,
+$rhs$ is $\top, []$, and
+i-th premise of $prems$ be $val_i = (x_{i1}, x_{i2}, ..., x_{ij})$.
+The claim is that when this rule is animated properly, this gives a solution to the exact-cover problem.
+After animation, some premises will be explicitly annotated to be a variable bindings,
+and they will be ordered in front of other premises. Note that the requirement for the
+bound variables is that every vairable must be bound exactly once. Therefore, if we collect
+all $S_i$ such that the i-th premise is denoted to be bounding, then the subcolelction is
+the partition of the set $X$.
+
+\textbf{Example.}
+Let's consider the example of $X = \{a, b, c, d, e\}$ and $S = \{\{a,b\}, \{b,c\}, \{c,d,e\}\}$ again.
+Following the proof above, the exact cover problem for X and S is reduced to the animation problem for the
+following reduction rule:
+\[r = (\top, [val_3, val_2, val_1]), (\top, []), [val_1 = (a,b), val_2 = (b,c), val_3 = (c, d, e)]\]
+If we successfully solve the animation problem, then the result should look like the following:
+\[r' = (\top, [val_3, val_2, val_1]), (\top, []), [(a,b) \leftarrow val_1, (c, d, e) \leftarrow val_3, val_2 = (b,c)]\]
+From the result, we can reconstruct the partition of the set $X$ by looking at first two bindings,
+$\{\{a, b\}, \{c, d, e\}\}$, giving the answer to the exact cover problem.
 
 This theorem implies that there is no trivial method for solving this problem.
 One obvious solution to this kind of problem is probably using a SMT solver such as Z3, since
@@ -163,7 +271,9 @@ the Knuth algorithm[?].
 }.
 
 
-\subsubsection{DSL->AL transformation}
+~
+
+\subsubsection{\textbf{DSL->AL transformation}}~
 
 In this section, we explain the transformation of DSL with preconditions into an AL algorithm.
 
@@ -200,19 +310,22 @@ Output: An algorithm $\mathsf{A}$
 \inred{TODO: Pretty print algorithm 1}
 
 
-After the group is transformed, the next step is to
-change each group into an algorithm. Algorithm 1 depicts the pseudocode of the transformation
-of group of reduction rules into an algorithm.
-First, the lhs of this reduction rule group is extracted on line 1, and is transformed into
-an AL instructions on line 2. Since it is guaranteed that every lhs of reduction rule are
-identical, any lhs from any rules of the group can be used. This transformed list of instructions
-will be used as an initial list, and will grow iteratively by the loop on line 3.
-Premises and rhs are extracted for each reduction rule on line a and b, and then transformed into
-instructions on lines c and d. These two lists of instructions are merged to form a single
-list of instructions, and then accumulatively appended to the intial instruction list.
-Finally, the name and parameter of this algorithm should be extracted from the target instruction of the reduction rule,
-which itself is obtained from any lhs of the rule on line 4. At last, the name, parameters, and
-AL instructions will be packed and returned as the final algorithm.
+After the group is pre-processed, the next step is to transform the group into
+an algorithm. Algorithm 1 depicts the pseudocode of the transformation of group
+of reduction rules into an algorithm.  First, the lhs of this reduction rule
+group is extracted on line 1, and is transformed into an AL instructions on
+line 2. Due to the pre-condition, it is guaranteed that every lhs of reduction
+rule are identical and any lhs from any rules of the group can be used. In the
+algorithm, lhs of the first rule (r*[0]) is used. The result of this
+transformed lhs will be used as an initial instruction list, and will grow
+iteratively by the loop that iterates over each rule on line 3.  For each rule,
+premises and rhs are extracted on line a and b respectively, and then
+transformed into instructions on lines c and d respectively. These two lists of
+instructions are merged to form a single list of instructions, and then
+appended to the intial instruction list on line e.  Finally, the name and
+parameter of this algorithm is extracted from the lhs of the reduction rule on
+line 4. At last, the name, parameters, and AL instructions will be packed and
+returned as the final algorithm.
 
 \inred{
   TODO: Explain lhs\_to\_instr, prems\_to\_instr, rhs\_to\_instr, merge, extract\_name\_and\_params

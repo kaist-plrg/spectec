@@ -11,9 +11,9 @@ This section describes the syntax of AL.
 \begin{minipage}{0.5\textwidth}
 $$
 \begin{array}{@{}lrrl@{}}
-& \mathsf{p} &::=& {\mathsf{A}^\ast} \\
-& \mathsf{A} &::=& \mathsf{algorithm}~\mathit{f}~({\mathit{e}^\ast})~\{{\mathsf{i}^\ast}\} \\
-& \mathsf{i} &::=& \mathsf{if}~\mathit{c}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
+\text{Program} & \mathsf{p} &::=& {\mathsf{A}^\ast} \\
+\text{Algorithm} & \mathsf{A} &::=& \mathsf{algorithm}~\mathit{f}~({\mathit{e}^\ast})~\{{\mathsf{i}^\ast}\} \\
+\text{Instruction} & \mathsf{i} &::=& \mathsf{if}~\mathit{c}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
 \mathsf{either}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
 \mathsf{assert}~\mathit{c} \\ &&|&
 \mathsf{push}~\mathit{e} \\ &&|&
@@ -32,7 +32,7 @@ $$
 \mathsf{replace}~\mathit{e}~\mathit{p}~\mathit{e} \\ &&|&
 \mathsf{append}~\mathit{e}~\mathit{e} \\ &&|&
 \mathsf{appendlist}~\mathit{e}~\mathit{e} \\
-& \mathit{c} &::=& \sim\mathit{c} \\ &&|&
+\text{Condition} & \mathit{c} &::=& \sim\mathit{c} \\ &&|&
 \mathit{c}(\wedge)\mathit{c} \\ &&|&
 \mathit{e}(<)\mathit{e} \\ &&|&
 !\mathit{e} \\ &&|&
@@ -44,29 +44,33 @@ $$
 \begin{minipage}{0.5\textwidth}
 $$
 \begin{array}{@{}lrrl@{}}
-& \mathit{e} &::=& \mathit{n} \\ &&|&
+\text{Expression} & \mathit{e} &::=& \mathit{n} \\ &&|&
 \mathit{s} \\ &&|&
 \mathit{op}(\mathit{e^\ast}) \\ &&|&
 \mathit{e}^\ast \\ &&|&
 \mathit{e}^\mathit{e} \\ &&|&
+\mathit{e}^? \\ &&|&
 \mathit{e}::\mathit{e} \\ &&|&
 |\mathit{e}| \\ &&|&
-\{{(\mathit{text} \rightarrow \mathit{e})^\ast}\} \\ &&|&
+\{{(\mathit{s} \rightarrow \mathit{e})^\ast}\} \\ &&|&
 \mathit{e}[\mathit{p}] \\ &&|&
 \mathit{e}[\mathit{p}^\ast:+=\mathit{e}] \\ &&|&
 \mathit{e}[\mathit{p}^\ast:=\mathit{e}] \\ &&|&
 \mathit{s}(\mathit{e}^\ast) \\ &&|&
-\mathit{e}^? \\ &&|&
 (\mathit{e},\mathit{e}) \\ &&|&
 \mathit{x} \\ &&|&
 \mathit{e}^{\{\mathit{x}^\ast\}~\mathit{iter}} \\
-& \mathit{iter} &::=& \mathsf{?} \\ &&|&
+\text{Iter} & \mathit{iter} &::=& \mathsf{?} \\ &&|&
 \mathsf{\ast} \\ &&|&
 \mathsf{+} \\ &&|&
 {(\mathit{x}<)}^?~\mathit{e} \\
-& \mathit{p} &::=& [\mathit{e}] \\ &&|&
+\text{Path} & \mathit{p} &::=& [\mathit{e}] \\ &&|&
 [\mathit{e}:\mathit{e}] \\ &&|&
 .\mathit{s} \\
+\text{Program} & \mathit{n} &\in& \mathbb{N} \\
+\text{String} & \mathit{s} &\in& \mathit{Id} \\
+\text{Variable name} & \mathit{x} &\in& \mathit{Id} \\
+\text{Function name} & \mathit{f} &\in& \mathit{Id} \\
 \end{array}
 $$
 \end{minipage}
@@ -98,7 +102,7 @@ conditions and expressions.
 
 This section describes the semantics of AL. It is based on an abstract machine
 that models the program state, which consists of a stack and a store. An
-algorithm is a entry point of an execution. One can execute a algorithm of the
+algorithm is a entry point of an execution. One can execute an algorithm of the
 program by calling it.  When an algorithm is called, the body instructions of
 the algorithm are interpreted sequentially.
 

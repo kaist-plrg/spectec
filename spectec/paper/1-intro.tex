@@ -3,9 +3,9 @@
 WebAssembly, commonly referred to as Wasm, is a versatile and efficient binary
 instruction format that enables high-performance execution of code across
 diverse environments, from web browsers to edge devices. The design philosophy
-of Wasm revolves around platform independence, security, and efficient
+of WebAssembly revolves around platform independence, security, and efficient
 performance, resulting in a versatile technology that bridges the gap between
-high-level programming languages and the web ecosystem. As the adoption of Wasm
+high-level programming languages and the web ecosystem. As the adoption of WebAssembly
 gains momentum, a continuous stream of new features is incorporated, extending
 the capabilities of the language.
 
@@ -65,7 +65,7 @@ description begins by asserting the existence of a value with a type of
 value is removed from the stack.  Depending on whether the removed value is
 `ref.null t` or not, either the integer value 1 or 0 is pushed onto the stack
 in lines 3-a or 4-a, respectively. In Figure~\ref{fig:formalspec1}, we provide
-the operational semantics using formal notation. The reduction rule specifies
+the operational semantics using formal notation, using two reduction rules. The reduction rule specifies
 the shape of the stack before and after executing one step, potentially with
 side conditions indicating when this reduction should occur. For instance, the
 stack `val ref.is\_null` should reduce to (i32.const 1) only if `val` equals
@@ -100,7 +100,7 @@ errors found its way into the specification of new or modified instructions,
 one of which took two years to be rectified. This example, exemplified by the
 expansion to Wasm 2.0, underscores the challenges posed by manually crafting and
 maintaining the specification, demanding a labor-intensive process and
-entailing the risk of errors. Given Wasm's planned extensions beyond 3.0,
+entailing the risk of errors. Given WebAssembly's planned extensions beyond 3.0,
 driven by over 25 proposals, addressing this challenge becomes increasingly
 critical.
 
@@ -108,7 +108,7 @@ In response to the challenges of crafting precise specifications manually, the
 Wasm community has introduced a promising solution in the form of $\dsl$
 (WebAssembly Domain Specific Language). It is a domain-specific language
 tailored to describing the standard of WebAssembly, including its execution
-semantics. $\dsl$ serves as the single source of truth for the Wasm semantics.
+semantics. $\dsl$ serves as the single source of truth for the WebAssembly semantics.
 Once the operation semantics of WebAssembly is articulated using this
 specialized language, numerous other 'representations' of the semantics can be
 automatically generated, including interpreters, test suites, mechanized
@@ -162,7 +162,7 @@ the formal specification.
 \end{figure}
 
 Figure~\ref{fig:spec2} illustrates one of these challenges, depicting the
-manually-written specifications of the Wasm `indirect\_call` instruction. In
+manually-written specifications of the WebAssembly `indirect\_call` instruction. In
 the formal specification (Figure~\ref{fig:formalspec2}), three premises are
 presented, each comprising a simple equality. These premises are translated
 into three instructions on line 2, 4, and 6 in the prose specification
@@ -213,11 +213,11 @@ In summary, this paper offers the following key contributions:
 Algorithmic Language ($\al$), an executable language designed to resemble prose
 specification.
 \item We present an automated method for generating prose specification from
-the execution semantics of Wasm described in $\dsl$, and provide the solutions for
+the execution semantics of WebAssembly described in $\dsl$, and provide the solutions for
 the identified challenges during the process.
 \item We establish the correctness and reliability of our automatically
 generated prose descriptions by subjecting them to comprehensive testing
-against the official Wasm test suite.
+against the official WebAssembly test suite.
 \end{itemize}
 
 The subsequent sections of this paper will delve into the specifics of our
@@ -225,6 +225,6 @@ methodology, detailing the creation of $\al$, the translation process from
 $\dsl$ into $\al$ and the identified challenges, the development of the $\al$
 interpreter, and the comprehensive testing framework employed. Through this
 exploration, we aim to not only address the challenges associated with prose
-notation in Wasm, but also explore the potential of $\al$ as a transformative
+notation in WebAssembly, but also explore the potential of $\al$ as a transformative
 tool for enhancing the accuracy and efficiency of programming language
 specifications in general.
