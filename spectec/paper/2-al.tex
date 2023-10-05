@@ -13,7 +13,7 @@ $$
 \begin{array}{@{}lrrl@{}}
 \text{Program} & \mathsf{p} &::=& {\mathsf{A}^\ast} \\
 \text{Algorithm} & \mathsf{A} &::=& \mathsf{algorithm}~\mathit{f}~({\mathit{e}^\ast})~\{{\mathsf{i}^\ast}\} \\
-\text{Instruction} & \mathsf{i} &::=& \mathsf{if}~\mathit{c}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
+\text{Instruction} & \mathsf{i} &::=& \mathsf{if}~\mathit{c}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast}^? \\ &&|&
 \mathsf{either}~{\mathsf{i}^\ast}~{\mathsf{i}^\ast} \\ &&|&
 \mathsf{assert}~\mathit{c} \\ &&|&
 \mathsf{push}~\mathit{e} \\ &&|&

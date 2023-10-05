@@ -3,7 +3,7 @@
 In this section, we describe the transformation process of Wasm-DSL into AL.
 Wasm-DSL can express whole standard of the WebAssembly, including not only
 execution semantics but also syntax and validation rules.
-Since the main goal of this paper is to generate prose from execution semantics byt not syntax or validation,
+Since the main goal of this paper is to generate prose from execution semantics but not syntax or validation,
 we will focus on how only execution semantics of Wasm is expressed using Wasm-DSL.
 
 \subsection{Notations}
@@ -18,9 +18,16 @@ function calls, pairs, operations between them, etc. \inred{How much detail is n
 
 A reduction rule $\ruleW \in \rulesW = \configsW \times \configsW \times \premsW^\ast$ is a triplet of a
 configuration \textit{lhs}, a configuration \textit{rhs}, and a finite sequences of premises \textit{prem}*.
+The high-level interpretation of a reduction rule $r = (lhs, rhs, prem*)$ should be straightforward:
+when the current configuration of the program matches \textit{lhs} and all \textit{prem}s are
+evaluated to be true, then alter the program configuration into \textit{rhs}.
 
-A configuration $\configW \in \configsW = E_\bot \times E$ is a tuple of an optional expression for state \textit{s},
+A configuration $\configW \in \configsW = E_\bot \times E$ is a tuple of an optional expression for state \textit{z},
 and an expression for a finite sequence of Wasm instructions, \textit{winstrs}.
+\textit{z} is a syntactic representation of the internal state of the program. Specifically for WebAssembly,
+a state is a pair of the current \textit{store} and the current \textit{frame}. A naive, high-level
+interpretation of \textit{winstrs} is that it represents the current \textit{stack}, which grows right.
+Thus, the last element of winstrs represent the top of the stack.
 
 A premise $p \in \premsW = B \uplus \{otherwise\}$ is either a boolean expression, or a
 single `otherwise` whose high-level interpretation is "negation of all previous premises".
@@ -32,10 +39,6 @@ The second rule will be parsed into the following:
 \[r_2=(\bot, [val, \text{REF.IS\_NULL}]), (\bot, [\text{CONST I32 0}]), [otherwise]\]
 Note that both of lhs and rhs for both rules are omitting the state expression,
 and thus we notate it by using $\bot$.
-
-The high-level interpretation of a reduction rule $r = (lhs, rhs, prem*)$ should be straightforward:
-when the current configuration of the program matches \textit{lhs} and all \textit{prem}s are
-evaluated to be true, then alter the program configuration into \textit{rhs}.
 
 A helper function $\helperW \in \helpersW = Id \times E^\ast \times E \times \premsW^\ast$ is a quadruple of
 the name, parameters \textit{params}, a return expressions \textit{ret}, and a finite sequences of premises \textit{prem}*.
@@ -127,17 +130,17 @@ group, but they are both based on the following fundamental approach.
 
 ~
 
-\subsubsection{\textbf{DSL->DSL preprocessing}}~
+\subsubsection{\textbf{DSL->DSL pre-processing}}~
 
 The first step of the transformation is to pre-process DSL into a one that meets certain preconditions.
-There are two major preprocessing: 1. Unification and
+There are two major pre-processing: 1. Unification and
 2. Animation.
 
 \textbf{1. Unification}
 
 Unification is a step that makes all LHS (for reduction rule) or parameters
 (for helper functions) identical within the group.
-This precondtion already holds for most cases, with a few exceptions.
+This precondition already holds for most cases, with a few exceptions.
 The most notable example is the `br` instruction.
 Here are two simplified reduction rules for the `br` instruction
 \[
@@ -176,7 +179,7 @@ correctly find out where each free variable is getting bound. Second, the order
 of premises can be permutated in an arbitrary order. This is problematic for
 generating algorithm, since the exact order of steps are crucial in the algorithm.
 
-Animation is a step that addresses these two challanges. Its goal is to infer
+Animation is a step that addresses these two challenges. Its goal is to infer
 the bound variables and the order of each premise.
 After animation, each premise is tagged with what variables it is binding
 such that every variables are bound exactly once, and premises are ordered in a way that
@@ -216,15 +219,15 @@ since 1. the union of all sets is X, and 2. any pair of subsets are disjoint.
 
 \textbf{Definition.} Exact cover problem: Given a set $X$ and a collection of subsets $S \subset 2^X$,
 exact cover problem is a decision problem to determine if there exists a partition $P$ which is a
-subcolelction of S.
+subcollection of S.
 
 For example, consider a collection $S = \{\{a,b\}, \{b,c\}, \{c,d,e\}\}$.
 One of it's subcollection, $\{\{a,b\}, \{c,d,e\}\} \subset S$ is a partition of $X$,
 so the answer to the problem is YES.
 On the other hand, given a collection $S' = \{\{a,b\}, \{b,c\}, \{c,d\}, \{d,e\}\}$,
 no any subcollection of $S'$ is a partition of $X$\footnote{It can be easily
-verified by the parity. The union of any subcollection would have even number
-of elements, while it is required to be 5.}, so the answer to the problem is
+verified by the parity. The union of any pair-wise disjoint subcollection of $S'$ would have an even number
+of elements, but the whole set $X$ has 5 elements.}, so the answer to the problem is
 NO.
 
 Exact cover problem is a well-known NP-complete problem and is one of Karp's 21 NP-complete problems[?].
@@ -237,15 +240,16 @@ into animation problem in polynomial time.
 collection of its subset, $S \subset 2^X$. Let n be size of $S$.
 Let $S_i = \{x_{i1}, x_{i2}, ..., x_{ij}\}$ be the i-th subset of S.
 Now, consider the reduction rule $(lhs, rhs, prems)$ where
-$lhs$ is $\top, [val_n, val_{n-1}, ..., val_1]$,
-$rhs$ is $\top, []$, and
+$lhs$ is $(\top, [val_n, val_{n-1}, ..., val_1])$,
+$rhs$ is $(\top, [])$, and
 i-th premise of $prems$ be $val_i = (x_{i1}, x_{i2}, ..., x_{ij})$.
+Note that this reduction rule can be constructed in linear time.
 The claim is that when this rule is animated properly, this gives a solution to the exact-cover problem.
 After animation, some premises will be explicitly annotated to be a variable bindings,
 and they will be ordered in front of other premises. Note that the requirement for the
-bound variables is that every vairable must be bound exactly once. Therefore, if we collect
-all $S_i$ such that the i-th premise is denoted to be bounding, then the subcolelction is
-the partition of the set $X$.
+bound variables is that every variable must be bound exactly once. Therefore, if we collect
+all premises denoted to be bounding, then the subsets $S_i$ corresponding to each bounding premises
+would form a subcollection of S, which is a partition of the set $X$.
 
 \textbf{Example.}
 Let's consider the example of $X = \{a, b, c, d, e\}$ and $S = \{\{a,b\}, \{b,c\}, \{c,d,e\}\}$ again.
@@ -275,11 +279,14 @@ the Knuth algorithm[?].
 
 \subsubsection{\textbf{DSL->AL transformation}}~
 
-In this section, we explain the transformation of DSL with preconditions into an AL algorithm.
+In this section, we explain the transformation of pre-processed DSL into an AL algorithm.
+We will explain the transformation in top-down manner:
+first explain the flow of top-level algorithm,
+and then detail expression for each sub-algorithms.
 
 ----------------
 
-Algorithm 1.
+Algorithm 1. rule\_to\_algo
 
 Input: A group of reduction rules r* = (lhs, rhs, prems)*
 
@@ -287,7 +294,7 @@ Output: An algorithm $\mathsf{A}$
 
 1. lhs <- r*[0].lhs
 
-2. instrs <- lhs\_to\_instr(lhs)
+2. instrs <- lhs\_to\_instrs(lhs)
 
 3. For r in r*:
 
@@ -295,11 +302,11 @@ Output: An algorithm $\mathsf{A}$
 
 --b. rhs = r.rhs
 
---c. instr\_prems <- prems\_to\_instr(prems)
+--c. instrs\_prems <- prems\_to\_instrs(prems)
 
---d. instr\_rhs <- rhs\_to\_instr(rhs)
+--d. instrs\_rhs <- rhs\_to\_instrs(rhs)
 
---e. instrs <- instrs ++ merge(instr\_prems, instr\_rhs)
+--e. instrs <- instrs ++ append\_at\_innermost(instrs\_prems, instrs\_rhs)
 
 4. (name, params) <- extract\_name\_and\_params(lhs)
 
@@ -308,7 +315,6 @@ Output: An algorithm $\mathsf{A}$
 ----------------
 
 \inred{TODO: Pretty print algorithm 1}
-
 
 After the group is pre-processed, the next step is to transform the group into
 an algorithm. Algorithm 1 depicts the pseudocode of the transformation of group
@@ -321,12 +327,148 @@ transformed lhs will be used as an initial instruction list, and will grow
 iteratively by the loop that iterates over each rule on line 3.  For each rule,
 premises and rhs are extracted on line a and b respectively, and then
 transformed into instructions on lines c and d respectively. These two lists of
-instructions are merged to form a single list of instructions, and then
-appended to the intial instruction list on line e.  Finally, the name and
+instructions are merged to form a single list of instructions by appending the
+rhs-instructions into the innermost block of prems-instructions,
+and then appended to the initial instruction list on line e.  Finally, the name and
 parameter of this algorithm is extracted from the lhs of the reduction rule on
 line 4. At last, the name, parameters, and AL instructions will be packed and
 returned as the final algorithm.
 
+\textbf{Example.} Recall the reduction rules for `REF.IS\_NULL` again:
+
+\[r_1=(\bot, [val, \text{REF.IS\_NULL}]), (\bot, [\text{CONST I32 1}]), [val = (\text{REF.NULL rt})]\]
+
+\[r_2=(\bot, [val, \text{REF.IS\_NULL}]), (\bot, [\text{CONST I32 0}]), [otherwise]\]
+
+When this group of reductions is given as an input to the Algorithm 1, the following steps are taken.
+First, the common lhs $(\bot, [val, \text{REF.IS\_NULL}])$ is extracted from line 1.
+Then, this lhs will be transformed into the AL instructions by line 2:
+\[[\mathsf{assert} ...,~\mathsf{pop}~val]\].
+Next, we look at the first reduction rule and extract its premises and rhs on line a and b:
+$ [val = (\text{REF.NULL rt})], (\bot, [\text{CONST I32 1}])$.
+The premise is transformed into an $\mathsf{if}$ instruction on line c:
+\[[\mathsf{if}~(val = \text{REF.NULL rt})~[]]\]
+and the rhs is transformed into a $\mathsf{push}$ instruction on line d:
+\[[\mathsf{push}~\text{(CONST I32 1)}]\]
+The $\mathsf{push}$ instruction is then appended to the then-branch of the $\mathsf{if}$ instruction on line e:
+\[[\mathsf{if}~(val = \text{REF.NULL rt})~[\mathsf{push} \text{(CONST I32 1)}]]\]
+and the final $\mathsf{if}$ instruction will be appended after lhs-instruction.
+In similar fashion, the premises and rhs of the second rule will be translated into the following:
+\[[\mathsf{if}~\text{otherwise}~[\mathsf{push} \text{(CONST I32 0)}]]\]
+By concatenating all of the generated AL instructions, we get this final result:
+\[[
+\mathsf{assert} ...,~
+\mathsf{pop}~val,~
+\mathsf{if}~(val = \text{REF.NULL rt})~[\mathsf{push}~\text{(CONST I32 1)}]~[\mathsf{push}~\text{(CONST I32 0)}]
+]\]
+Finally, we extract the name and the parameters for the algorithm, which is obtained by looking at
+the target instruction, `REF.IS\_NULL`. Here, the name of algorithm is simply same as the instruction tag,
+`REF.IS\_NULL`, and since this instruction does not get any other parameter (unlike `br`), the parameter of
+the algorithm is also a empty list. As a result, the triplet of name, parameters, and body instructions will form
+the AL algorithm.
+By stringifying this algorithm into a prose, we can get the result that resembles the prose notation in
+Figure~\ref{fig:prose1} very closely.
+
+From now on, we explain three main sub-algorithms for the algorithm 1,
+which transform lhs, rhs, and premises into AL instructions.
+
+----------------
+
+Algorithm 2. lhs\_to\_instrs
+
+Input: A lefthand side expression $lhs = (z, winstrs)$
+
+Assumption: Exactly one of target\_is\_on\_top (winstrs) or target\_is\_in\_context (winstrs) holds.
+
+Output: A list of AL instructions $instrs$
+
+1. header <- state\_to\_instrs(z)
+
+2. If target\_is\_on\_top (winstrs)
+
+-- a. [v\_n v\_n-1 ... v\_1 winstr] <- winstrs
+
+-- b. instr\_i <- $\mathsf{pop}$ v\_i (for 1 <= i <= n)
+
+-- c. Return [instr\_1, instr\_2, ..., instr\_n]
+
+3. Else if target\_is\_in\_context (winstrs)
+
+-- a. [ C[v\_n v\_n-1 ... v\_1 winstr \_] ] <- winstrs
+
+-- b. instrs\_context <- context\_to\_instrs(C)
+
+-- c. instr\_i <- $\mathsf{pop}$ v\_i (for 1 <= i <= n)
+
+-- d. Return append\_at\_innermost (instrs\_context, [instr\_1, instr\_2, ..., instr\_n])
+
+----------------
+
+Algorithm 2 depicts the detail of lhs\_to\_instrs sub-algorithm.
+The transformation is based on an assumption that holds for every lhs of current Wasm reduction rules:
+\textit{winstrs} is either 1) a list of several Wasm instructins with the target instruction at the top of the stack,
+or 2) a single \textbf{context} with the target instruction at somwhere inside it.
+
+The first form has the following structure:
+\[
+w\_instrs = v_n v_{n-1} ... v_1 winstr
+\]
+For most of the existing rules for current version of Wasm semantics, including the one in the figure~\ref{fig:formal1}),
+lhs has this form.
+
+The second form has the following structure:
+\[
+w_instrs' = C[v_n v_{n-1} ... v_1 winstr \_]
+\]
+Here, $C$ represents a \textit{context}. We define a context as a Wasm instructions that
+can contain other wasm instructions inside it. Currently, there are only two kinds of
+contexts that actually appear in the left hand side of the reduction rules of the
+current version of Wasm semantics: \textit{Label} and \textit{Frame}.
+The rules that have the second form are relatively rare.
+In fact, there are only 2 exceptions: `br` and `return`, whose reduction rules
+have the second form.
+
+The following is the process of the algorithm.
+When the input $lhs = (z, winstrs)$ is given, the algorithm first
+generate the AL instructions from the state expression $z$ on line 1.
+Currently all it does is generating the AL instruction that is strignified into:
+`Let F be the current frame`, if $z$ is not $\bot$. Then, the different instructions are
+generated based on the form of the Wasm instruction stack. First branch on line 2 is taken
+when the lhs is of the first form. In this case, the list of pop instructions are generated,
+which pops all of the operands for the target instruction in right-to-left order.
+The operand values are extracted on line 2-a, and pop instructions are generated on line 2-b.
+Finally, the concatenation of these pop instructions are returned as the result on line 2-c.
+Second branch on line 3 is taken when the lhs is of the second form.
+In this case, in addition to the pop instructions, some context-related AL instructions are prepended.
+First, the lhs is decomposed into the outter-most context $C$ and the sequence of inner-wasm instructions on line 3-a.
+Then, the context $C$ is transformed into the AL instructions on line 3-b.
+The main role of these instructions is to extract the information out of the context
+and bind new variables to store those information.
+The exact instructions that are generated are different based on what $C$ is.
+For example, if $C$ is a label, following instructions are generated:
+
+------------------
+
+1. Let C be the current context.
+
+2. If C is a label:
+
+-- a. Let n be the arity of C
+
+-- b. Let instr* be the continuation of C
+
+-- c. Exit current context
+
+------------------
+
+After that, opearnds are transformed into the pop instructions as usual on line 3-c,
+and the merged sequence of of two instruction sequences, context-instructions and pop-instructions, is
+returned as a final result on line 3-d.
+
+Overall, this sub-algorithms corresponds to a preparation phase, which consumes the
+inputs for the target instruction (the operands in the stack, or the context) and
+bind new variables that contains the information about the consumed inputs.
+
 \inred{
-  TODO: Explain lhs\_to\_instr, prems\_to\_instr, rhs\_to\_instr, merge, extract\_name\_and\_params
+  TODO: Explain prems\_to\_instr, rhs\_to\_instr
 }
