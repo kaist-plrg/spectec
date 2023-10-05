@@ -404,10 +404,10 @@ Output: A list of AL instructions $instrs$
 
 ----------------
 
-Algorithm 2 depicts the detail of lhs\_to\_instrs sub-algorithm.
+\textbf{lhs\_to\_instrs} Algorithm 2 depicts the detail of lhs\_to\_instrs sub-algorithm.
 The transformation is based on an assumption that holds for every lhs of current Wasm reduction rules:
-\textit{winstrs} is either 1) a list of several Wasm instructins with the target instruction at the top of the stack,
-or 2) a single \textbf{context} with the target instruction at somwhere inside it.
+\textit{winstrs} is either 1) a list of several Wasm instructions with the target instruction at the top of the stack,
+or 2) a single \textbf{context} with the target instruction at somewhere inside it.
 
 The first form has the following structure:
 \[
@@ -418,10 +418,10 @@ lhs has this form.
 
 The second form has the following structure:
 \[
-w_instrs' = C[v_n v_{n-1} ... v_1 winstr \_]
+w\_instrs' = C[v_n v_{n-1} ... v_1 winstr \_]
 \]
 Here, $C$ represents a \textit{context}. We define a context as a Wasm instructions that
-can contain other wasm instructions inside it. Currently, there are only two kinds of
+can contain other Wasm instructions inside it. Currently, there are only two kinds of
 contexts that actually appear in the left hand side of the reduction rules of the
 current version of Wasm semantics: \textit{Label} and \textit{Frame}.
 The rules that have the second form are relatively rare.
@@ -440,7 +440,7 @@ The operand values are extracted on line 2-a, and pop instructions are generated
 Finally, the concatenation of these pop instructions are returned as the result on line 2-c.
 Second branch on line 3 is taken when the lhs is of the second form.
 In this case, in addition to the pop instructions, some context-related AL instructions are prepended.
-First, the lhs is decomposed into the outter-most context $C$ and the sequence of inner-wasm instructions on line 3-a.
+First, the lhs is decomposed into the outter-most context $C$ and the sequence of inner-Wasm instructions on line 3-a.
 Then, the context $C$ is transformed into the AL instructions on line 3-b.
 The main role of these instructions is to extract the information out of the context
 and bind new variables to store those information.
@@ -461,7 +461,7 @@ For example, if $C$ is a label, following instructions are generated:
 
 ------------------
 
-After that, opearnds are transformed into the pop instructions as usual on line 3-c,
+After that, operands are transformed into the pop instructions as usual on line 3-c,
 and the merged sequence of of two instruction sequences, context-instructions and pop-instructions, is
 returned as a final result on line 3-d.
 
@@ -469,6 +469,139 @@ Overall, this sub-algorithms corresponds to a preparation phase, which consumes 
 inputs for the target instruction (the operands in the stack, or the context) and
 bind new variables that contains the information about the consumed inputs.
 
-\inred{
-  TODO: Explain prems\_to\_instr, rhs\_to\_instr
-}
+----------------
+
+Algorithm 3. prems\_to\_instrs
+
+Input: A list of premises $prems$
+
+Output: A list of AL instructions $instrs$
+
+1. instrs <- []
+
+2. For each prem in prems:
+
+-- a. If prem is `x <- y`:
+
+---- 1) instr <- `Let x y`
+
+---- 2) For each c in side\_conditions(x):
+
+------ a) instr <- `if c instr`
+
+---- 2) instrs <- append\_at\_innermost(instrs, instr)
+
+-- b. Else:
+
+---- 1) instr <- `if prem []`
+
+---- 2) instrs <- append\_at\_innermost(instrs, instr)
+
+3. Return instrs
+
+----------------
+
+\textbf{prems\_to\_instrs} Algorithm 3 depicts the detail of the algorithm prems\_to\_instrs.
+The list of premises $prems$ is given as an input. Due to the precondition established by the pre-process step,
+it is guaranteed that the binding premises are distinguishable, and the order of premises are correct.
+On line 1, the `instrs` is initialized as an empty sequence, and will grow through iterating over premises
+on line 2. For each premises, instructions are added depending on the type of the premise.
+If the premise is a binding premise `x <- y`, then branch on a is taken.
+In this case, a let binding AL instruction, `Let x y`, which would be stringified into the prose
+`Let x be y.`, is generated on line 2-a-1. A notable point is that,
+the binding can introduce one or more side conditions. For example, consider the binding `[a, b] <- arr`.
+In this case, it also inflicts a side condition on arr that it should be an array of length two. Therefore,
+on line 2-a-2), such side conditions are inferred based on the syntax of assignee expression.
+If the binding target expression is a simple variable, then no sidecondition would be generated.
+For example, the simple binding `a <- arr[0]` would be directly translated into the AL instruction
+`1. Let a be arr[0]`.
+Otherwise, the appropriate side conditions are generated,
+and injected as conditions for the if instructions on line 1-a-2-a.
+For instance, for the previous example `[a,b] <- arr`,
+the side condition `|arr| = 2` is inferred and
+the following AL instruction:
+
+-----------
+
+1. If |arr| = 2, then:
+
+-- a. Let [a, b] be arr
+
+----------
+
+will be stored in the variable `instr` after the line 2-a-2-a) is executed.
+Finally, the instruction for this premise is appended to the `instrs` variable.
+The branch on line b is taken, if the given premise is a simple condition.
+In this case, a single if instruction with that condition and an empty then-body is generated on line
+b-1, and then appended to the `instrs` variable on line b-2. The empty body works as
+a hole, and will be filled with
+the AL instructions generated by either handling the subsequent premises, or transforming
+rhs of the reduction using the algorithm `rhs\_to\_instrs`. As a result, the accumulated
+sequence of AL instructions, `instrs`, is returned as the final result of the algorithm.
+
+----------------
+
+Algorithm 4. rhs\_to\_instrs
+
+Input: A righthand side expression $rhs = (z, winstrs)$
+
+Output: A list of AL instructions $instrs$
+
+1. mutate\_instrs <- state\_to\_mutate\_instrs(z)
+
+2. If is\_context (winstrs)
+
+-- a. Return mutate\_instrs ++ context\_to\_instrs(winstrs[0])
+
+3. Else:
+
+-- a. [winstr\_1, winstr\_2, ..., winstr\_n] <- winstrs
+
+-- b. instr\_i <- is\_value(winstr\_i) ? $\mathsf{push}$ winstr\_i : $\mathsf{execute}$ winstr\_i  (for 1 <= i <= n)
+
+-- c. Return mutate\_instrs ++ [instr\_1, instr\_2, ..., instr\_n]
+
+----------------
+
+\textbf{rhs\_to\_instrs} Algorithm 4 depicts the detail of the algorithm rhs\_to\_instrs.
+The righthand side expression $rhs$ is given as an input.
+Note that the non-empty state expression $z$ indicates the current reduction rule is
+inflicts a mutation on the state of the Wasm program. Therefore, if the expression `z`
+is first checked if it is not a $\bot$, and will generate a mutating AL instructions if
+that is the case. For example, the rhs of the reduction rule of the Wasm instruction
+`local.set` has a call to a helper function, with\_local(z), as its state expression.
+Therefore, this function call is transformed into an AL instruction: `$\mathsf{perform}$ with\_local`.
+The mutation on the frame will occur in the body of the with\_local function, resulting in globally
+modifying the internal state of the program. After handling the state expression, the next step is to
+handle the stack. The result stack, winstrs, can be in one of two form. The branch on
+line 2 handles th case where the rhs stack is as single context (frame / label). In this case,
+different instructions are generated by context\_to\_instrs on line 2-a depending on the type of context,
+similar to lhs. For example, the reduction rule of Wasm's `block` instruction has following rhs:
+`Label n eps (val\^~m instr*)`. When this is given as an input, the context\_to\_instrs would return the
+following as an output:
+
+------------
+
+1. Let L be the label whose arity is n and continuation is eps
+
+2. Push L to the stack.
+
+3. Enter new context.
+
+4. Push val\^m to the stack.
+
+5. Execute instrs.
+
+------------
+
+The concatenation of the mutate\_instrs and this result is returned as the result of the algorithm.
+Line 3 handles the case where rhs instruction stack is a normal sequence of instructions. In this case,
+the algorithm does first break down the stack into individual expressions on line 3-a. Then,
+by iterating over each expression, either $\mathsf{push}$ or $\mathsf{execute}$ instruction is
+generated on line 3-b. $\mathsf{push}$ is generated if the given expression for Wasm instruction is
+already a Wasm value, such as (i32.const n) or (ref.null). On the other hand, $\mathsf{execute}$ instruction is generated
+when the given expression is a non-value Wasm instruction, such as (local.get) or (table.copy).
+\inred{As mentioned before}, the $\mathsf{execute}$ instruction is actually a function call instruction,
+which works by calling the algorithm that corresponds to the given Wasm instruction.
+Finally, all of the $\mathsf{push}$ or $\mathsf{execute}$ instructions are concatenated in order, and
+returned as the final result along with the previous mutate\_instrs.
