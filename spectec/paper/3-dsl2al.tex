@@ -199,9 +199,12 @@ second rule into the following:
 \[
 r_2'' = (..., [... \text{(BR t)} ...]),  (..., ...), [l + 1 \leftarrow t]
 \]
-which clearly indicates that the new variable $l$ is a new variable.
-The effect of premise ordering is not illustrated in this example, but
-if there were some additional premises that contains the variable $l$, then
+which clearly indicates that the new variable $l$ is a new introduced variable.
+Now, in order to illustrate the effect of premise ordering, let's think of 
+hypothetical additional premises that contains the variable $l$, i.e.,
+\[
+r_2'' = (..., [... \text{(BR t)} ...]),  (..., ...), [l + 1 \leftarrow t]
+\]
 the animation process will make sure that the premise $(l + 1 \leftarrow t)$ will be
 placed before them.
 
@@ -210,14 +213,16 @@ This is especially because a single premise can bind more than two variables at 
 $(x,y) \leftarrow p$.
 We prove it by reduction from a known NP-hard problem, the \textit{exact cover} problem.
 
-\textbf{Definition.} Partition: Given a set $X$, a collection of subsets $P \subset 2^X$ is a partition of $X$ iff
+\textbf{Definition.} Partition: Given a set $X$, a collection\footnote{Throughout the paper, we will
+use a convention of notation that a collection means a set of sets.}
+of subsets of $X$, $P \subset 2^X$, is a partition of $X$ iff
 1. The union of all sets in $P$ is $X$,
 2. All sets in $P$ are pairwise disjoint.
 
 For example, $P$ = \{\{a,b\}, \{c,d\}, \{e\}\} is a partition of the set $X$ = \{a, b, c, d, e\},
 since 1. the union of all sets is X, and 2. any pair of subsets are disjoint.
 
-\textbf{Definition.} Exact cover problem: Given a set $X$ and a collection of subsets $S \subset 2^X$,
+\textbf{Definition.} Exact cover problem: Given a set $X$ and a collection $S \subset 2^X$,
 exact cover problem is a decision problem to determine if there exists a partition $P$ which is a
 subcollection of S.
 
@@ -261,21 +266,155 @@ If we successfully solve the animation problem, then the result should look like
 From the result, we can reconstruct the partition of the set $X$ by looking at first two bindings,
 $\{\{a, b\}, \{c, d, e\}\}$, giving the answer to the exact cover problem.
 
-This theorem implies that there is no trivial method for solving this problem.
-One obvious solution to this kind of problem is probably using a SMT solver such as Z3, since
+This theorem implies that there is no polynomial time algorithm for solving this problem, and a
+simple bure-force would not be sacalable enough to be applied to larger number of premises.
+One typical solution to this kind of problem is probably using a SMT solver such as Z3[???], since
 this problem is fundamentally a constraint problem.
 However, using such a heavy tool seems to be a bit over-engineering for this rather small input.
 Instead, we decided to use a simple yet effective approach.
 We reduce the problem into a exact cover problem\footnote{Note that the direction is opposite with
 the proof}, and then adopt the well-known effective algorithm to solve exact cover problem,
-the Knuth algorithm[?].
+the Knuth algorithm[?]. The high-level idea is to encode the premises into a
+collection of sets, where the solution for the exact cover problem on the encoded set
+would corresponds to the correct animation result.
 
-\inred{
-  TODO: Explain reduction to exact cover and Knuth algorithm to solve it
-}.
+----------------
 
+Algorithm 0. Premise inferecne
 
-~
+Input: A list of premises prems, a set of bound variables vars
+
+Output: A list of animated premises prems'
+
+1. S <- \{\}
+
+2. For i in |prems|:
+
+-- a. If prems[i] == `(lhs = rhs)`:
+
+---- 1) S\_i = \{\{i\}, \{i\} $\cup$ free(lhs), \{i\} $\cup$ free(rhs)\}
+
+-- b. Else:
+    
+---- 1) S\_i = \{\{i\}\}
+
+-- c. S <- S $\cup$ S\_i
+
+3. Let partitions <- knuth(S $\cup$ \{vars\})
+
+4. For partition in partitions:
+  
+-- a. prems' <- annotate(prems, partiton)
+
+-- b. If reorder(prems') succeeds:
+
+---- 1) Return reorder(prems')
+
+----------------
+
+----------------
+
+Helper: Annotate
+
+Input: A list of premises prem*, A partition p
+
+Output: A list of annotated premises prem'*
+
+1. For i in |prem*|:
+
+-- a. If prem[i] == `(lhs = rhs)`:
+
+---- 1) If \{i\} $\in$ p:
+
+------ a) prem'[i] <- `(lhs = rhs)`
+
+---- 2) Else if \{i\} $\cup$ free(lhs) $\in$ p:
+
+------ a) prem'[i] <- `(lhs <- rhs)`
+
+---- 3) Else if \{i\} $\cup$ free(lhs) $\in$ p:
+
+------ a) prem'[i] <- `(rhs <- lhs)`
+
+2. Return prem'*
+
+----------------
+
+----------------
+
+Helper algorithm: Reorder
+
+Input: A list of premises prem*, a set of bound variables vars
+
+Output: A list of reordered premises prem'*
+
+1. prem'* <- []
+
+2. Repeat:
+
+-- a. (p1*, p2*) <- extract\_bound\_conds(prem*, vars)
+
+-- d. (p3*, p4*) <- extract\_bound\_bindings(p2*, vars)
+
+-- c. prem'* <- prem'* ++ p1* ++ p3*
+
+-- d. If p4* is empty:
+
+---- 1) Return prem'*
+
+-- e. Else if p3* is empty:
+
+---- 1) Fail.
+
+-- f. prem* <- p4*
+
+-- g. vars <- vars $\cup$ free(lhs\_of(p3*))
+
+----------------
+
+Alogorithm 0 explains about the process.
+Two inputs are given: the list of premises to be animated, and the set of vriables that are already bound.
+In a reduction rule, all free variables appearing in the left-hand side are conidered to be bound,
+and for a helper function, all free variables appearing in the parameters are considered to be bound.
+The output of the algorithm is the animated (annoatated and reordered) list of premises.
+The step from line 1 to 2 is encodes premises into a collection of subset of $X$,
+where $X = \{1, ..., n = |prems|\} \cup free(prems*)$ is a set containing the number from 1 to the size of
+premesis $n$, and all free variables appearing in premises.
+on which the Knuth algorithm will be performed. The collection S is initilized as an empty collection on
+line 1, and is populated by the encoded subsets of $X$ for each premises on loop of line 2.
+In each loop, the i-th premise prem[i] is transformed into a collection of one or
+more subsets, depending on its form. If the premise has the form of a equalty `lhs = rhs` as on line 2-a,
+then the premise is encoded into three sets: \{i\}, \{i\} $\cup$ free(lhs), \{i\} $\cup$ free(rhs). The subset encodes
+the possible interpretations about i-th premise. The first set \{i\} denotes that
+the i-th variable does not bind any variables, meanig i-the premise is a condition.
+The set \{i\} $\cup$ free(lhs) denotes that the i-th premise binds all the variable in left-hand
+side of the equality, and similarly for \{i\} $\cup$ free(rhs). For example, if `x=y` is the first premise,
+it sould be enocded in three subsets: \{1\}, \{1, x\} and \{1, y\}. If the given premise was not equality,
+then the branch on line 2-b is taken and the premise is encoded into a single set, \{i\}, meaning
+that i-th premise would definitely bind no variables, meaning it works is a condition checking premise.
+For instace, if the second premise is `x < y`, then it will be endoded into only one set: \{2\}.
+On line 3, the collection S, containing all of the encoded subsets and additional one subset consisting of
+all already bound variables, is given to the knuth algorithm. The knuth algorithm will
+effectively find the partitions of S. Note that the partition of a collection may not be uique, and
+more than one partitons may be returned. Note that for any partiton p, due to the definition of partiton,
+there should be exactly one subset that contains a number i for all 1 <= i <= n. Thanks to the
+design of encoding, the subset is either a singleton set \{i\} or a set with other variables,
+\{i, var1, var2, ...\}. On line 4-a, the algorithm annotate the premises based on this information by calling
+the helper function Annotate. In a high-level, what the helper function does is to annotate whether
+the i-th premise is a condition or
+a variable binding, depending on what subset is included in the given partition. For example, if the
+subset {1} is included in the partiton, then the first premise will remain as `x = y`, but if the
+subset {1, y} is present, then the first premise will be transformed into the binding `y <- x`.
+Afther the annotation is done, the final step is to reorder the premises, which is done by calling the helper
+function reorder on line 4-b. It reorders the premises in a way that whenever a premise binds a new variable,
+any other premises that use the variable to appear after it.
+In a high-level, the helper function works by iteratively extracting completely bound
+conditions and variables, which are safe to be placed in the front of the premise list.
+If successful, the reordered premises will be returned as the final result on
+line 4-b-1.  The reordering may fail, if the premises contaian a cyclic
+definition.  For example, the list of premises {x=f(y), y=g(x)} would be
+annotated \{x<-f(y), y<-g(x)\}, but it is impossible to correctly reorder them. 
+
 
 \subsubsection{\textbf{DSL->AL transformation}}~
 
@@ -376,7 +515,7 @@ which transform lhs, rhs, and premises into AL instructions.
 
 Algorithm 2. lhs\_to\_instrs
 
-Input: A lefthand side expression $lhs = (z, winstrs)$
+Input: A left-hand side expression $lhs = (z, winstrs)$
 
 Assumption: Exactly one of target\_is\_on\_top (winstrs) or target\_is\_in\_context (winstrs) holds.
 
@@ -422,7 +561,7 @@ w\_instrs' = C[v_n v_{n-1} ... v_1 winstr \_]
 \]
 Here, $C$ represents a \textit{context}. We define a context as a Wasm instructions that
 can contain other Wasm instructions inside it. Currently, there are only two kinds of
-contexts that actually appear in the left hand side of the reduction rules of the
+contexts that actually appear in the left-hand side of the reduction rules of the
 current version of Wasm semantics: \textit{Label} and \textit{Frame}.
 The rules that have the second form are relatively rare.
 In fact, there are only 2 exceptions: `br` and `return`, whose reduction rules
@@ -605,3 +744,9 @@ when the given expression is a non-value Wasm instruction, such as (local.get) o
 which works by calling the algorithm that corresponds to the given Wasm instruction.
 Finally, all of the $\mathsf{push}$ or $\mathsf{execute}$ instructions are concatenated in order, and
 returned as the final result along with the previous mutate\_instrs.
+
+\textbf{Helper function to AL} Translating helper functions into
+AL is almost identical to translating reduction rules into AL. The only difference is that lhs\_to\_instrs
+is removed, and rhs\_to\_instrs is replaced with body\_to\_instrs. Unlike
+rhs\_to\_instrs that generate `push` or `execute` AL instructions, body\_to\_instrs generate mostly
+`return` instructions.
