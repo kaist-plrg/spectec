@@ -171,7 +171,7 @@ Algorithm 7. Unification
 
 Input: A list of DSL expressions e*
 
-Output: A unified DSL expression e, a list of premise sequnces p**
+Output: A unified DSL expression e, a list of premise sequences p**
 
 1. template <- fold\_left(unify\_two)(e*)
 
@@ -191,7 +191,7 @@ Input: Two DSL expressions e1, e2
 
 Output: Unified DSL expression e
 
-1. If e1 is idenical with e2:
+1. If e1 is identical with e2:
 
   a) Return e1
 
@@ -217,7 +217,7 @@ Input: Two DSL expressions e, e\_t
 
 Output: A list of premises p*
 
-1. If e1 is idenical with e2:
+1. If e1 is identical with e2:
 
   a) Return []
 
@@ -235,27 +235,27 @@ Output: A list of premises p*
 
 ----------------
 
-Algorithm 7 shows the detaield description of the unification process.
+Algorithm 7 shows the detailed description of the unification process.
 The input is a list of a expressions to be unified: the lhs for reduction rule group, and the parameter
 sequence for the helper function group.
 The unification is performed in two phases: Creating a the unified expression \textit{template} which may
-contain new fresh variables, and aplying the template to extract premises to be added for each definition.
-As a resuslt, the output of the algorithm is a tuple of tthe template, and the list of extracted premise sequence.
+contain new fresh variables, and applying the template to extract premises to be added for each definition.
+As a result, the output of the algorithm is a tuple of the template, and the list of extracted premise sequence.
 To begin with, the template is calculated by fold-lefting the expressions
 with the unify\_two helper function (i.e. template <- e1 + e2 + ... + en,
-where + symbol denotates unify\_two helper function) on line 1.
+where + symbol denotes unify\_two helper function) on line 1.
 In a high-level, the unify\_two helper function is a function that given two expressions,
-spots the difference between them and replace the differences with fresh vaiables. It works by
-traaversing two ASTs of expressions simultaneously, until they are totally identical or
+spots the difference between them and replace the differences with fresh variables. It works by
+traversing two ASTs of expressions simultaneously, until they are totally identical or
 has different grammar production.
 After the template is calculated, the new premises that handles fresh variables are extracted
-in the loop on line 2. This is done by callig extract\_prems helper function. In a high-level,
+in the loop on line 2. This is done by calling extract\_prems helper function. In a high-level,
 this function compares the template and the expression, and extract the premise that identifies the
 generated fresh variable in the template, and the corresponding sub-expression for the given expression.
 This helper function also use the strategy of traversing two ASTs simultaneously. Once the premises are
-extracted, the tuple of the template and the premise sequnce list is returned as the final result on line 3.
+extracted, the tuple of the template and the premise sequence list is returned as the final result on line 3.
 These information will be used to generate the pre-processed definition group, by
-replacing the expresions (lhs or parameters) with the template, and appending additional
+replacing the expressions (lhs or parameters) with the template, and appending additional
 premises to the original premises.
 
 
@@ -356,7 +356,7 @@ From the result, we can reconstruct the partition of the set $X$ by looking at f
 $\{\{a, b\}, \{c, d, e\}\}$, giving the answer to the exact cover problem.
 
 This theorem implies that there is no polynomial time algorithm for solving this problem, and a
-simple bure-force would not be sacalable enough to be applied to larger number of premises.
+simple brute-force would not be scalable enough to be applied to larger number of premises.
 One typical solution to this kind of problem is probably using a SMT solver such as Z3[???], since
 this problem is fundamentally a constraint problem.
 However, using such a heavy tool seems to be a bit over-engineering for this rather small input.
@@ -369,7 +369,7 @@ would corresponds to the correct animation result.
 
 ----------------
 
-Algorithm 0. Premise inferecne
+Algorithm 0. Premise inference
 
 Input: A list of premises prems, a set of bound variables vars
 
@@ -393,7 +393,7 @@ Output: A list of animated premises prems'
 
 4. For partition in partitions:
   
--- a. prems' <- annotate(prems, partiton)
+-- a. prems' <- annotate(prems, partition)
 
 -- b. If reorder(prems') succeeds:
 
@@ -461,46 +461,46 @@ Output: A list of reordered premises prem'*
 
 ----------------
 
-Alogorithm 0 explains about the process.
-Two inputs are given: the list of premises to be animated, and the set of vriables that are already bound.
-In a reduction rule, all free variables appearing in the left-hand side are conidered to be bound,
+Algorithm 0 explains about the process.
+Two inputs are given: the list of premises to be animated, and the set of variables that are already bound.
+In a reduction rule, all free variables appearing in the left-hand side are considered to be bound,
 and for a helper function, all free variables appearing in the parameters are considered to be bound.
-The output of the algorithm is the animated (annoatated and reordered) list of premises.
+The output of the algorithm is the animated (annotated and reordered) list of premises.
 The step from line 1 to 2 is encodes premises into a collection of subset of $X$,
 where $X = \{1, ..., n = |prems|\} \cup free(prems*)$ is a set containing the number from 1 to the size of
-premesis $n$, and all free variables appearing in premises.
-on which the Knuth algorithm will be performed. The collection S is initilized as an empty collection on
+premises $n$, and all free variables appearing in premises.
+on which the Knuth algorithm will be performed. The collection S is initialized as an empty collection on
 line 1, and is populated by the encoded subsets of $X$ for each premises on loop of line 2.
 In each loop, the i-th premise prem[i] is transformed into a collection of one or
-more subsets, depending on its form. If the premise has the form of a equalty `lhs = rhs` as on line 2-a,
+more subsets, depending on its form. If the premise has the form of a equality `lhs = rhs` as on line 2-a,
 then the premise is encoded into three sets: \{i\}, \{i\} $\cup$ free(lhs), \{i\} $\cup$ free(rhs). The subset encodes
 the possible interpretations about i-th premise. The first set \{i\} denotes that
-the i-th variable does not bind any variables, meanig i-the premise is a condition.
+the i-th variable does not bind any variables, meaning i-the premise is a condition.
 The set \{i\} $\cup$ free(lhs) denotes that the i-th premise binds all the variable in left-hand
 side of the equality, and similarly for \{i\} $\cup$ free(rhs). For example, if `x=y` is the first premise,
-it sould be enocded in three subsets: \{1\}, \{1, x\} and \{1, y\}. If the given premise was not equality,
+it should be encoded in three subsets: \{1\}, \{1, x\} and \{1, y\}. If the given premise was not equality,
 then the branch on line 2-b is taken and the premise is encoded into a single set, \{i\}, meaning
 that i-th premise would definitely bind no variables, meaning it works is a condition checking premise.
-For instace, if the second premise is `x < y`, then it will be endoded into only one set: \{2\}.
+For instance, if the second premise is `x < y`, then it will be encoded into only one set: \{2\}.
 On line 3, the collection S, containing all of the encoded subsets and additional one subset consisting of
 all already bound variables, is given to the knuth algorithm. The knuth algorithm will
-effectively find the partitions of S. Note that the partition of a collection may not be uique, and
-more than one partitons may be returned. Note that for any partiton p, due to the definition of partiton,
+effectively find the partitions of S. Note that the partition of a collection may not be unique, and
+more than one partitions may be returned. Note that for any partition p, due to the definition of partition,
 there should be exactly one subset that contains a number i for all 1 <= i <= n. Thanks to the
 design of encoding, the subset is either a singleton set \{i\} or a set with other variables,
 \{i, var1, var2, ...\}. On line 4-a, the algorithm annotate the premises based on this information by calling
 the helper function Annotate. In a high-level, what the helper function does is to annotate whether
 the i-th premise is a condition or
 a variable binding, depending on what subset is included in the given partition. For example, if the
-subset {1} is included in the partiton, then the first premise will remain as `x = y`, but if the
+subset {1} is included in the partition, then the first premise will remain as `x = y`, but if the
 subset {1, y} is present, then the first premise will be transformed into the binding `y <- x`.
-Afther the annotation is done, the final step is to reorder the premises, which is done by calling the helper
+After the annotation is done, the final step is to reorder the premises, which is done by calling the helper
 function reorder on line 4-b. It reorders the premises in a way that whenever a premise binds a new variable,
 any other premises that use the variable to appear after it.
 In a high-level, the helper function works by iteratively extracting completely bound
 conditions and variables, which are safe to be placed in the front of the premise list.
 If successful, the reordered premises will be returned as the final result on
-line 4-b-1.  The reordering may fail, if the premises contaian a cyclic
+line 4-b-1.  The reordering may fail, if the premises contain a cyclic
 definition.  For example, the list of premises {x=f(y), y=g(x)} would be
 annotated \{x<-f(y), y<-g(x)\}, but it is impossible to correctly reorder them. 
 
@@ -659,7 +659,7 @@ have the second form.
 The following is the process of the algorithm.
 When the input $lhs = (z, winstrs)$ is given, the algorithm first
 generate the AL instructions from the state expression $z$ on line 1.
-Currently all it does is generating the AL instruction that is strignified into:
+Currently all it does is generating the AL instruction that is stringified into:
 `Let F be the current frame`, if $z$ is not $\bot$. Then, the different instructions are
 generated based on the form of the Wasm instruction stack. First branch on line 2 is taken
 when the lhs is of the first form. In this case, the list of pop instructions are generated,
@@ -771,7 +771,7 @@ sequence of AL instructions, `instrs`, is returned as the final result of the al
 
 Algorithm 4. rhs\_to\_instrs
 
-Input: A righthand side expression $rhs = (z, winstrs)$
+Input: A right-hand side expression $rhs = (z, winstrs)$
 
 Output: A list of AL instructions $instrs$
 
@@ -792,7 +792,7 @@ Output: A list of AL instructions $instrs$
 ----------------
 
 \textbf{rhs\_to\_instrs} Algorithm 4 depicts the detail of the algorithm rhs\_to\_instrs.
-The righthand side expression $rhs$ is given as an input.
+The right-hand side expression $rhs$ is given as an input.
 Note that the non-empty state expression $z$ indicates the current reduction rule is
 inflicts a mutation on the state of the Wasm program. Therefore, if the expression `z`
 is first checked if it is not a $\bot$, and will generate a mutating AL instructions if
