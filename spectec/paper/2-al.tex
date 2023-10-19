@@ -177,6 +177,7 @@ Also, the execution or evaluation may incur a runtime error, (i.e. executing Tra
 / out of boundary access), which is indicated by the fact that the range of each function
 is lifted with the bottom ($\bot$) element.
 
+\textbf{Algorithm}
 An algorithm a = (e*, i) is executed by executing its body instruction i under a newly created context c.
 The new context c consists of the initial environment $\rho$, unset return value $\bot$ and a
 Wasm context counter value 0. The initial environment $\rho$ is initialized by binding
@@ -188,6 +189,7 @@ After executing the body instruction is done, the AL context is popped from stat
 the return value is extracted in the helper function pop\_al\_context. The new state
 and the return value is returned as the final output.
 
+\textbf{Instruction}
 Executing an instruction i alters the input state s to a different state.
 
 The instruction `i1; i2` is a sequence instruction. The first instruction
@@ -262,6 +264,68 @@ is replaced by the value v, obtained by evaluating e2. Otherwise, the only
 specific portion of the value h(a), specified by the path, is mutated with the
 value v, and the partially-replaced value will be in the place of h(a).
 
-\inred{
-  TODO: evaluating conditions and expressions
-}
+\textbf{Condition}
+Evaluating a condition results in a pure boolean value, without modifying the state.
+
+The condition `not c` is a negation and results in the negation of evaluating c.
+
+The condition `c1 + c2` is a binary operation, such as logical and or logical or. It is evaluated
+by applying the binary operator to each evaluated boolean value of c1 and c2.
+
+The condition `e1 < e1` is a relational operation over expressions. It is also evaluated
+by applying the relational operator to each evaluated value of e1 and e2.
+
+The condition `c is of case t` is a tag checking condition for a named tuple. This evaluates to
+true if and only if the evaluated value of the expression e is a named tuple, and its name is t.
+
+\textbf{Expression}
+Evaluating an expression also results in a pure value, without modifying the state.
+
+The number expression `n` and string expression `s` are already a value, so they are immediately returned.
+
+The expression `e1 + e2` is a binary operation, and is evaluated
+by applying the relational operator to each evaluated value of e1 and e2.
+
+The expression `[e*]` is an list expression, and it results in a list value
+filled with values of e*.
+
+The expression `e1 ++ e2` is a list concatenation expression, and the result is
+the concatenation of two lists, obtained by evaluating e1 and e2.
+
+The expression `|e|` calculates the length of a list value of e.
+
+The expression `\{(t->e)*\}` is a record expression, and it results in a record
+with the given keys t* and the values of e*.
+
+The expression `e[p]` is a indexing expression. It returns p-th element of list if p is a number and
+the result of e is a list, and the value corresponding to p if p is a string and the result of e is a record.
+
+The expression `e1[p*] := e2` is a replace expression. It returns the almost same value
+obtained by evaluating e1, except e[p*] (i.e. e[p1][p2]...[pk]) is replaced with the value of e2.
+Note that this expression returns a new value, and does not affect the original value.
+
+Similarly, the expression `e1[p*] :+ e2` is a append expression. It returns the almost same value
+obtained by evaluating e1, except e[p*] (i.e. e[p1][p2]...[pk]) is appended with the value of e2.
+
+The expression `t(e*)` is a named tuple expression, which creates a named tuple with tag t and
+the elements are the values of e*.
+
+The expression `(e1, e2)` is a tuple expression, resulting in a tuple of two values of e1 and e2.
+
+The expression `f(e*)` is a call expression. It is evaluated by obtaining the return value
+of the algorithm call to a function named f, with arguments set as the values of e*.
+
+The expression `current context` is a expression that obtains the current context. It obtains the
+top of the Wasm context stack of the current state, and return the information of that context.
+
+The expression `x` is a variable expression, and it is evaluated by finding that variable form the
+environment.
+
+The expression `e\^\{x*\}*` is a iteration expression. This expression contains a
+list of variables to be iterated. It is required that the values mapped to the these variables
+in the environment should be list with same lengths.
+This expression results in a list,
+where i-th element is calculated by evaluating each expression under a new environments,
+where each environments is obtained by replacing each variable, with i-th element of the
+list corresponding to that variable.
+
