@@ -7,10 +7,16 @@ Since the main goal of this paper is to generate prose from execution semantics 
 we will focus on how only execution semantics of Wasm is expressed using Wasm-DSL.
 
 \subsection{Notations}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{img/notation.png}
+  \caption{Notation}
+  \label{fig:notation}
+\end{figure}
 
 Two kinds of \textit{definitions} are needed to express the execution semantics of Wasm:
 reduction rules and auxiliary helper functions.
-Here, we formally define the notations for the reduction rules and the auxiliary helper functions.
+Figure~\ref{fig:notation} shows the notations for these definitions.
 
 First, assume that the set of DSL expressions $E$ and boolean expressions $B \subset E$ are given.
 DSL expressions are basic building building blocks of DSL, including number, identifiers,
