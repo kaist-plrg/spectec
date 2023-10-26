@@ -1,0 +1,99 @@
+% load packages
+\usepackage{float}
+\usepackage{algorithmic}
+\usepackage{amsmath,amsfonts}
+\usepackage[ruled, vlined]{algorithm2e}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{soul}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{galois}
+\usepackage{mathpartir}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+\usepackage{colortbl}
+\usepackage{hhline}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{balance}
+\usepackage{adjustbox}
+\usepackage{tikz}
+\usepackage{csquotes}
+
+% box
+\newcommand{\cfbox}[2]{%
+  \colorlet{currentcolor}{.}%
+  {\color{#1}%
+  \fbox{\color{currentcolor}#2}}%
+}
+\newcommand{\lcolorbox}[2]{\adjustbox{padding=0ex 1ex 1ex 1ex, bgcolor=#1}{#2}}
+\newcommand{\rcolorbox}[2]{\adjustbox{padding=1ex 1ex 0ex 1ex, bgcolor=#1}{#2}}
+
+% table rules
+\newcolumntype{?}{!{\vrule width 1pt}}
+\newcommand*{\belowrulesepcolor}[1]{%
+  \noalign{%
+    \kern-\belowrulesep
+    \begingroup
+      \color{#1}%
+      \hrule height\belowrulesep
+    \endgroup
+  }%
+}
+\newcommand*{\aboverulesepcolor}[1]{%
+  \noalign{%
+    \begingroup
+      \color{#1}%
+      \hrule height\aboverulesep
+    \endgroup
+    \kern-\aboverulesep
+  }%
+}
+
+% colors
+\definecolor{gainsboro}{rgb}{0.86, 0.86, 0.86}
+\definecolor{dkgreen}{rgb}{0, 0.5, 0}
+\definecolor{lightred}{rgb}{0.93, 0.57 0.52}
+\definecolor{esnt}{rgb}{0.20, 0.20, 0.20}
+\definecolor{esparam}{rgb}{0.16, 0.63, 0.59}
+\definecolor{esalg}{rgb}{0.12, 0.42, 0.65}
+\definecolor{esvar}{rgb}{0.16, 0.63, 0.59}
+\definecolor{gray1}{rgb}{0.95, 0.95, 0.95}
+\definecolor{gray2}{rgb}{0.85, 0.85, 0.85}
+\definecolor{gray3}{rgb}{0.75, 0.75, 0.75}
+
+% basic
+\newcommand{\inblue}[1]{{\color{blue}{#1}}}
+\newcommand{\inred}[1]{{\color{red}{#1}}}
+\newcommand{\x}[1]{\inred{#1}}
+\newcommand{\y}[1]{\textbf{\inred{#1}}}
+\newcommand{\todo}{\inred{TODO}}
+\newcommand{\powerset}{\mathcal{P}}
+\newcommand{\tif}{\text{if} \; }
+\newcommand{\telse}{\text{otherwise}}
+\newcommand{\tst}{{\; \text{s.t.} \; }}
+
+% tool name
+\newcommand{\name}[1]{\textsf{#1}}
+\newcommand{\sname}[1]{\name{\small #1}}
+\newcommand{\stextbf}[1]{\textbf{\small #1}}
+\newcommand{\dsl}{\sname{Wasm-DSL}}
+\newcommand{\al}{\sname{AL}}
+
+% formal
+\newcommand{\ruleW}{r}
+\newcommand{\rulesW}{R}
+\newcommand{\configW}{c}
+\newcommand{\configsW}{C}
+\newcommand{\stW}{S}
+\newcommand{\premsW}{P}
+\newcommand{\helperW}{h}
+\newcommand{\helpersW}{H}
+

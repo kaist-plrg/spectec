@@ -43,7 +43,7 @@ zip:  all clean
 	zip -r  $(PACKAGE).zip * -x '*~' -x '*.tgz' -x '*.zip' -x CVS -x 'CVS/*'
 
 documents.zip: all docclean
-	zip -r $@ main.pdf ACM-Reference-Format.*
+	zip -r $@ $(PACKAGE).pdf ACM-Reference-Format.*
 
 .PHONY: all docclean clean distclean archive zip
 .SILENT: pdf
