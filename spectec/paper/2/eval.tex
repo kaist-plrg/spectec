@@ -3,10 +3,28 @@
 
 \begin{itemize}
   \item SIMD, numerics, one helper function is not specified yet
+  \item Slightly different with actual spec: bubbling up br, return / non cyclic module instantiation
   \item use reference interpreter for numerics (with version)
   \item explanation about the helper function
   \item manually write AL for the helper function
 \end{itemize}
+
+\subsection{Setup}
+
+\textbf{Input Spec File}
+The baseline input spec is based on Wasm 2.0, the most up-to-date version of
+Wasm standard. We described the syntax, validation, and execution semantics of
+Wasm 2.0 using DSL, which plays the role of the initial input of SpecTec
+framework.  In order to focus on the core of the Wasm 2.0 semantics,  we made
+the deliberate choice to omit certain features, such as SIMD instructions or
+auxilirary functions for numeric instructions.  In addition, some rules or
+auxilirary helper functions are described in different way.  For example, the
+current standard of Wasm 2.0 uses the evaluation context to describe the
+behavior of `br` and `return` instructions, but we use bubble-up style in DSL.
+Also, the auxilirary functions used for instantiation of modules are rewritten
+in a way that avoid the cyclic definitions whitin premises. We have confirmed
+that our re-written rules are equivalnet to original rules by the Wasm spec
+developers.
 
 \subsection{Correctness}
 Wasm official test is written in Wast\textcolor{red}{(reference of Wast)}, scripting language for testing Wasm, which mainly consists of definitions and assertions.
