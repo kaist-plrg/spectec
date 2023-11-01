@@ -24,7 +24,52 @@ To evaluate the correctness of \textcolor{red}{SpecTec}, we tested the generated
 The AL interpreter and generated AL pass 21,363 AssertReturn, 2354 AssertTrap, and 34 AssertUninstantiable from the official test in \textcolor{red}{???} seconds, which shows the correctness of generated AL.
 
 \subsection{Usefulness}
-DSL bug detection
+To assess the effectiveness of SpecTec in preventing human errors, we conducted
+an in-depth investigation into actual errors that had previously occurred in
+the main branch of the repository for Wasm standard. Our objective was to
+determine whether SpecTec could have prevented these errors. We classified the
+investigated errors into four distinct categories.
+
+\textbf{Type Errors}
+Two fixes were attributed to type errors within the specification. These
+instances included an arity mismatch when invoking the auxiliary helper
+function runelem, and an omission of the field TYPE during the initialization
+of the element instance in the elem.drop execution semantics. We artificially
+introduced each of these errors into the DSL spec document and applied SpecTec.
+Subsequently, we confirmed that SpecTec effectively identified and reported the
+TypeErrors. In addition, the error message gives the information about the
+exact location of the error within the specification, and the reason for the
+error correctly.  This result signifies its capability to detect mistakes made
+by spec writers.
+
+\textbf{Prose Errors}
+Five errors were found to occur within the prose notation. These errors
+encompassed free identifier issues, the absence of an immediate value after an
+instruction name, and outdated steps that introduced a new variable which was
+never utilized. Our automatic prose generation process proved to be free from
+these types of errors, and we verified that the corresponding prose was
+generated accurately, devoid of any such issues.
+
+\textbf{Semantics Errors}
+Three errors resulted in incorrect behavior of the WebAssembly specification.
+We manually introduced these errors into the DSL, and subsequently executed the
+official tests against them using our indirect interpreter. In all cases, the
+tests returned failures as expected, indicating that our indirect interpreter
+was proficient in detecting these errors.
+
+\textbf{Editorial Fixes}
+A total of \inred{ten} editorial fixes were identified. While these fixes did
+not impact the behavior of the specification, they addressed typographical
+errors in LaTeX or ensured consistency in writing style. Once again, SpecTec
+can effectively address these types of issues.  Additionally, the consistency
+in writing style within the generated spec is guaranteed by design.
+
+The evaluation results demonstrate that SpecTec is effective at preventing a wide
+range of human errors within the WebAssembly specification.  Its capabilities
+extend to detecting and addressing type errors, prose errors, semantics errors,
+as well as editorial fixes. This is a strong evidence that leveraging SpecTec
+can significantly enhance the robustness and reliability of the specification
+writing process.
 
 \subsection{Generality}
 In this section, we present the generality of SpecTec, by applying it to five
