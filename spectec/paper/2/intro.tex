@@ -1,233 +1,185 @@
 \section{Introduction}\label{sec:intro}
-
-A programming language \textit{standard} provides a universal set of rules
-governing syntax and semantics of the language. It is essential to have a clear
-and well-defined standard of a programming language, as it is the foundation
-upon which all subsequent development and analysis of the language rely.
-Without it, the language’s behavior becomes unpredictable and unmanageable.
-
-%Two primary approaches are commonly used to define language semantics:
-%\begin{itemize}
-  %\item
-    %\textbf{Declarative semantics} focuses on specifying the language’s behavior through formal, mathematical rules.
-    %It rigorously defines a high-level, abstract model of the language semantics, without delving into implementation details.
-    %Declarative semantics is especially valuable in theoretical contexts, such as academic research and formal verification.
-    %It facilitates reasoning about language properties, like type soundness.
-    %\inred{(a more detailed example of the use cases of declarative style semantics)}
-  %\item
-    %\textbf{Algorithmic semantics} utilizes detailed, stepwise instructions, typically presented in pseudocode, to define the language's behavior.
-    %This approach offers a concrete, implementation-oriented view of how the language should be executed.
-    %Such a style aids in human comprehension, as it aligns well with the sequential computational model in a developer's mind.
-    %One example of algorithmic style semantics can be found in ECMAScript, which describes the semantics of JavaScript with abstract algorithms in well-structured English sentences.
-%\end{itemize}
-
-WebAssembly, commonly referred to as Wasm, especially requires the well-defined
-standard, due to its nature as a Web language.  Wasm is a versatile technology,
-initially introduced as an efficient compilation target and execution model in
-Web platforms.  However, flexibility of the Web environment exposes Wasm to the
-risk of implementation discrepancies.  Various browsers implement Wasm within
-vendor-specific architectures with multi-tier interpretation or just-in-time
-compilation.  In the absence of a clear Wasm standard, it is likely to result
-in the divergence in Wasm implementations, which is unfavorable since Wasm
-programs may fail to be portable across various platforms.
-
-In effort to maintain the well-defined standard, the W3C Wasm Community Group
-has established a meticulous standardization process.  Four key artifacts are
-required for a feature to be standardized in Wasm:
-\begin{itemize}
-  \item a \textit{formal specification} for the feature in declarative-style rewrite rules, written in LaTeX;
-  \item a \textit{prose pseudocode} presenting an algorithmic-style semantics, written in reStructuredText markup;
-  \item an extended \textit{reference interpreter} with the implementation of the feature, written in OCaml; and
-  \item a \textit{unit test suite} for the feature, written in the Wasm text format.
-\end{itemize}
-All of these artifacts contribute to defining the meticulous behavior of
-Wasm programs.
-
 \begin{figure}[t]
-\includegraphics[width=.7\textwidth]{../img/spec.png}
-\caption{The binary operator semantics in the specification}
+  \centering
+  \begin{subfigure}{\textwidth}
+    \centering
+    \includegraphics[width=.7\textwidth]{../img/spec-prose.png}
+\vspace*{-1em}
+    \subcaption{Prose notation}
+\vspace*{.5em}
+  \end{subfigure}
+  \begin{subfigure}{\textwidth}
+    \centering
+    \includegraphics[width=.7\textwidth]{../img/spec-formal.png}
+    \subcaption{Formal notation}
+  \end{subfigure}
+\caption{Semantics of \ensuremath{t.\mathit{\inblue{binop}}} in the specification}
 \label{fig:spec}
 \end{figure}
 
-Notably, Wasm standard provides both declarative and algorithmic styles of
-semantic definition.  For example, Figure~\ref{fig:spec} is the execution
-semantics of the Wasm $t.\mbox{\emph{binop}}$ binary operator instruction from
-the official specification.  Figure~\ref{fig:spec}(a) presents the
-\textit{prose pseudocode} description of the $t.\mbox{\emph{binop}}$ binary
-operator instruction.  The execution of the instruction is broken down into
-five sequential steps.  Below, Figure~\ref{fig:spec}(b) specifies the
-operational semantics in rewrite rules, operating on an implicit stack of
-values and instructions.  \inred{(elaborate on the "implicit stack", if
-necessary)} Although in different styles, the prose and rewrite rules must be
-equivalent in terms of the behavior being specified.
+A programming language is defined by its syntax and semantics.
+Syntax and semantics are the basis for all subsequent development and
+analysis of the language, so it is important to define them clearly and rigorously. 
+Many programming languages, such as Java~\cite{javaspec} and Python~\cite{pythonspec},
+therefore have language specifications that define their syntax and semantics.
+For languages that are prone to implementation inconsistency issues,
+such as C~\cite{cstandard} and JavaScript~\cite{ecmascript},
+international committees define them according to their own standardization processes.
+Some languages, like Standard ML~\cite{sml}, even have formal descriptions
+that define them in mathematical notation.
 
-The two styles of semantics cater to the dual needs of \textit{language
-designers} and \textit{implementers}.  The rewrite rules serve the needs of
-designers, focusing on clarity and correctness of the language semantics.  The
-system of rewrite rules can also be proved of type safety with assistance of
-interactive theorem provers, ensuring Wasm's safety from construction.  On the
-other hand, the prose pseudocode aids language implementers in comprehending
-the language behavior, providing explicit guidance.  The sequential steps add a
-computational sense to the execution semantics.
+WebAssembly (Wasm) is a low-level bytecode language and virtual machine~\cite{wasmspec}.
+It was initially designed as an efficient compilation target and execution model on Web platforms
+and has been adopted across a wide range of ecosystems,
+including cloud and edge computing~\cite{lucet, cloudflare}, 
+mobile and embedded systems~\cite{wasm-embedded}, IoT~\cite{wasm-iot}, and
+blockchains~\cite{wasm-blockchain}.
+Because different browsers implement Wasm within vendor-specific architectures
+using multi-tier interpretation or just-in-time compilation,
+Wasm faces the risk of implementation discrepancies.
+The diversity of the various ecosystems exacerbates the situation.
 
-Despite the sophisticated standardization process, every piece of the Wasm
-specification thus far has been written \textit{manually}, and thereby
-painstakingly.  This poor authorship induces several challenges in
-crafting and maintaining the Wasm specification:
-\begin{itemize}
-  \item
-    \textbf{Properly typesetting the specification is a tedious and labor-intensive task.}
-    \inred{(quotes from spec authors)}
-  \item
-    \textbf{Raw source of the specification text lacks visual clarity.}
-    Code reviews on feature proposals become a nightmare when the gist of the language is occluded by LaTeX and reStructuredText constructs.
-  \item
-    \textbf{Manual processes are susceptible to human error, potentially leading to inconsistencies or inaccuracies in the specification.}
-    The specification text surely contains errors, since human eyes are the only barrier to them.
-    Moreover, the dual semantics representation opens the door to a wide range of errors, from mainly three sources: rewrite rule itself, prose itself, and the congruence of the two styles.
-    Errors in rewrite rules span from simple typos to misuse of mathematical symbols.
-    The prose may not be consistent in the English expressions, and can even contain some free variables.
-    \inred{(error example in the congruence, if exists)}
-  \item
-    \textbf{Maintaining a manual specification becomes increasingly challenging as Wasm evolves.}
-    Wasm is a growing language that continually accepts proposals to add features.
-    After its initial release in 2017 as version 1.0, several proposals, including SIMD, were merged into the official specification in 2022, bumping up to version 2.0.
-    Currently, proposals including Garbage Collected Types, Threads, and Exception Handling are being developed to comprise Wasm 3.0.
-    Manual efforts are not scalable in the face of future proposals.
-\end{itemize}
+To mitigate these risks, Wasm has been standardized by
+the W3C Wasm Community Group~\cite{wasm-w3c}.
+It requires four key artifacts for a feature to be standardized:
+1) a \textit{formal specification} for the feature in declarative-style rewrite rules, written in LaTeX;
+2) a \textit{prose pseudocode} presenting an algorithmic-style semantics, written in reStructuredText markup;
+3) an extended \textit{reference interpreter} with the implementation of the feature, written in OCaml; and
+4) a \textit{unit test suite} for the feature, written in the Wasm text format.
+All of these artifacts must define the same behavior of a Wasm program.
+Note that the specification provides \textit{both} declarative and algorithmic styles of semantic definitions.
+For example, Fig.~\ref{fig:spec} shows the execution semantics of the binary operation instruction
+$t.\mathit{\inblue{binop}}$ in the official Wasm specification.
+Fig.~\ref{fig:spec}(a) presents the semantics in a prose notation broken down into five steps,
+while Fig.~\ref{fig:spec}(b) specifies it in a formal notation using rewrite rules.
 
+The two styles of semantic definitions cater to the dual needs of
+language ``designers'' and ``implementers.''  Declarative rewrite
+rules serve the needs of designers by focusing on clarity and
+correctness of language semantics. They allow theorem provers like
+Coq, Isabelle, Lean, and Agda to mechanize language semantics
+and prove various properties, including type safety.
+Algorithmic prose pseudocode, on the other hand, helps implementers
+understand language behavior. A step-by-step description of the
+language semantics can be a good guide to how to implement it.
 
-These challenges call for the need to automate, or \textit{mechanize} the
-standardization process. The mechanization provides various benefits
-compared to the manual process, demonstrated by various language semantics
-mechanization frameworks in literature. For example, PLT-Redex and the K
-framework are general-purpose language frameworks based on formal rewrite
-rules.  These frameworks excel in model checking and verification.  PLT-Redex
-specializes in actuating the rewrite rules with evaluation contexts.  Model
-checking can then be applied to the rewrite system, to debug the language
-semantics.  The K framework is also a rewrite-based executable semantic
-framework.  From language specification written in their language K, it
-generates language tools including interpreters, model checkers, and verifiers.
-The K framework has been applied to specify and debug the core semantics of
-real-world programming languages such as C, Java, Python, and JavaScript.
-\inred{TODO: Change the nuance in a way that implies why these are `beneficial`}
-Another example is ESMeta toolchain, a semantic framework for ECMAScript.
-ESMeta parses the structured English prose algorithms of ECMAScript
-Specification document, and translates them into an internal representation,
-$IR_{ES}$.  $IR_{ES}$ has its own semantics, and thus can be executed with an
-interpreter implementation.  Executing the JavaScript semantics written in
-$IR_{ES}$ allows an indirect execution of JavaScript programs.  Utilizing the
-executable semantics, ESMeta derives a type checker for the specification, test
-suite synthesizers, and a static analyzer of JavaScript.  Notably, ESMeta has
-been gracefully integrated into the continuous integration (CI) system of
-ECMAScript as of 2022. As exemplified by existing approaches, the mechanization
-provides benefits in terms of ensuring the reliability of the language standard.
+Despite the onerous standardization process, the Wasm specification has been
+written and maintained \textit{manually}, which creates challenges for specification writers.
+Writing the prose is extremely laborious~\cite{Andreasicfp23}, and code reviews of
+feature proposals written in LaTeX and reStructuredText are not user-friendly.
+Manual processes are vulnerable to human error, potentially leading
+to inconsistencies or inaccuracies in the specification.
+As Wasm grows with new language features such as Garbage Collected Types, Threads,
+and Exception Handling that will be supported by Wasm 3.0,
+manually crafting all of the artifacts is not scalable.
 
-
-For Wasm, mechanizing the standardization process becomes especially
-challenging due to the fact that Wasm's standard encompasses both of two different
-styles of semantics: Declarative and Algorithmic. The existing tools are specialized in
-either one style of semantics: PLT-Redex and K are based on the \textbf{declarative}
-style formal semantics, and ESMeta toolchain only supports \textbf{algorithmic} style
-semantics.  In order to fully mechanize the standardization process of Wasm and
-take advantage of the mechanization in both styles, we need a framework that
-can bride the gap between two styles of semantics.
-
-
-Acknowledging the absence of a mechanization framework that utilizes both
-declarative and algorithmic styles, we introduce \textbf{SpecTec}, a tailored
-language framework that \textit{mechanizes} the Wasm standardization process.
-SpecTec defines a \emph{Domain-Specific Language (DSL)} as Wasm's single source
-of truth, succinctly describing the syntax, type system, and execution
-semantics of Wasm.  In contrast to the official specification, the DSL
-deliberately and exclusively chooses a declarative style to document the
-execution semantics.  Figure~\ref{fig:dsl} illustrates the semantics of
-$t.\mbox{\emph{binop}}$ instruction in the DSL.  The semantics in the DSL is in
-close resemblance with the official formal notations in
-Figure~\ref{fig:spec}(b).  Once the Wasm specification is articulated using the
-DSL, numerous other representations of the language can be automatically
-generated.  SpecTec envisions to derive language backends dwelling in the two
-semantic domains: \begin{itemize} \item \textit{Declarative backends},
-including LaTeX for the formal notations and mechanized definitions in
-interactive theorem provers.  \item \textit{Algorithmic backends}, with
-reStructuredText for the prose pseudocode and a Wasm interpreter.
-\end{itemize} Currently, SpecTec is capable of generating formal notations of
-spec in LaTeX and prose notation of spec in reStructuredText format. Moreover,
-The vision of SpecTec offers a substantial amount of automation to the current,
-handcrafted Wasm standard by automatically generating more kinds of artifacts.
-
+These challenges call for the need to automate the process or \textit{mechanize} the language semantics.
+For declarative-style rewrite rules, the literature shows general-purpose language frameworks such as
+Ott~\cite{ott}, PLTRedex~\cite{pltredex}, Skeleton~\cite{skeleton}, Spoofax~\cite{spoofax},
+and the K framework~\cite{k}. Among them, the K framework can generate various tools,
+including interpreters, model checkers, and verifiers, from a language specification written in its language K.
+It has specified the core semantics of real-world programming languages
+such as C~\cite{kc}, Java~\cite{kjava}, Python~\cite{kpython}, and JavaScript~\cite{kjs}.
+For algorithmic-style semantics, the ESMeta framework~\cite{esmeta}
+can extract a mechanized specification from
+an ECMAScript/JavaScript specification~\cite{ecmascript} and automatically
+generate diverse tools~\cite{jiset,jest,jstar,jsaver}.
+%
+%  ESMeta parses the structured English prose algorithms of ECMAScript
+% Specification document, and translates them into an internal representation, $IR_{ES}$.
+%   $IR_{ES}$ has its own semantics, and thus can be executed with an interpreter implementation.
+%   Executing the JavaScript semantics written in $IR_{ES}$ allows an indirect execution of JavaScript programs.
+%   Utilizing the executable semantics, ESMeta derives a type checker for the specification, test
+% suite synthesizers, and a static analyzer of JavaScript.
+%
+% Now, each ECMA-262 PR will execute the ESMeta type checker, and any new or changed tests in a Test262 PR will be executed using the ESMeta interpreter.
+%
+ESMeta has been officially integrated into the continuous integration (CI) systems of
+the ECMAScript specification~\cite{ciecma262} and the Test262 conformance test suite~\cite{citest262}
+since November 2022.
+Because the existing language frameworks can mechanize only one style of semantics,
+they are not applicable to Wasm, which should support both declarative and algorithmic styles of semantics.
 
 \begin{figure}[t]
 \footnotesize
 \begin{verbatim}
-rule Step_pure/binop-val:
-  (CONST nt c_1) (CONST nt c_2) (BINOP nt binop) ~> (CONST nt c)
-  -- if $binop(binop, nt, c_1, c_2) = c
+                rule Step_pure/binop-val:
+                    (CONST nt c_1) (CONST nt c_2) (BINOP nt binop) ~> (CONST nt c)
+                    -- if $binop(binop, nt, c_1, c_2) = c
 
-rule Step_pure/binop-trap:
-  (CONST nt c_1) (CONST nt c_2) (BINOP nt binop) ~> TRAP
-  -- if $binop(binop, nt, c_1, c_2) = epsilon
+                rule Step_pure/binop-trap:
+                    (CONST nt c_1) (CONST nt c_2) (BINOP nt binop) ~> TRAP
+                    -- if $binop(binop, nt, c_1, c_2) = epsilon
 \end{verbatim}
-\caption{The binary operator semantics in SpecTec DSL}
+\caption{The binary operator semantics in \spectec's DSL}
 \label{fig:dsl}
 \end{figure}
 
+In this paper, we propose \spectec, a framework for mechanizing Wasm semantics in both styles.
+\spectec presents a \emph{Domain-Specific Language (DSL)} that
+defines the Wasm syntax, type system, and execution semantics in a declarative style,
+which serves as a single source of truth.
+Figure~\ref{fig:dsl} illustrates the semantics of $t.\mathit{\inblue{binop}}$ in the DSL,
+which looks similar to the one in the official specification in Figure~\ref{fig:spec}(b).
+Once the Wasm formal semantics is written in the DSL,
+a number of tools can be automatically generated as backends:
+1) declarative backends, including LaTeX-based formal specifications and
+mechanized definitions in various theorem provers, and
+2) algorithmic backends, such as prose specifications in reStructuredText and Wasm interpreters.
+By conducting meta-level error checking and automatically generating the required specification artifacts,
+\spectec can alleviate the burden on language designers and implementers.
 
-SpecTec's DSL offers a clear and assisted method of defining and reasoning in
-the declarative backends.  The LaTeX backend augments the declarative style DSL
-with LaTeX constructs to produce a LaTeX document of the Wasm specification.
-Moreover, DSL is typed to prevent simple typos and arity mismatches when using
-parametric expressions in the rewrite rules.  This automation streamlines
-authoring endeavors and guards against errors in the specification document.
-The declarative language definition can also be translated into mechanized
-definitions in interactive theorem provers, Coq, Isabelle, Lean, and Agda.
-Language designers can save their time and effort in manually specifying the
-language in various theorem provers at each specification updates.
+\spectec's DSL is designed to provide a close and easy representation and reasoning of
+the Wasm semantics in declarative backends.
+It can directly produce LaTeX-based formal specifications from the definitions in the DSL,
+and all definitions and variables in the DSL are ``type-checked'' to detect ill-formed ones.
+It can also generate mechanized definitions for theorem provers.
+This saves language designers the trouble of manually specifying
+language semantics in different theorem provers every time the specification is updated.
 
-SpecTec's algorithmic backends are laid out by \emph{AL (Algorithmic
-Language)}, our meta-level language designed to describe the Wasm semantics.
-AL is carefully designed after the existing prose of Wasm specification.  By
-design, converting AL programs to English prose with reStructuredText markup
-becomes a straightforward task.  Furthermore, as in the approach of ESMeta, we
-have defined the semantics of AL with an interpreter implementation.  This
-enables an indirect execution of Wasm programs.  Our generated AL, along with
-the AL interpreter boasts a 100\% pass rate against the current official test
-suite, except for the SIMD features.
+On the contrary, algorithmic backends are not directly produced from the definitions in the DSL,
+but from the definitions in the \emph{Algorithmic Language (AL)}.
+The AL is designed to provide a close and easy representation and manipulation of
+the Wasm semantics in the official prose specification,
+so the English prose in reStructuredText markup can be generated directly from the definitions in the AL.
+\spectec can also support the interpretation of Wasm programs,
+following the approach of the ESMeta framework.
 
-A significant challenge arises in transforming the declarative-style formal
-rules in DSL to algorithmic-style prose pseudocode in AL.  Bridging the gap
-between the two styles is a non-trivial task due to several reasons.  To name a
-few, while there can be multiple rewrite rules for a single Wasm instruction,
-each expressing certain premises, there should be only one prose pseudocode for
-each instruction.  Additionally, the equals operator '$=$' in the mathematical
-rules becomes ambiguous in computational sense, of whether it means an
-assignment or a condition check.  Despite the differences in style, we have
-devised a mechanism to derive the algorithmic AL from the declarative DSL.  We
-identify that the transformation is a NP-hard problem, and propose a novel
-solution.
+To bridge the gap between the two styles of semantics,
+we present a mechanism for automatically deriving algorithmic ALs from declarative DSLs.
+Several challenges arise in transforming declarative-style rewrite rules
+into algorithmic-style prose pseudocode.
+For example, a single Wasm instruction may have multiple rewrite rules,
+each expressing certain premises,
+but each instruction should have only one prose pseudocode. 
+In addition, the equals operator `$=$' in mathematical rules
+can be ambiguous, as it can mean assignment or equality checking.
+We show that the transformation is an NP-hard problem
+and propose a practical solution.
 
-SpecTec is available open source, currently documenting all of Wasm 2.0 except
-for the SIMD feature.  \inred{(some coverage of the 2.0 specification?)}
-SpecTec claims to be forward-compatible, even for upcoming Wasm 3.0.
-Surprisingly, specifying Wasm 3.0 in SpecTec only required minor tweaks to the
-tool.  In the process, we reported several errors in the Garbage Collected
-Types proposal and got approval from the proposal champions.
+\spectec is available as an open-source project~\cite{spectec}
+and covers everything in Wasm 2.0 except SIMD instructions.
+The automatically generated Wasm semantics in the AL passes
+100\% of the official test suite (except for SIMD) using an AL interpreter.
+To further specify the semantics for Wasm 3.0, we only needed
+to make minor adjustments in \spectec. During this process, we
+reported a few errors in the Garbage Collected Types proposal and
+received confirmation from the proposal champions.
 
-Our contribution is \textbf{SpecTec}, a comprehensive toolchain for the Wasm specification:
+This paper presents the following contributions:
 \begin{itemize}
-  \item
-    \textbf{SpecTec allows spec writers to concisely specify the syntax and semantics of Wasm.}
-    \inred{(LoC comparison)}
-  \item
-    \textbf{SpecTec automatically generates backends constituting the requirement of the Wasm standardization process.}
-    \inred{(self-explanatory?)}
-  \item
-    \textbf{SpecTec is the first language semantics framework to embrace both declarative and algorithmic styles of semantics.}
-    \inred{(also self-explanatory)}
-  \item
-    \textbf{SpecTec is a barrier against meta-level errors in the specification.}
-    \inred{(type checks in El/IL and errors caught by executing the AL)}
-  \item
-    \textbf{SpecTec is a forward-compatible toolchain that can adapt to the evolving Wasm semantics.}
-    \inred{(case study of 3.0 proposal, maybe Exception Handling?)}
+\item \textbf{\spectec is the first language semantics framework that
+embraces both declarative and algorithmic styles of semantics.}
+Unlike existing language frameworks that can mechanize only one style of semantics,
+\spectec can support both styles of semantics.
+
+\item \textbf{\spectec can automatically generate multiple backends from 
+a single source of truth.}
+It is designed to be easy to write, read, and reivew, enabling
+meta-level error detection in the Wasm specification.
+
+\item \textbf{\spectec is a forward-compatible toolchain that can
+adapt to the evolving Wasm semantics.}
+To evaluate \spectec's forward compatibility, we applied it to five
+proposals in Wasm 3.0 and found that only minor adjustments were necessary. 
 \end{itemize}
