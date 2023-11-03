@@ -37,7 +37,7 @@ blockchains~\cite{wasm-blockchain}.
 Because different browsers implement Wasm within vendor-specific architectures
 using multi-tier interpretation or just-in-time compilation,
 Wasm faces the risk of implementation discrepancies.
-The diversity of the various ecosystems exacerbates the situation,
+The diversity of the ecosystems exacerbates the situation,
 which is unfavorable since it harms the portability of Wasm across various platforms.
 
 To mitigate these risks, Wasm has been standardized by
@@ -49,7 +49,7 @@ It requires four key artifacts for a feature to be standardized:
 4) a \textit{unit test suite} for the feature, written in the Wasm text format.
 All of these artifacts must define the same behavior of a Wasm program.
 Note that the specification provides \textit{both} declarative and algorithmic styles of semantic definitions.
-For example, Fig.~\ref{fig:spec} shows the execution semantics of the binary operation instruction
+For example, Fig.~\ref{fig:spec} shows the semantics of the binary operation instruction
 $t.\mathit{\inblue{binop}}$ in the official Wasm specification.
 Fig.~\ref{fig:spec}(a) presents the semantics in a prose notation broken down into five steps,
 while Fig.~\ref{fig:spec}(b) specifies it in a formal notation using rewrite rules.
