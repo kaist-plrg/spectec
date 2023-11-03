@@ -70,10 +70,10 @@ written and maintained \textit{manually}, which creates challenges for specifica
 Writing the prose is extremely laborious~\cite{Andreasicfp23}, and code reviews of
 feature proposals written in LaTeX and reStructuredText are not user-friendly.
 Manual processes are vulnerable to human error, potentially leading
-to inconsistencies or inaccuracies in the specification.
-As Wasm grows with new language features such as Garbage Collected Types, Threads,
-and Exception Handling that will be supported by Wasm 3.0,
-manually crafting all of the artifacts is not scalable.
+to inconsistency or incorrectness in the specification.
+As Wasm grows with new language features such as Garbage Collected Types,
+Tail Call Extension, and Function Reference Types that will be supported by
+the next release of Wasm, manually crafting all of the artifacts is not scalable.
 
 These challenges call for the need to automate the process via \textit{mechanizing} the language semantics.
 For declarative-style rewrite rules, the literature shows general-purpose language frameworks such as
@@ -152,22 +152,21 @@ To bridge the gap between the two styles of semantics,
 we present a mechanism for automatically deriving algorithmic ALs from declarative DSLs.
 Several challenges arise in transforming declarative-style rewrite rules
 into algorithmic-style prose pseudocode.
-For example, a single Wasm instruction may have multiple rewrite rules,
-each expressing certain premises,
-but each instruction should have only one prose pseudocode. 
+For example, a single Wasm instruction may have multiple rewrite rules
+that describe different premises, but each instruction should only have one prose pseudocode.
 In addition, the equals operator `$=$' in mathematical rules
 can be ambiguous, as it can mean assignment or equality checking.
 We show that the transformation is an NP-hard problem
 and propose a practical solution.
 
 \spectec is available as an open-source project~\cite{spectec}
-and covers everything in Wasm 2.0 except SIMD instructions.
-The automatically generated Wasm semantics in AL passes
+and covers all of Wasm 2.0, the most recent release of Wasm,
+except SIMD instructions.
+The automatically generated Wasm semantics passes
 100\% of the official test suite (except for SIMD).
-To further specify the semantics for Wasm 3.0, we only needed
-to make minor adjustments in \spectec. During this process, we
-reported a few errors in the Garbage Collected Types proposal and
-received confirmation from the proposal champions.
+We found a few errors in the proposals
+that would be included in the upcoming release of Wasm by utilizing \spectec,
+and we obtained confirmation from the proposal champions.
 
 This paper presents the following contributions:
 \begin{itemize}
