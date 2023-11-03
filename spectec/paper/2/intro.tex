@@ -18,8 +18,8 @@
 \end{figure}
 
 A programming language is defined by its syntax and semantics.
-Syntax and semantics are the basis for all subsequent development and
-analysis of the language, so it is important to define them clearly and rigorously. 
+Since syntax and semantics provide the foundation for all subsequent development and
+analysis of the language, it is important to define them clearly and rigorously. 
 Many programming languages, such as Java~\cite{javaspec} and Python~\cite{pythonspec},
 therefore have language specifications that define their syntax and semantics.
 For languages that are prone to implementation inconsistency issues,
@@ -119,9 +119,9 @@ In this paper, we propose \spectec, a framework for mechanizing Wasm semantics i
 \spectec presents a \emph{Domain-Specific Language (DSL)} that
 defines the Wasm syntax, type system, and execution semantics in a declarative style,
 which serves as a single source of truth.
-Figure~\ref{fig:dsl} illustrates the semantics of $t.\mathit{\inblue{binop}}$ in the DSL,
+Figure~\ref{fig:dsl} illustrates the semantics of $t.\mathit{\inblue{binop}}$ in DSL,
 which looks similar to the one in the official specification in Figure~\ref{fig:spec}(b).
-Once the Wasm formal semantics is written in the DSL,
+Once the Wasm formal semantics is written in DSL,
 a number of tools can be automatically generated as backends:
 1) declarative backends, including LaTeX-based formal specifications and
 mechanized definitions in various theorem provers, and
@@ -131,17 +131,17 @@ By conducting meta-level error checking and automatically generating the require
 
 \spectec's DSL is designed to provide a close and easy representation and reasoning of
 the Wasm semantics in declarative backends.
-It can directly produce LaTeX-based formal specifications from the definitions in the DSL,
-and all definitions and variables in the DSL are ``type-checked'' to detect ill-formed ones.
+It can directly produce LaTeX-based formal specifications from the definitions in DSL,
+and all definitions and variables in DSL are ``type-checked'' to detect ill-formed ones.
 It can also generate mechanized definitions for theorem provers.
 This saves language designers the trouble of manually specifying
 language semantics in different theorem provers every time the specification is updated.
 
-On the contrary, algorithmic backends are not directly produced from the definitions in the DSL,
+On the contrary, algorithmic backends are not directly produced from the definitions in DSL,
 but from the definitions in the \emph{Algorithmic Language (AL)}.
-The AL is designed to provide a close and easy representation and manipulation of
-the Wasm semantics in the official prose specification,
-so the English prose in reStructuredText markup can be generated directly from the definitions in the AL.
+AL is designed to provide a close and easy representation and manipulation of
+the Wasm semantics in the official prose specification.
+Thus, the English prose in reStructuredText markup can be generated directly from the definitions in AL.
 \spectec can also support the interpretation of Wasm programs,
 following the approach of the ESMeta framework.
 
@@ -159,7 +159,7 @@ and propose a practical solution.
 
 \spectec is available as an open-source project~\cite{spectec}
 and covers everything in Wasm 2.0 except SIMD instructions.
-The automatically generated Wasm semantics in the AL passes
+The automatically generated Wasm semantics in AL passes
 100\% of the official test suite (except for SIMD) using an AL interpreter.
 To further specify the semantics for Wasm 3.0, we only needed
 to make minor adjustments in \spectec. During this process, we
@@ -177,9 +177,12 @@ Unlike existing language frameworks that can mechanize only one style of semanti
 a single source of truth.}
 It is designed to be easy to write, read, and reivew, enabling
 meta-level error detection in the Wasm specification.
+The automatically generated Wasm semantics passes
+100\% of the official test suite (except for SIMD).
+
 
 \item \textbf{\spectec is a forward-compatible toolchain that can
 adapt to the evolving Wasm semantics.}
-To evaluate \spectec's forward compatibility, we applied it to five
-proposals in Wasm 3.0 and found that only minor adjustments were necessary. 
+To evaluate the forward compatibility of \spectec, we applied it to five proposals
+in Wasm 3.0 with minor adjustments, and found a few errors in the proposals.
 \end{itemize}
