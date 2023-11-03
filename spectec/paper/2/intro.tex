@@ -37,13 +37,14 @@ blockchains~\cite{wasm-blockchain}.
 Because different browsers implement Wasm within vendor-specific architectures
 using multi-tier interpretation or just-in-time compilation,
 Wasm faces the risk of implementation discrepancies.
-The diversity of the various ecosystems exacerbates the situation.
+The diversity of the various ecosystems exacerbates the situation,
+which is unfavorable since it harms the portability of Wasm across various platforms.
 
 To mitigate these risks, Wasm has been standardized by
 the W3C Wasm Community Group~\cite{wasm-w3c}.
 It requires four key artifacts for a feature to be standardized:
-1) a \textit{formal specification} for the feature in declarative-style rewrite rules, written in LaTeX;
-2) a \textit{prose pseudocode} presenting an algorithmic-style semantics, written in reStructuredText markup;
+1) a \textit{formal specification} for the feature in \textbf{declarative-style} rewrite rules, written in LaTeX;
+2) a \textit{prose pseudocode} presenting an \textbf{algorithmic-style} semantics, written in reStructuredText markup;
 3) an extended \textit{reference interpreter} with the implementation of the feature, written in OCaml; and
 4) a \textit{unit test suite} for the feature, written in the Wasm text format.
 All of these artifacts must define the same behavior of a Wasm program.
@@ -53,17 +54,18 @@ $t.\mathit{\inblue{binop}}$ in the official Wasm specification.
 Fig.~\ref{fig:spec}(a) presents the semantics in a prose notation broken down into five steps,
 while Fig.~\ref{fig:spec}(b) specifies it in a formal notation using rewrite rules.
 
-The two styles of semantic definitions cater to the dual needs of
-language ``designers'' and ``implementers.''  Declarative rewrite
-rules serve the needs of designers by focusing on clarity and
-correctness of language semantics. They allow theorem provers like
-Coq, Isabelle, Lean, and Agda to mechanize language semantics
-and prove various properties, including type safety.
-Algorithmic prose pseudocode, on the other hand, helps implementers
-understand language behavior. A step-by-step description of the
-language semantics can be a good guide to how to implement it.
+The two styles of semantic definitions possess distinct strongpoints,
+appealing to the dual needs of language ``designers'' and ``implementers.''
+Declarative rewrite rules specify the semantics through rigorous mathematical rules.
+They can be mechanized in theorem provers like Coq, Isabelle, Lean, and Agda
+to prove various properties, including type safety.
+This aligns with the needs of language designers,
+focusing on clarity and correctness of language semantics.
+Algorithmic prose pseudocode provides a step-by-step description of the language semantics.
+This on the other hand, aids in comprehension of language implementers,
+to give good guidance in implementing the semantics.
 
-Despite the onerous standardization process, the Wasm specification has been
+Despite the demanding standardization process, the Wasm specification has been
 written and maintained \textit{manually}, which creates challenges for specification writers.
 Writing the prose is extremely laborious~\cite{Andreasicfp23}, and code reviews of
 feature proposals written in LaTeX and reStructuredText are not user-friendly.
@@ -73,7 +75,7 @@ As Wasm grows with new language features such as Garbage Collected Types, Thread
 and Exception Handling that will be supported by Wasm 3.0,
 manually crafting all of the artifacts is not scalable.
 
-These challenges call for the need to automate the process or \textit{mechanize} the language semantics.
+These challenges call for the need to automate the process via \textit{mechanizing} the language semantics.
 For declarative-style rewrite rules, the literature shows general-purpose language frameworks such as
 Ott~\cite{ott}, PLTRedex~\cite{pltredex}, Skeleton~\cite{skeleton}, Spoofax~\cite{spoofax},
 and the K framework~\cite{k}. Among them, the K framework can generate various tools,
@@ -97,8 +99,8 @@ generate diverse tools~\cite{jiset,jest,jstar,jsaver}.
 ESMeta has been officially integrated into the continuous integration (CI) systems of
 the ECMAScript specification~\cite{ciecma262} and the Test262 conformance test suite~\cite{citest262}
 since November 2022.
-Because the existing language frameworks can mechanize only one style of semantics,
-they are not applicable to Wasm, which should support both declarative and algorithmic styles of semantics.
+Existing language frameworks are tailored to a specific choice of the semantics style, 
+making it unapplicable to Wasm that encompasses both declarative and algorithmic styles.
 
 \begin{figure}[t]
 \footnotesize
@@ -137,8 +139,9 @@ It can also generate mechanized definitions for theorem provers.
 This saves language designers the trouble of manually specifying
 language semantics in different theorem provers every time the specification is updated.
 
-On the contrary, algorithmic backends are not directly produced from the definitions in DSL,
-but from the definitions in the \emph{Algorithmic Language (AL)}.
+Prior to the generation of algorithmic backends,
+definitions in DSL are translated into definitions in the \emph{Algorithmic Language (AL)}.
+Once translated, AL lays out the foundation of the algorithmic backends.
 AL is designed to provide a close and easy representation and manipulation of
 the Wasm semantics in the official prose specification.
 Thus, the English prose in reStructuredText markup can be generated directly from the definitions in AL.
@@ -160,7 +163,7 @@ and propose a practical solution.
 \spectec is available as an open-source project~\cite{spectec}
 and covers everything in Wasm 2.0 except SIMD instructions.
 The automatically generated Wasm semantics in AL passes
-100\% of the official test suite (except for SIMD) using an AL interpreter.
+100\% of the official test suite (except for SIMD).
 To further specify the semantics for Wasm 3.0, we only needed
 to make minor adjustments in \spectec. During this process, we
 reported a few errors in the Garbage Collected Types proposal and
