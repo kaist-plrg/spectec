@@ -1,7 +1,7 @@
 % load packages
 \usepackage{float}
-\usepackage{algorithmic}
 \usepackage{amsmath,amsfonts}
+\usepackage{algpseudocode}
 \usepackage[ruled, vlined]{algorithm2e}
 \usepackage{graphicx}
 \usepackage{textcomp}
@@ -26,6 +26,9 @@
 \usepackage{adjustbox}
 \usepackage{tikz}
 \usepackage{csquotes}
+\usepackage{url}
+\usepackage{amstext} % for \text macro
+\usepackage{array}   % for \newcolumntype macro
 
 % box
 \newcommand{\cfbox}[2]{%
@@ -69,32 +72,165 @@
 \definecolor{gray2}{rgb}{0.85, 0.85, 0.85}
 \definecolor{gray3}{rgb}{0.75, 0.75, 0.75}
 
+\newcolumntype{L}{>{$}l<{$}} % math-mode version of "l" column type
+\newcommand{\llb}{\llbracket}
+\newcommand{\rrb}{\rrbracket}
+
 % basic
 \newcommand{\inblue}[1]{{\color{blue}{#1}}}
 \newcommand{\inred}[1]{{\color{red}{#1}}}
 \newcommand{\x}[1]{\inred{#1}}
 \newcommand{\y}[1]{\textbf{\inred{#1}}}
 \newcommand{\todo}{\inred{TODO}}
-\newcommand{\powerset}{\mathcal{P}}
+%\newcommand{\powerset}{\mathcal{P}}
 \newcommand{\tif}{\text{if} \; }
 \newcommand{\telse}{\text{otherwise}}
 \newcommand{\tst}{{\; \text{s.t.} \; }}
 
-% tool name
+% Our tool name
 \newcommand{\name}[1]{\textsf{#1}\xspace}
-\newcommand{\sname}[1]{\name{\small #1}}
-\newcommand{\stextbf}[1]{\textbf{\small #1}}
-\newcommand{\spectec}{\name{WasmMeta}} % Codename for SpecTec
-\newcommand{\dsl}{\sname{Wasm-DSL}}
-\newcommand{\al}{\sname{AL}}
+\newcommand{\ssf}[1]{\ensuremath{\mathsf{#1}}\xspace}
+\newcommand{\sbf}[1]{\textbf{\small #1}\xspace}
+\newcommand{\stt}[1]{\texttt{\small #1}\xspace}
+\newcommand{\dsl}{\name{Wasm-DSL}}
+\newcommand{\dl}{\name{DL}}
+\newcommand{\al}{\name{AL}}
+\newcommand{\spectec}{\name{\$SRC}}
+\newcommand{\dslname}{SpecTec\xspace}
 
-% formal
-\newcommand{\ruleW}{r}
-\newcommand{\rulesW}{R}
-\newcommand{\configW}{c}
-\newcommand{\configsW}{C}
-\newcommand{\stW}{S}
-\newcommand{\premsW}{P}
-\newcommand{\helperW}{h}
-\newcommand{\helpersW}{H}
+% codes
+\newcommand{\code}[1]{\text{\lstinline[style=JS]!#1!}} 
+\newcommand{\scode}[1]{\texttt{\scriptsize #1}} 
+\newcommand{\bcode}[1]{\texttt{\small #1}}
+\newcommand{\ircode}[1]{\text{\lstinline[style=ires]!#1!}}
+
+\newcommand{\kwsyn}{\bcode{syntax}}
+\newcommand{\kwret}{\bcode{return}}
+
+\newcommand{\kwalg}{\bcode{algorithm}}
+\newcommand{\kweq}{\coloneqq}
+\newcommand{\kwdef}{\bcode{def}}
+\newcommand{\kwif}{\bcode{if}}
+\newcommand{\kwreturn}{\bcode{return}}
+\newcommand{\kweither}{\bcode{either}}
+\newcommand{\kwenter}{\bcode{enter}}
+\newcommand{\kwassert}{\bcode{assert}}
+\newcommand{\kwpush}{\bcode{push}}
+\newcommand{\kwpop}{\bcode{pop}}
+\newcommand{\kwpopall}{\bcode{popall}}
+\newcommand{\kwlet}{\bcode{let}}
+\newcommand{\kwtrap}{\bcode{trap}}
+\newcommand{\kwnop}{\bcode{nop}}
+\newcommand{\kwexecute}{\bcode{execute}}
+\newcommand{\kwexecuteseq}{\bcode{executeseq}}
+\newcommand{\kwperform}{\bcode{perform}}
+\newcommand{\kwexit}{\bcode{exit}}
+\newcommand{\kwref}{\bcode{ref}}
+\newcommand{\kwreplace}{\bcode{replace}}
+\newcommand{\kwiscaseof}{\bcode{iscaseof}}
+\newcommand{\kwisdefined}{\bcode{isdefined}}
+\newcommand{\kwisvalid}{\bcode{isvalid}}
+%\newcommand{\kwwasmc}{\bcode{wasmc}}
+%\newcommand{\kw}{\bcode{}}
+\newcommand{\kwnot}{\bcode{not}}
+\newcommand{\kwequ}{\bcode{=}}
+\newcommand{\kwrl}{\bcode{(}}
+\newcommand{\kwrr}{\bcode{)}}
+\newcommand{\kwcl}{\bcode{\{}}
+\newcommand{\kwcr}{\bcode{\}}}
+\newcommand{\kwsl}{\bcode{[}}
+\newcommand{\kwsr}{\bcode{]}}
+\newcommand{\kwass}{\bcode{:=}}
+\newcommand{\kwext}{\bcode{:+}}
+\newcommand{\kwcat}{\bcode{++}}
+
+\newcommand{\unop}{\ensuremath{\otimes}}
+\newcommand{\binop}{\ensuremath{\oplus}}
+
+% Basic
+\DeclareMathAlphabet{\mathpzc}{T1}{pzc}{m}{it}
+\newcommand{\powerset}[1]{\mathcal{P}(#1)}
+\newcommand{\abs}[1]{\widehat{#1}}
+\newcommand{\finmap}{{\xrightarrow[]{\text{fin}}}}
+\newcommand{\mapstos}{\;\dot{\mapsto}\;}
+\newcommand{\Dom}{\name{Dom}}
+\DeclarePairedDelimiter{\norm}{\lvert}{\rvert} 
+
+% JavaScript
+\newcommand{\js}{\name{js}}
+
+% Getters
+\newcommand{\getfunc}{\name{func}}
+\newcommand{\getinst}{\name{inst}}
+\newcommand{\getnext}{\name{next}}
+\newcommand{\getcaller}{\name{caller}}
+\newcommand{\getlab}{\name{label}}
+
+% Values
+\newcommand{\valset}{\mathbb{V}}
+\newcommand{\val}{v}
+\newcommand{\pvalset}{\valset^\name{p}}
+\newcommand{\pval}{\val^\name{p}}
+\newcommand{\boolset}{\valset_\name{bool}}
+\newcommand{\bool}{b}
+\newcommand{\true}{\code{\#t}}
+\newcommand{\false}{\code{\#f}}
+\newcommand{\intset}{\valset_\name{int}}
+\newcommand{\strset}{\valset_\name{str}}
+
+% JavaScript ASTs
+\newcommand{\treeset}{\mathbb{T}}
+\newcommand{\tree}{t}
+\newcommand{\trees}{\overline{t}}
+\newcommand{\nodeset}{\Phi}
+\newcommand{\node}{\phi}
+\newcommand{\subtree}{\lhd}
+\newcommand{\getsubs}{\name{subs}}
+\newcommand{\treetop}{\code{\#}}
+\newcommand{\ty}{\tau}
+\newcommand{\eval}{\code{eval}}
+
+% DL Syntax
+\newcommand{\defnset}{\mathfrak{D}}
+\newcommand{\defn}{d}
+\newcommand{\infrset}{\mathcal{R}}
+\newcommand{\infr}{r}
+\newcommand{\funcset}{\mathcal{F}}
+\newcommand{\func}{f}
+
+% AL Syntax
+\newcommand{\progset}{\mathfrak{P}}
+\newcommand{\prog}{p}
+\newcommand{\algset}{\mathcal{A}}
+\newcommand{\alg}{a}
+\newcommand{\instset}{\mathcal{I}}
+\newcommand{\inst}{i}
+\newcommand{\exprset}{\mathcal{E}}
+\newcommand{\expr}{e}
+\newcommand{\condset}{\mathcal{C}}
+\newcommand{\cond}{c}
+\newcommand{\numset}{\mathcal{N}}
+\newcommand{\num}{n}
+\newcommand{\qualset}{\mathcal{Q}}
+\newcommand{\qual}{q}
+\newcommand{\wasmcset}{\mathcal{W}}
+\newcommand{\wasmc}{w}
+\newcommand{\cnstrset}{\mathcal{K}}
+\newcommand{\cnstr}{k}
+
+% Variables
+\newcommand{\varset}{\mathcal{X}}
+\newcommand{\varx}{x}
+\newcommand{\varf}{f}
+\newcommand{\vart}{t}
+\newcommand{\varp}{p}
+
+% Field Mappings
+\newcommand{\fmapset}{\mathbb{M}}
+\newcommand{\fmap}{m}
+\newcommand{\jsfmapset}{\fmapset_\js}
+\newcommand{\jsfmap}{\fmap_\js}
+
+% Transition Relations
+\newcommand{\trans}[1]{\leadsto_{#1}}
 
