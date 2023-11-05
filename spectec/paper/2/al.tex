@@ -1,4 +1,4 @@
-\section{Algorithmic Backends}\label{sec:al} % 8p
+\section{Algorithmic Backends}\label{sec:al}
 This section presents a mechanism for automatically generating
 algorithmic backends from the formal semantics.
 We define \emph{\dl}, a declarative language that defines the formal
@@ -10,7 +10,7 @@ We then show how to generate a prose specification from the semantics
 described in \al (Sec.~\ref{sec:prose}) and
 support its interpretation (Sec.~\ref{sec:interp}).
 
-\subsection{\dl: Declarative Language}\label{sec:dl} %0.5p
+\subsection{\dl: Declarative Language}\label{sec:dl}
 The DSL describes the formal semantics of Wasm, and
 we abstract it into a \dl that only shows the features relevant to translation to an algorithmic representation.
 Fig.~\ref{fig:dl-syntax} presents the syntax of \dl.
@@ -22,17 +22,21 @@ Fig.~\ref{fig:dl-syntax} presents the syntax of \dl.
 \text{Semantics} & \delta^*\\
 \text{Definition} & \delta &::=& \rho\ \mid\ \lambda\\
 \text{Reduction rule} & \rho &::=& \gamma \leadsto \gamma\ \mbox{---}\ \pi^*\\
-\text{Configuration} & \gamma &::=&(\eta_\bot,\ \eta^*)\\
+\text{Configuration} & \gamma &::=&(\eta_\bot,\ \eta)\\
 \text{Premise} & \pi &::=& \beta\ \mid\ \mathsf{\small otherwise}\\
 \text{Helper function} &
 \lambda &::=& \varx \kwrl \eta^* \kwrr\ \kwequ\ \eta\ \mbox{---}\ \pi^*\\
-\text{Expression} & \eta &::=& \upsilon\ \mid\ \kappa\ \eta^*\ \mid \cdots \\
+\text{Expression} & \eta &::=& \upsilon\ \mid\ \kappa\ \eta^*\ \mid\ \eta + \eta\
+\mid \eta^*\ \mid \eta \leftarrow \eta \ \mid (\eta,\ \eta)\
+\mid \cdots \\
 \text{Condition} & \beta  &::=& \eta\ = \eta\ \mid \cdots\\
 \text{Value} & \upsilon &::=& \ssf{I32}\ \mid\ \ssf{I64}\ \mid\ 
 \ssf{F32}\ \mid\ \ssf{F64}\ \mid\ 
-\ssf{0}\ \mid\ \ssf{1}\ \mid\ t\ \mid\ \epsilon\ \mid \cdots \\
+\ssf{0}\ \mid\ \ssf{1}\ \mid\ x\ \mid\ \epsilon\ \mid \cdots \\
 \text{Constructor} & \kappa &::=& \ssf{REF.IS\_NULL}\ \mid\ \ssf{REF.NULL}\
-\mid\ \ssf{REF} \mid\ \ssf{NULL}\ \mid\ \ssf{CONST}\ \mid \cdots
+\mid\ \ssf{REF} \mid\ \ssf{NULL}\ \mid\ \ssf{CONST}\ \mid\ \ssf{LABEL\_}\
+\mid\ \ssf{BR}\
+\mid \cdots
 \end{array}
 \]
 \caption{Syntax of \dl for Wasm}\label{fig:dl-syntax}
@@ -43,13 +47,13 @@ A definition is either a reduction rule $\rho$ or an auxiliary helper function $
 A reduction rule $\gamma_1 \leadsto \gamma_2\ \mbox{---}\ \pi^*$ denotes that
 when the current configuration of a program matches $\gamma_1$ and
 all $\pi^*$ are evaluated to true, then the program configuration becomes $\gamma_2$.
-A configuration $(\eta_\bot,\ \eta^*)$ denotes an optional Wasm program state $\eta_\bot$,
+A configuration $(\eta_\bot,\ \eta)$ denotes an optional Wasm program state $\eta_\bot$,
 which is a pair of the current store and the current frame,
-and a sequence of Wasm instructions $\eta^*$ that represents the current stack.
+and a Wasm instruction $\eta$ that represents the current stack.
 Because the details of the Wasm program states and instructions are
-not relevant to this report,
+not relevant to this paper,
 we abstract them as $\eta$. We show only some cases used for concrete
-examples in this report.
+examples in this paper.
 A premise $\pi$ is a condition $\beta$ or a special keyword
 \ensuremath{\mathsf{\small otherwise}},
 which denotes the negation of all the previous premises.
@@ -61,18 +65,17 @@ and a body expression $\eta$ is evaluated if all $\pi^*$ are evaluated to true.
 For example, the semantics of \inblue{\ensuremath{\mathsf{ref.is\_null}}}
 in Fig.~\ref{fig:dsl} corresponds to the following in \dl:
 \[
-\footnotesize
 \begin{array}{l@{}l@{~}c@{~}l}
-[&(\bot, [\upsilon, \ssf{REF.IS\_NULL}]) &\leadsto& (\bot, [\ssf{CONST\ I32\ 1}])
-\mbox{---} [\upsilon = \ssf{REF.NULL}\ t],\\
-&(\bot, [\upsilon, \ssf{REF.IS\_NULL}])&\leadsto&(\bot, [\ssf{CONST\ I32\ 0}])
-\mbox{---}[\ssf{\small otherwise}] ]
+[&(\bot, [\upsilon, \ssf{REF.IS\_NULL}]) &\leadsto& (\bot, [\ssf{CONST\ I32\ 1}])\
+\mbox{---}\ [\upsilon = \ssf{REF.NULL}\ t],\\
+&(\bot, [\upsilon, \ssf{REF.IS\_NULL}])&\leadsto&(\bot, [\ssf{CONST\ I32\ 0}])\
+\mbox{---}\ [\ssf{\small otherwise}] ]
 \end{array}
 \]
 where a sequence is represented as comma separated elements
-enclosed by $[$ and $]$.
+enclosed by $[$ and $]$ for readability.
 
-\subsection{\al: Algorithmic Language}\label{sec:aldef} %1.5p
+\subsection{\al: Algorithmic Language}\label{sec:aldef}
 Before generating algorithmic backends, definitions in \dl are translated into definitions in \al,
 an algorithmic language that defines the Wasm language semantics in a pseudocode style.
 
@@ -204,53 +207,310 @@ rather than ``not $\expr$ is valid.''
 For example, the semantics of \inblue{\ensuremath{\mathsf{ref.is\_null}}}
 in Fig.~\ref{fig:dsl} corresponds to the following in \al:
 \[
-\footnotesize
-\begin{array}{lll}
+\small
+\!\!
+\begin{array}{r@{~}l}
 \kwalg \; \mathit{REF.IS\_NULL} \kwrl \kwrr \; \kwcl &
   \kwassert \; \wasmc \\
 & \kwpop \; \mathit{val}\\
-& \kwif \; (\kwnot \; (\kwiscaseof \; \mathit{val} \; \mathit{REF.NULL\_val}))\\
-& \quad \; \; \kwpush \; \ssf{CONST}(\ssf{I32}(0)) \\
-& \quad \; \; \kwpush \; \ssf{CONST}(\ssf{I32}(1)) & \kwcr
+& \kwif \; (\kwiscaseof \; \mathit{val} \; \mathit{REF.NULL})\;
+\; (\kwpush \; \ssf{CONST}(\ssf{I32}(1))) \; (\kwpush \; \ssf{CONST}(\ssf{I32}(0)))\\
+\kwcr
 \end{array}
 \]
 
-\subsection{DL2AL}\label{sec:dl2al} %3.5p
-To bridge the gap between the two styles of semantics,
-we present a mechanism for automatically deriving algorithmic ALs from declarative DSLs.
-Several challenges arise in transforming declarative-style rewrite rules
-into algorithmic-style prose pseudocode.
-For example, a single Wasm instruction may have multiple rewrite rules
-that describe different premises, but each instruction should only have one prose pseudocode.
-In addition, the equals operator `$=$' in mathematical rules
-can be ambiguous, as it can mean assignment or equality checking.
-We show that the transformation is an NP-hard problem
-and propose a practical solution.
+\subsection{\dl to \al Transformation}\label{sec:dl2al}
+Now, we describe how to transform a Wasm semantics $\delta^*$ in \dl into an \al program $\prog$.
+First, the definitions in $\delta^*$ are grouped to represent algorithms; among $\delta^*$,
+the reduction rules $\gamma^*$ are grouped according to their target Wasm instructions, and
+the helper functions $\lambda^*$ are grouped according to their names.
+Each group is transformed into a single algorithm in two phases:
+1) preprocess the group's definitions to satisfy some \textit{preconditions}, and
+2) generate an \al algorithm from the preprocessed \dl definitions.
 
-\subsubsection{DL2DL Preprocessing} %3.5p
-\paragraph{Unification} % 1p
-\paragraph{Animation} % 2.5p
-NP-hard: proof % 1.5p
+\subsubsection{\dl to \dl Preprocessing}
+Preprocessing consists of two steps: for each group of reduction rules (or helper functions),
+1) preprocess the left-hand sides (or parameters) of the reduction rules (or helper functions)
+in the group to make them the same, and
+2) preprocess the premises of the definitions in the group
+so that every variable is bound exactly once before its uses.
 
-solution: how % 1p
-\subsubsection{DL2AL Transformation} % 1p
+\medskip
+The first preprocessing step is to make the left-hand sides (or parameters) of
+the reduction rules (or helper functions) in each group identical.
+Most Wasm  definitions satisfy this precondition, but some do not, such as the following
+DSL reduction rules for the \inblue{\ensuremath{\mathsf{br}}} instruction:
+
+{
+\begin{verbatim}
+     rule Step_pure/br-zero:
+        (LABEL_ n `{instr'*} val'* val^n (BR 0) instr*)  ~>  val^n instr'*
+
+     rule Step_pure/br-succ:
+        (LABEL_ n `{instr'*} val* (BR $(l+1)) instr*)  ~>  val* (BR l)
+\end{verbatim}
+}
+
+\noindent
+which corresponds to the following in \dl:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; v'^*\; v^n\; (\ssf{BR\; 0})\; \eta^*) &\leadsto&
+ (\bot,\; v^n\; \eta^*)\ \mbox{---}\ []\\
+\rho_2 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; v^*\; (\ssf{BR\; (}l\ssf{+1)})\; \eta^*) &\leadsto&
+ (\bot,\; v^*\; (\ssf{BR}\; l))\ \mbox{---}\ []
+\end{array}
+\]
+
+For each group of reduction rules $\rho^* =
+(\eta_1, \eta' _1) \leadsto \gamma_1\ \mbox{---}\ \pi_1^*\
+\cdots\
+(\eta_n, \eta' _n) \leadsto \gamma_n\ \mbox{---}\ \pi_n^*$,
+the unification algorithm \unify takes a list of expressions to unify,
+$\eta_1\,\eta'_1\ \cdots\ \eta_n\,\eta'_n$, and returns a pair of
+a unified expression $\eta$ and a list of premises $\pi^n$.
+Similarly, for each group of helper functions $\lambda^*=
+\varx_1 \kwrl \eta_1^* \kwrr\ \kwequ\ \eta_1\ \mbox{---}\ \pi_1^*\
+\cdots\
+\varx_n \kwrl \eta_n^* \kwrr\ \kwequ\ \eta_n\ \mbox{---}\ \pi_n^*$,
+\unify takes a list of expressions to unify,
+$\eta_1^*\ \cdots\ \eta_n^*$, and returns a pair of
+a unified expression $\eta$ and a list of premises $\pi^n$.
+For the \inblue{\ensuremath{\mathsf{br}}} instruction, for example,
+\unify takes two expressions
+``{$(\ssf{LABEL\_} \; n) \; \eta'^*\; v'^*\; v^n\; (\ssf{BR\; 0})\; \eta^*$}'' and
+``{$(\ssf{LABEL\_} \; n) \; \eta'^*\; v^*\; (\ssf{BR\; (}l\ssf{+1)})\; \eta^*$}.''
+
+For a list of expressions to unify $\eta_1\ \cdots\ \eta_n$,
+\unify first 1) generates a unified expression $\eta$ possibly containing some fresh variables
+and then 2) generates premises $\pi_i^*\ (1\le i \le n)$ using the fresh variables to make
+each $\eta_i\ (1\le i \le n)$ be the same as $\eta$ with $\pi_i^*\ (1\le i \le n)$.
+More specifically, the unified expression $\eta$ is the most common expression of
+the expressions to unify $\eta_1\ \cdots\ \eta_n$,
+replacing the different components with fresh variables.
+For example, the unified expression for the reduction rules for \inblue{\ensuremath{\mathsf{br}}} is
+``{$(\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*$}.''
+After generating the unified expression, \unify generates premises $\pi_i^*\ (1\le i \le n)$
+for each $\eta_i\ (1\le i \le n)$ so that $\eta_i$ is an instance of the unified expression satisfying $\pi_i^*$.
+For $\eta_i\ (1\le i \le n)$, \unify infers the conditions $\pi_i^*$ for the free variables
+in the unified expression $\eta$ to make $\eta$ the same as $\eta_i$.
+For example, to make the unified expression for \inblue{\ensuremath{\mathsf{br}}}
+same as the left-hand sides of $\rho_1$ and $\rho_2$, \unify infers the conditions
+$[t = v'^*\; v^n,\ t' = 0]$ and $[t = v^*,\ t' = l\ssf{+1}]$, respectively.
+Finally, the unification result of the rules for the \inblue{\ensuremath{\mathsf{br}}} instruction is as follows:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
+ (\bot, v^n\; \eta^*)\ \mbox{---}\ [t = v'^*\; v^n,\ t' = 0]\\
+\rho_2 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
+ (\bot, v^*\; (\ssf{BR}\; l))\ \mbox{---}\ [t = v^*,\ t' = l\ssf{+1}]
+\end{array}
+\]
+The fresh variables $t$ and $t'$ are introduced for both rules $\rho_1$ and $\rho_2$
+to make their left-hand sides the same. The definitions of $t$ and $t'$ are available as premises:
+$[t = v'^*\; v^n,\ t' = 0]$ for $\rho_1$ and
+$[t = v^*,\ t' = l\ssf{+1}]$ for $\rho_2$.
+
+
+\medskip
+The second preprocessing step is to change the premises of each group's definitions
+so that each variable is bound exactly once before it is used.
+While the order of the premises is not important in declarative reduction rules,
+it is crucial in algorithmic backends.
+In addition, an equality expression $\eta = \eta'$ in a premise $\pi$ can be ambiguous,
+because it can refer to an equality check condition or a variable binding.
+This second preprocessing step replaces every equality expression denoting a variable binding with $\eta \leftarrow \eta'$.
+Thus, this step identifies each variable's binding occurrence,
+keeps track of the variables that each premise binds,
+and reorders premises so that preceding premises bind all free variables in each premise.
+
+For example, consider the rules for the \inblue{\ensuremath{\mathsf{br}}} instruction again:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
+ (\bot, v^n\; \eta^*)\ \mbox{---}\ [t = v'^*\; v^n,\ t' = 0]\\
+\rho_2 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
+ (\bot, v^*\; (\ssf{BR}\; l))\ \mbox{---}\ [t = v^*,\ t' = l\ssf{+1}]
+\end{array}
+\]
+In the first rule $\rho_1$, the second premise $t' = 0$ is an equality check codition,
+while in the second rule $\rho_2$, the second premise $t' = l\ssf{+1}$ is a binding of a fresh variable $l$.
+Therefore, this step changes the second rule as follows:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho_2' = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
+ (\bot, v^*\; (\ssf{BR}\; l))\ \mbox{---}\ [t = v^*,\ l\ssf{+1} \leftarrow t']
+\end{array}
+ \]
+which clearly indicates that the fresh variable $l$ is newly introduced in this premise.
+Once the variable binding occurrences in premises are identified,
+reordering the premises is a simple def-use dataflow analysis.
+
+The main problem is now reduced to identifying each variable's binding occurrence in premises,
+which turns out to be a \textit{NP-hard} problem.
+This is especially because a single premise can bind more than two variables at once,
+as in $(x,y) \leftarrow \eta$.
+We prove it by reduction from a known NP-hard problem, the \textit{exact cover} problem~\cite{exactcover}:
+\begin{quote}
+The exact cover problem aims at deciding whether it is possible to select some subsets within a given collection of subsets in such a way that each element of a given set belongs to exactly one selected subset. This problem is NP-complete~\cite{karp72}.
+\end{quote}
+
+\begin{definition}[Exact Cover Problem]\label{def:exactcover}
+An instance of the \textit{Exact Cover Problem} (EC) is defined by a tuple $(X, S)$
+such that $X$ is a set of elements and $S \subseteq \mathcal{P}(X)$ is a set of subsets of $X$.
+EC aims at deciding if there exists a subset $P \subseteq S$ which is a partition of $X$,
+such that $\forall a \in X.\ \#\{ u \in P \mid a \in u \} = 1$.
+\end{definition}
+
+\noindent
+For example, consider $X = \{a, b, c, d, e\}$ and $S = \{\{a,b\}, \{b,c\}, \{c,d,e\}\}$.
+Because $\{\{a,b\}, \{c,d,e\}\}$, one of the subsets of $S$, is a partition of $X$,
+the answer is yes.
+On the other hand, for $S' = \{\{a,b\}, \{b,c\}, \{c,d\}, \{d,e\}\}$,
+since no subset of $S'$ is a partition of $X$\footnote{It can be easily
+verified by the parity. The union of any pair-wise disjoint subset of $S'$ would have an even number
+of elements, but the whole set $X$ has 5 elements.}, the answer is no.
+
+Because EC is one of Karp's 21 NP-complete problems~\cite{karp72},
+we can prove that the problem of identifying each variable's binding occurrence in premises is NP-hard,
+if we can reduce EC into the problem in polynomial time.
+
+\begin{theorem}\label{thm:np-hard}
+The problem of identifying each variable's binding occurrence in premises is NP-hard.
+\end{theorem}
+\begin{proof}
+Assume that we are given EC with a set $X$ and
+a set of its subsets $S \subseteq \mathcal{P}(X)$. Let $n$ be the size of $S$.
+Let $S_i = \{x_{i1}, x_{i2}, ..., x_{ij}\}$ be the $i$-th subset of $S$.
+Now, consider a reduction rule $\gamma \leadsto \gamma'\ \mbox{---}\ \pi^*$
+where $\gamma = (\top,\ v_n, v_{n-1}, \cdots, v_1)$,
+$\gamma' = (\top,\ [])$, and
+the $i$-th premise of $\pi^*$ be $v_i = (x_{i1}, x_{i2}, ..., x_{ij})$.
+Note that this reduction rule can be constructed in linear time.
+The claim is that when we identify each variable's binding occurrence in $\pi^*$,
+this gives a solution to EC.
+Note that every variable must be bound exactly once.
+Thus, if we collect all premises that bind new variables,
+then the subsets $S_i$ corresponding to binding premises
+would form a subset of $S$, which is a partition of $X$.
+\end{proof}
+
+\textbf{Example.}
+Let's consider the example of $X = \{a, b, c, d, e\}$ and $S = \{\{a,b\}, \{b,c\}, \{c,d,e\}\}$ again.
+Following the proof above, EC for $X$ and $S$ is reduced to the problem of
+identifying each variable's binding occurrence in the premises of the
+following reduction rule:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho = & (\top, [v_3, v_2, v_1]) &\leadsto& (\top, [])\ \mbox{---}\
+[v_1 = (a,b), v_2 = (b,c), v_3 = (c, d, e)]
+\end{array}
+ \]
+If we successfully solve the problem, then the result should look like the following:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho' = & (\top, [v_3, v_2, v_1]) &\leadsto& (\top, [])\ \mbox{---}\
+[(a,b) \leftarrow v_1, (c, d, e) \leftarrow v_3, v_2 = (b,c)]
+\end{array}
+\]
+From the result, we can reconstruct the partition of the set $X$
+by collecting the binding premises, $\{\{a, b\}, \{c, d, e\}\}$, giving the answer to EC.
+
+\begin{algorithm}[t]
+\DontPrintSemicolon
+\KwIn{A list of premises $\pi^*$ and a set of bound variables $X$}
+\KwOut{A list of preprocessed premises $\pi'^*$}
+$S \gets \emptyset$\;
+\For{$i \gets 1$ \textbf{to} $|\pi^*|$}{
+    \lIf{$\pi_i = (\eta = \eta')$}
+    {$S_i \gets \{\{i\},\ \{i\}\cup\mathit{free}(\eta),\ \{i\}\cup\mathit{free}(\eta')\}$}
+    \lElse{$S_i \gets \{\{i\}\}$}
+$S \gets S \cup S_i$\;
+}
+$P \gets \mathit{Knuth}(S \cup X)$\;
+\For{$p \in P$}{
+    $\pi'^* \gets \mathit{replaceVariableBinding}(\pi^*, p)$\;
+    \lIf{reordering $\pi'^*$ succeeds}
+    {\Return{reordered $\pi'^*$}}
+}
+where $\mathit{free}(\eta)$ returns free variables in $\eta$ and
+$\mathit{Knuth}(S)$ returns partitions of $S$
+\caption{Preprocess Premises}
+\label{algo:preminfer}
+\end{algorithm}
+
+\medskip
+This theorem implies that no polynomial-time algorithm can solve the problem.
+If the numbers of premises are rather small, a simple brute-force algorithm might be a solution.
+However, the reduction rule for Wasm module instantiation, for example,
+has more than 10 premises and variables, so a brute-force approach is not applicable.
+Another solution is to use an SMT solver like Z3~\cite{z3},
+since this is a constraint solving problem.
+However, the performance overhead of Z3 does not apply to this problem either.
+
+As a practical solution to the NP-hard problem,
+we reduce the problem into EC\footnote{Note that the direction is opposite with
+the proof} and then adopt the Knuth algorithm~\cite{knuth2000dancing},
+a well-known and effective algorithm for solving EC.
+The high-level idea is to encode the premises as a collection of sets,
+where a solution to EC of the encoded set corresponds to the solution to our problem.
+
+Algorithm~\ref{algo:preminfer} describes the process.
+It takes two inputs, a list of premises $\pi^*$ in reduction rules and helper functions
+and a set of already bound variables $X$, and returns a list of preprocessed premises $\pi'^*$.
+First, it encodes premises as a collection of subsets of $X$,
+where $X = \{1, \cdots, |\pi^*|\} \cup \mathit{free}(\pi^*)$
+is a set of the numbers from $1$ to the size of premises
+and all free variables in them, on which the Knuth algorithm performs.
+For each $\pi_i$, if it is an equality expression $\eta = \eta'$,
+it is encoded as $\{\{i\},\ \{i\}\cup\mathit{free}(\eta),\ \{i\}\cup\mathit{free}(\eta')\}$,
+which denotes its possible interpretations.
+The first set $\{i\}$ denotes when the $i$-th premise does not bind any variables,
+meaning $\pi_i$ is an equality check condition.
+The second set $\{i\} \cup \mathit{free}(\eta)$ denotes when $\pi_i$ binds all the variables in $\eta$ and
+the third set $\{i\} \cup \mathit{free}(\eta')$ denotes when $\pi_i$ binds all the variables in $\eta'$.
+For example, if the first premise is $x = y$, it is encoded as $\{1\}$, $\{1, x\}$, and $\{1, y\}$.
+If $\pi_i$ is not an equality expression, it is encoded as $\{\{i\}\}$,
+meaning $\pi_i$ does not bind any variables but checks some non-equality condition.
+Then, the Knuth algorithm takes the collection $S$ containing all the encoded subsets and
+the set of bound variables $X$ and returns their partitions $P$.
+Note that the Knuth algorithm may not return a unique partion.
+In addition, due to the definition of partition, for any partion $p$,
+there should be exactly one subset that contains a number $i$ for $1 <= i <= n$.
+Thanks to the design of encoding, a subset is either a singleton set $\{i\}$ or
+a set with an index and some variables $\{i, x_1, x_2, \cdots\}$.
+
+\begin{algorithm}[t]
+\DontPrintSemicolon
+\KwIn{A list of premises $\pi^*$ and a set of sets of numbers and variables $p$}
+\KwOut{A list of premises $\pi'^*$ with explicit variable binding }
+\SetKwProg{Fn}{Function}{}{}
+\Fn{$\mathit{replaceVariableBinding}(\pi^*, p)$} {
+\For{$i \gets 1$ \textbf{to} $|\pi^*|$}{
+\If{$\pi_i = (\eta = \eta')$}
+    {\lIf{$\{i\} \in p$}{$\pi'_i \leftarrow (\eta = \eta')$}
+     \lElseIf{$\{i\}\cup\mathit{free}(\eta) \in p$}{$\pi'_i \leftarrow (\eta \leftarrow \eta')$}
+     \lElseIf{$\{i\}\cup\mathit{free}(\eta') \in p$}{$\pi'_i \leftarrow (\eta' \leftarrow \eta)$}
+    }
+}
+\Return{$\pi'^*$}
+}
+\caption{Replace Variable Binding}
+\label{algo:binding}
+\end{algorithm}
+
+Using a partition $p$, it replaces every equality expression denoting a variable binding 
+with an explicit variable binding expression via $\mathit{replaceVariableBinding}$ in Algorithm~\ref{algo:binding}.
+For example, if a singleton set $\{2\}$ is in the input partition $p$,
+then the second premise $\pi_2$ is an equality check condition and remains the same.
+If a set $\{3, y\}$ is in $p$ and the third premise is $x = y$,
+then the third premise is replaced with $y \leftarrow x$.
+For a preprocessed premise $\pi'^*$, Algorithm~\ref{algo:preminfer} tries to reorder them 
+so that all variables are bound before their uses in premises.
+If reordering $\pi'^*$ succeeds, the algorithm returns the reordered $\pi'^*$.
+Reordering premises may fail, if they contain cyclic bindings like $x = f(y)$ and $y = g(x)$.
+The Wasm semantic definitions do not have premises with cyclic bindings.
+
+
+\subsubsection{DL2AL Transformation}
 divide \& conquer
-
-\subsection{Prose Backend}\label{sec:prose} %0.5p
-AL is designed to provide a close and easy representation and manipulation of
-the Wasm semantics in the official prose specification.
-Thus, the English prose in reStructuredText markup can be generated directly from the definitions in AL.
-\spectec can also support the interpretation of Wasm programs,
-following the approach of the ESMeta framework.
-
-\subsection{Interpreter Backend}\label{sec:interp} %1p
-%
-%  ESMeta parses the structured English prose algorithms of ECMAScript
-% Specification document, and translates them into an internal representation, $IR_{ES}$.
-%   $IR_{ES}$ has its own semantics, and thus can be executed with an interpreter implementation.
-%   Executing the JavaScript semantics written in $IR_{ES}$ allows an indirect execution of JavaScript programs.
-%   Utilizing the executable semantics, ESMeta derives a type checker for the specification, test
-% suite synthesizers, and a static analyzer of JavaScript.
-%
-% Now, each ECMA-262 PR will execute the ESMeta type checker, and any new or changed tests in a Test262 PR will be executed using the ESMeta interpreter.
-%
