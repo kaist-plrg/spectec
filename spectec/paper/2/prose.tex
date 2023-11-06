@@ -17,3 +17,14 @@ which is very close to the original handwritten prose description in Fig.~\ref{f
 \item cf) error-prone generation of references done manually
 \item systematic naming and bug detection?
 \end{itemize}
+
+Note that an \al expression may have a different prose rendering
+depending on where it appears. For example, $|e|$ is rendered as 
+``$|\expr|$'' or ``the length of $\expr$'' depending on whether it appears in
+a mathematical context or not.
+To support intuitive prose notation, some \al conditions are specially rendered.
+For example, while ``$\kwnot$'' is rendered as ``not'' and ``$\kwisvalid\;\expr$''
+is rendered as ``$\expr$ is valid,''
+``$\kwnot \; (\kwisvalid \; \expr)$'' is rendered as ``$\expr$ is not valid''
+rather than ``not $\expr$ is valid.''
+
