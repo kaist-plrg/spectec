@@ -1,11 +1,22 @@
 \subsection{Interpreter Backend}\label{sec:interp} %1p
-%
-%  ESMeta parses the structured English prose algorithms of ECMAScript
-% Specification document, and translates them into an internal representation, $IR_{ES}$.
-%   $IR_{ES}$ has its own semantics, and thus can be executed with an interpreter implementation.
-%   Executing the JavaScript semantics written in $IR_{ES}$ allows an indirect execution of JavaScript programs.
-%   Utilizing the executable semantics, ESMeta derives a type checker for the specification, test
-% suite synthesizers, and a static analyzer of JavaScript.
-%
-% Now, each ECMA-262 PR will execute the ESMeta type checker, and any new or changed tests in a Test262 PR will be executed using the ESMeta interpreter.
-%
+\dslname supports the interpretation of Wasm programs by \textit{meta-level interpretation}.
+By interpreting an \al program that denotes the Wasm semantics with
+a Wasm program as its input value, we can indirectly interpret the Wasm program.
+This approach was previously used by the ESMeta framework~\cite{esmeta,jiset},
+which extracts an executable semantics from the ECMAScript prose specification~\cite{ecmascript}.
+ESMeta parses the structured English prose algorithms in the specification,
+and translates them into its internal representation, \ires.
+\ires has its own semantics, and thus can be executed with an interpreter implementation.
+Executing the JavaScript semantics written in \ires allows an indirect execution of JavaScript programs.
+Similarly, we execute the Wasm semantics written in \al for an indirect execution of Wasm programs.
+
+\begin{itemize}
+\item Wasm text format, parser, ...
+\item Borrowed implementation from the reference interpreter
+\item Handwritten parts?
+\item How to execute a Wasm program
+\end{itemize}
+
+%./watsup spec/* --animate --sideconditions --interpreter
+% Interpretation of AL
+

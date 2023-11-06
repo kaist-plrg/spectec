@@ -5,7 +5,7 @@ We define \emph{\dl}, a declarative language that defines the formal
 semantics of Wasm (Sec.~\ref{sec:dl}),
 \emph{\al}, an algorithmic language that defines the Wasm semantics
 in a pseudocode style (Sec.~\ref{sec:aldef}),
-and a \dl to \al transformation (Sec.~\ref{sec:dl2al}).
+and a \dl to \al translation (Sec.~\ref{sec:dl2al}).
 We then show how to generate a prose specification from the semantics
 described in \al (Sec.~\ref{sec:prose}) and
 support its interpretation (Sec.~\ref{sec:interp}).
@@ -27,7 +27,7 @@ Fig.~\ref{fig:dl-syntax} presents the syntax of \dl.
 \text{Helper function} &
 \lambda &::=& \varx \kwrl \eta^* \kwrr\ \kwequ\ \eta\ \mbox{---}\ \pi^*\\
 \text{Expression} & \eta &::=& \upsilon\ \mid\ \kappa\ \eta^*\ \mid\ \eta + \eta\
-\mid \eta^*\ \mid \eta \leftarrow \eta \ \mid (\eta,\ \eta)\
+\mid \eta^*\ \mid \eta \leftarrow \eta \ \mid (\eta,\ \eta)\ \mid [\eta^*]\
 \mid \cdots \\
 \text{Condition} & \beta  &::=& \eta\ = \eta\ \mid \cdots\\
 \text{Value} & \upsilon &::=& \ssf{I32}\ \mid\ \ssf{I64}\ \mid\ 
@@ -219,14 +219,15 @@ in Fig.~\ref{fig:dsl} corresponds to the following in \al:
 \end{array}
 \]
 
-\subsection{\dl to \al Transformation}\label{sec:dl2al}
-Now, we describe how to transform a Wasm semantics $\delta^*$ in \dl into an \al program $\prog$.
+\subsection{\dl to \al Translation}\label{sec:dl2al}
+Now, we describe how to translate a Wasm semantics $\delta^*$ in \dl into an \al program $\prog$.
 First, the definitions in $\delta^*$ are grouped to represent algorithms; among $\delta^*$,
 the reduction rules $\gamma^*$ are grouped according to their target Wasm instructions, and
 the helper functions $\lambda^*$ are grouped according to their names.
-Each group is transformed into a single algorithm in two phases:
+Each group is translated into a single algorithm in two phases:
 1) preprocess the group's definitions to satisfy some \textit{preconditions}, and
 2) generate an \al algorithm from the preprocessed \dl definitions.
+The detailed description of the translation is availabe at a companion report~\cite{il-tr}.
 
 \subsubsection{\dl to \dl Preprocessing}
 Preprocessing consists of two steps: for each group of reduction rules (or helper functions),
@@ -440,9 +441,9 @@ $\mathit{Knuth}(S)$ returns partitions of $S$
 \end{algorithm}
 
 \medskip
-This theorem implies that no polynomial-time algorithm can solve the problem.
-If the numbers of premises are rather small, a simple brute-force algorithm might be a solution.
-However, the reduction rule for Wasm module instantiation, for example,
+Thus, no polynomial-time algorithm can solve the problem.
+If the numbers of premises are small, a brute-force algorithm might be a solution.
+However, the reduction rule for module instantiation, for example,
 has more than 10 premises and variables, so a brute-force approach is not applicable.
 Another solution is to use an SMT solver like Z3~\cite{z3},
 since this is a constraint solving problem.
@@ -505,12 +506,50 @@ For example, if a singleton set $\{2\}$ is in the input partition $p$,
 then the second premise $\pi_2$ is an equality check condition and remains the same.
 If a set $\{3, y\}$ is in $p$ and the third premise is $x = y$,
 then the third premise is replaced with $y \leftarrow x$.
-For a preprocessed premise $\pi'^*$, Algorithm~\ref{algo:preminfer} tries to reorder them 
-so that all variables are bound before their uses in premises.
+For preprocessed premises $\pi'^*$, Algorithm~\ref{algo:preminfer} tries to reorder them 
+so that all variables are bound before their uses.
 If reordering $\pi'^*$ succeeds, the algorithm returns the reordered $\pi'^*$.
-Reordering premises may fail, if they contain cyclic bindings like $x = f(y)$ and $y = g(x)$.
+Reordering premises may fail, if they contain cyclic bindings like $x \leftarrow f(y)$ and $y \leftarrow g(x)$.
 The Wasm semantic definitions do not have premises with cyclic bindings.
 
+\subsubsection{\al Generation}
+After preprocessing, \dl definitions satisfy two preconditions:
+1) the left-hand sides (or parameters) of the reduction rules (or helper functions) in each group
+are identical and 2) every variable in premises is bound exactly once before its uses.
+For each group of reduction rules $\rho^* =
+(\eta_1, \eta' _1)  \leadsto \gamma_1\ \mbox{---}\ \pi_1^*\
+\cdots\
+(\eta_n, \eta' _n) \leadsto \gamma_n\ \mbox{---}\ \pi_n^*$,
+the translation algorithm \dltoil generates an \al algorithm
+by translating the left-hand-side $(\eta_1, \eta' _1)$ first,
+and then translating the premise $\pi_i$ and right-hand-side $\gamma_i$
+for each rule $\rho_i (1\le i\le n)$.
+For the rules for \inblue{\ensuremath{\mathsf{ref.is\_null}}} in \dl, for example:
+\[
+\begin{array}{l@{~}l@{~}c@{~}l}
+\rho_1 = &(\bot, [\upsilon, \ssf{REF.IS\_NULL}]) &\leadsto& (\bot, [\ssf{CONST\ I32\ 1}])\
+\mbox{---}\ [\upsilon = \ssf{REF.NULL}\ t]\\
+\rho_2 = &(\bot, [\upsilon, \ssf{REF.IS\_NULL}])&\leadsto&(\bot, [\ssf{CONST\ I32\ 0}])\
+\mbox{---}\ [\ssf{\small otherwise}]
+\end{array}
+\]
+the identical left-hand-side $(\bot, [\upsilon, \ssf{REF.IS\_NULL}])$
+is translated to $[\kwassert \; \wasmc, \kwpop \; \mathit{val}]$.
+For the first rule $\rho_1$, the premise ``$\upsilon = \ssf{REF.NULL}\ t$'' and
+the right-hand-side ``$(\bot, [\ssf{CONST\ I32\ 1}])$'' are translated to
+``$\kwif \; (\kwiscaseof \; \mathit{val} \; \mathit{REF.NULL})$'' and
+``$\kwpush \; \ssf{CONST}(\ssf{I32}(1))$,'' respectively.
 
-\subsubsection{DL2AL Transformation}
-divide \& conquer
+Roughly speaking, translating a left-hand-side of a reduction rule corresponds to
+generating the beginning of an algorithm, which pops the values from the stack
+to use as the inputs for the target instruction and binds new variables
+that contain the information about the inputs.
+Translation of premises generates either variable bindings $\kwlet \; \expr \; \expr$
+from $\eta \leftarrow \eta'$ or conditions $\cond$ from $\beta$.
+Note that a single binding expression can introduce multiple conditions.
+For example, a binding $[x, y] \leftarrow \mathit{arr}$ introduces a side condition
+that the size of the array $\mathit{arr}$ is two.
+\dltoil generates such side conditions based on binding patterns.
+Finally, translation of a right-hand-side of a reduction rule corresponds to
+generation of the end of an algorithm, which pushes the result value onto the stack top.
+Due to space limitation, we refer the interested readers to a companion report~\cite{il-tr}.
