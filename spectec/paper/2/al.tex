@@ -1,14 +1,14 @@
 \section{Algorithmic Backends}\label{sec:al}
 This section presents a mechanism for automatically generating
-algorithmic backends from the formal semantics.
+algorithmic representations from the formal semantics.
 We define \emph{\dl}, a declarative language that defines the formal
 semantics of Wasm (Sec.~\ref{sec:dl}),
 \emph{\al}, an algorithmic language that defines the Wasm semantics
 in a pseudocode style (Sec.~\ref{sec:aldef}),
 and a \dl to \al translation (Sec.~\ref{sec:dl2al}).
-We then describe generating a prose specification from the semantics
-described in \al (Sec.~\ref{sec:prose}) and interpreting the prose
-specification which enables the indirect interpretation of Wasm (Sec.~\ref{sec:interp}).
+We then describe how to generate prose specifications from the semantics
+described in \al (Sec.~\ref{sec:prose}) and how to interpret the prose
+specifications, which enables indirect interpretation of Wasm (Sec.~\ref{sec:interp}).
 
 \subsection{\dl: Declarative Language}\label{sec:dl}
 The DSL describes the formal semantics of Wasm, and
@@ -49,19 +49,18 @@ when the current configuration of a program matches $\gamma_1$ and
 all $\pi^*$ are evaluated to true, then the program configuration becomes $\gamma_2$.
 A configuration $(\eta_\bot,\ \eta)$ denotes an optional Wasm program state $\eta_\bot$,
 which is a pair of the current store and the current frame,
-and a list of Wasm instruction $\eta$ that represents the current stack.
+and a list of Wasm instructions $\eta$ that represents the current stack.
 A premise $\pi$ is a condition expression $\eta$ or a special keyword
 \ensuremath{\mathsf{\small otherwise}},
 which denotes the negation of all the previous premises.
 A helper function $\varx \kwrl \eta^* \kwrr\ \kwequ\ \eta\ \mbox{---}\ \pi^*$ denotes that
 when a function named $\varx$ is called, its arguments are bound to parameters $\eta^*$
 and a body expression $\eta$ is evaluated if all $\pi^*$ are evaluated to true.
-An expression $\eta$ is a DSL expression.
+An expression $\eta$ is a \dl expression.
 Because the details of the expression is not relevant to this section,
-we show only some cases used for concrete
-examples.
-A constructor $\kappa$ is an atomic string that denotes the names of
-Wasm types (i.e. $\ssf{I32}$) or Wasm instructions (i.e. $\ssf{REF.IS\_NULL}$).
+we show only some cases used for concrete examples.
+A constructor $\kappa$ is a string that denotes
+Wasm types, such as $\ssf{I32}$, or Wasm instructions, such as $\ssf{REF.IS\_NULL}$.
 
 For example, the semantics of \inblue{\ensuremath{\mathsf{ref.is\_null}}}
 in Fig.~\ref{fig:dsl} corresponds to the following in \dl:
@@ -79,7 +78,7 @@ enclosed by $[$ and $]$ for readability.
 \subsection{\al: Algorithmic Language}\label{sec:aldef}
 \al is an algorithmic language that defines the Wasm language semantics in a pseudocode style.
 Definitions in \dl are translated into definitions in \al,
-so that algorithmic backends can be generated.
+so that algorithmic representations can be generated.
 
 \begin{figure}[t]
 \[
@@ -184,14 +183,13 @@ The metavariables $\varx$ ranges over variables,
 $\num$ ranges over numbers, and
 $\cnstr$ ranges over constructors.
 An \al program $\prog$ is a sequence of algorithms $\alg^*$,
-which denotes the Wasm semantics in algorithmic style.
-An algorithm $\alg$ consists of a name $\varx$, parameters $\expr^*$,
-and body instructions $\inst^*$. An algorithm which denotes the semantics of a
+which denotes the Wasm semantics in algorithmic form.
+An algorithm $\alg$ consists of a name $\varx$, parameters~$\expr^*$,
+and body instructions $\inst^*$. An algorithm denotes the semantics of a
 certain Wasm instruction or an auxilirary helper function used to describe the language semantics.
-An instruction $\inst$ denotes a prose statement in the Wasm specification,
-and an expression $\expr$ denotes the expressions that can be evaluated to a value.
-A condition $\cond$ denotes an expression that is evaluatd to a boolean value, which can
-be used within if instructions or assert instructions.
+An instruction~$\inst$ denotes a prose statement in the Wasm specification.
+An expression $\expr$ denotes a prose expression that is evaluated to a value, and
+a condition $\cond$ denotes a prose expression that is evaluated to a boolean value.
 The figure also shows prose rendering of instructions and expressions.
 The Wasm specification often uses specific phrases like ``the current frame'' and
 ``a label is now on the top of the stack.''
@@ -204,23 +202,22 @@ in Fig.~\ref{fig:dsl} corresponds to the following in \al:
 \!\!
 \begin{array}{l}
 \kwalg \; \mathit{REF.IS\_NULL} \kwrl \kwrr \; \kwcl \\
-\quad \kwassert \; \wasmc \\
-\quad \kwpop \; \mathit{val}\\
-\quad \kwif \; (\kwiscaseof \; \mathit{val} \; \mathit{REF.NULL})\;
+\qquad \kwassert \; \wasmc \\
+\qquad \kwpop \; \mathit{val}\\
+\qquad \kwif \; (\kwiscaseof \; \mathit{val} \; \mathit{REF.NULL})\;
 \; (\kwpush \; \ssf{CONST}(\ssf{I32}(), 1)) \; (\kwpush \; \ssf{CONST}(\ssf{I32}(), 0))\\
 \kwcr
 \end{array}
 \]
 
-Due to the nature of AL as a language designed for describing the pseudocode,
-the semantics of $\al$ can be defined straightforwardly.
-In our companiaon report~\cite{il-tr}, we formally defined the semantics of $\al$ as the state transition system.
-Here, we provide a brief overview.
-The interpretation of program starts by calling one of its algorithms,
-which sequentially executes its body instructions.
-Executing one $\al$ instruction alters the program state,
-and the final state after executing the last instruction of an algorithm
-is the final result of the program execution.
+The semantics of $\al$ is conventional,
+The interpretation of a program $\prog$ starts by calling one of its algorithms,
+$\kwalg \; \varx \kwrl \expr^* \kwrr \; \kwcl \inst^* \kwcr$,
+which sequentially executes its body instructions $\inst^*$.
+Executing an instruction $\inst$ may alter the current program state,
+and the resulting state after executing the last instruction of the algorithm
+is the result of the program execution.
+We define the semantics of $\al$ as a state transition system in a companiaon report~\cite{il-tr}.
 
 \subsection{\dl to \al Translation}\label{sec:dl2al}
 Now, we describe how to translate a Wasm semantics $\delta^*$ in \dl into an \al program $\prog$.
@@ -230,10 +227,9 @@ the helper functions $\lambda^*$ are grouped according to their names.
 Each group is translated into a single algorithm in two phases:
 1) preprocess the group's definitions to satisfy some \textit{preconditions}, and
 2) generate an \al algorithm from the preprocessed \dl definitions.
-Here, we will omit the translation of helper functions and
-focus on explaining the translation of reduction rules as they share fundamental similarities
-with few differences.
-The detailed description of the translation is availabe at the companion report~\cite{il-tr}.
+Since the translation of helper functions is similar to the translation of reduction rules,
+this section focuses on the translation of reduction rules.
+A detailed description of the translation is available in the companion report~\cite{il-tr}.
 
 \subsubsection{\dl to \dl Preprocessing}
 Preprocessing consists of two steps: for each group of reduction rules
@@ -275,22 +271,21 @@ For each group of reduction rules $\rho^* =
 (\eta_n, \eta' _n) \leadsto \gamma_n\ \mbox{---}\ \pi_n^*$,
 the unification algorithm \unify takes a list of expressions to unify,
 $\eta'_1\ \cdots\ \eta'_n$, and returns a pair of
-a unified expression $\eta$ and a list of additional premises $\pi'^*_1 \cdots \pi'^*_n$.
+a unified expression~$\eta$ and a list of additional premises $\pi'^*_1 \cdots \pi'^*_n$.
 For the \inblue{\ensuremath{\mathsf{br}}} instruction, for example,
 \unify takes two expressions
-``{$(\ssf{LABEL\_} \; n \; i'^*\; v'^*\; v^n\; (\ssf{BR\; 0})\; i^*)$}'' and
-``{$(\ssf{LABEL\_} \; n \; i'^*\; v^*\; (\ssf{BR\; (}l\ssf{+1)})\; i^*$)}.''
+{$(\ssf{LABEL\_} \; n \; i'^*\; v'^*\; v^n\; (\ssf{BR\; 0})\; i^*)$} and
+{$(\ssf{LABEL\_} \; n \; i'^*\; v^*\; (\ssf{BR\; (}l\ssf{+1)})\; i^*$)}.
 
 For a list of expressions to unify $\eta_1\ \cdots\ \eta_n$,
 \unify 1) generates a unified expression $\eta$ possibly containing some fresh variables
 and then 2) generates premises $\pi_k^*\ (1\le k \le n)$ using the fresh variables to make
 each $\eta_k$ be the same as $\eta$ with $\pi_k^*$.
-More specifically, the unified expression $\eta$ is the most common expression of
+More specifically, the unified expression~$\eta$ is the most common expression of
 the expressions to unify $\eta_1\ \cdots\ \eta_n$,
 replacing the different components with fresh variables.
 For example, the unified expression for the reduction rules for \inblue{\ensuremath{\mathsf{br}}} is
-``{$(\ssf{LABEL\_} \; n \; i'^*\; t\; (\ssf{BR}\; t')\; i^*$)}.''
-Here, two new variables $t$ and $t'$ are introduced.
+{$(\ssf{LABEL\_} \; n \; i'^*\; t\; (\ssf{BR}\; t')\; i^*$)} with two fresh variables $t$ and $t'$.
 After generating the unified expression, \unify generates premises $\pi_k^*$
 for each $\eta_k$ so that $\eta_k$ is an instance of the unified expression satisfying $\pi_k^*$.
 For example, to make the unified expression for \inblue{\ensuremath{\mathsf{br}}}
@@ -306,18 +301,17 @@ Finally, the unification result of the rules for the \inblue{\ensuremath{\mathsf
 \end{array}
 \]
 Thanks to the fresh variables $t$ and $t'$, both rules $\rho_1$ and $\rho_2$ now have
-same left-hand sides. The definitions of $t$ and $t'$ are available as premises:
+the same left-hand sides. The definitions of $t$ and $t'$ are available as premises:
 $[t = v'^*\; v^n,\ t' = 0]$ for $\rho_1$ and
-$[t = v^*,\ t' = l\ssf{+1}]$ for $\rho_2$.
+$[t = v^*,\ t' = l\ssf{+1}]$ for~$\rho_2$.
 
 
 \medskip
 The second preprocessing step is to change the premises of each group's definitions
 so that each variable is bound exactly once before it is used.
-This step is required because the order of the premises can be
-shuffled in arbitrary order in declarative reduction rules.
-In addition, an equality expression $\eta = \eta'$ in a premise $\pi$ can be ambiguous,
-because it can refer to an equality check condition or a variable binding in either direction.
+This step is necessary because the order of premises in declarative reduction rules
+can be arbitrary.
+In addition, equality expressions in premises can be ambiguous because they can represent equality check conditions or bidirectional variable bindings.
 This second preprocessing step replaces every equality expression denoting a variable binding with $\eta \leftarrow \eta'$.
 Thus, this step identifies each variable's binding occurrence,
 keeps track of the variables that each premise binds,
@@ -440,7 +434,7 @@ $\mathit{Knuth}(S)$ returns partitions of $S$
 Thus, no polynomial-time algorithm can solve the problem.
 If the numbers of premises are small, a simple brute-force algorithm might be a solution.
 However, the reduction rule for module instantiation, for example,
-has more than 10 premises and variables, so more efficient method is required.
+has more than 10 premises and variables, so a more efficient method is required.
 Another solution is to use an SMT solver like Z3~\cite{z3},
 since this problem can be treated as a constraint solving problem.
 However, the performance overhead of Z3 does not apply to this problem either.
@@ -508,6 +502,7 @@ so that all variables are bound before their uses.
 If reordering $\pi'^*$ succeeds, the algorithm returns the reordered $\pi'^*$.
 Reordering premises may fail, if they contain cyclic bindings like $x \leftarrow f(y)$ and $y \leftarrow g(x)$.
 If that happens, the algorithm tries with the next partition.
+Preprocessing premises succeed for all the Wasm semantic definitions.
 
 \subsubsection{\al Generation}
 After preprocessing, \dl definitions satisfy two preconditions:
@@ -541,9 +536,9 @@ Roughly speaking, translating a left-hand-side of a reduction rule corresponds t
 generating the beginning of an algorithm, which pops the values from the stack
 to use as the inputs for the target instruction and binds new variables
 that contain the information about the inputs.
-Translation of premises corresponds to the middle of an algorithm,
-and generates either variable bindings $\kwlet \; \expr \; \expr$
-or if instructions with conditions $\cond$.
+Translation of premises corresponds to generation of the middle of an algorithm,
+which generates either variable bindings $\kwlet \; \expr \; \expr$
+or $\kwif$ instructions with conditions $\cond$.
 Note that a binding expression $\eta \leftarrow \eta'$ may introduce side conditions.
 For example, a binding $[x, y] \leftarrow \mathit{arr}$ introduces a side condition
 that the size of the array $\mathit{arr}$ is two.

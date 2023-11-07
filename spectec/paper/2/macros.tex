@@ -77,7 +77,12 @@
 \newcommand{\rrb}{\rrbracket}
 
 % basic
-\newcommand{\inblue}[1]{{\color{blue}{#1}}}
+\newcommand*{\sphinxDeclareColorOption}[2]{%
+   \definecolor{#1}#2%
+}%
+\sphinxDeclareColorOption{InnerLinkColor}{{rgb}{0.208,0.374,0.486}}
+\newcommand{\inblue}[1]{{\color{InnerLinkColor}{#1}}}
+%\newcommand{\inblue}[1]{{\color{blue}{#1}}}
 \newcommand{\inred}[1]{{\color{red}{#1}}}
 \newcommand{\x}[1]{\inred{#1}}
 \newcommand{\y}[1]{\textbf{\inred{#1}}}
