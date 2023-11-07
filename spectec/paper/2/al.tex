@@ -46,7 +46,7 @@ The Wasm semantics is defined by a sequence of definitions $\delta^*$.
 A definition is either a reduction rule $\rho$ or an auxiliary helper function $\lambda$.
 A reduction rule $\gamma_1 \leadsto \gamma_2\ \mbox{---}\ \pi^*$ denotes that
 when the current configuration of a program matches $\gamma_1$ and
-all $\pi^*$ are evaluated to true, then the program configuration becomes $\gamma_2$.
+all $\pi^*$ are satisfied, then the program configuration becomes $\gamma_2$.
 A configuration $(\eta_\bot,\ \eta)$ denotes an optional Wasm program state $\eta_\bot$,
 which is a pair of the current store and the current frame,
 and a list of Wasm instructions $\eta$ that represents the current stack.
@@ -55,11 +55,11 @@ A premise $\pi$ is a condition expression $\eta$ or a special keyword
 which denotes the negation of all the previous premises.
 A helper function $\varx \kwrl \eta^* \kwrr\ \kwequ\ \eta\ \mbox{---}\ \pi^*$ denotes that
 when a function named $\varx$ is called, its arguments are bound to parameters $\eta^*$
-and a body expression $\eta$ is evaluated if all $\pi^*$ are evaluated to true.
+and a body expression $\eta$ is evaluated if all $\pi^*$ are satisfied.
 An expression $\eta$ is a \dl expression.
 Because the details of the expression is not relevant to this section,
 we show only some cases used for concrete examples.
-A constructor $\kappa$ is a string that denotes
+A constructor $\kappa$ is a string that denotes the name of
 Wasm types, such as $\ssf{I32}$, or Wasm instructions, such as $\ssf{REF.IS\_NULL}$.
 
 For example, the semantics of \inblue{\ensuremath{\mathsf{ref.is\_null}}}
@@ -92,7 +92,7 @@ so that algorithmic representations can be generated.
 && \mid&
   \kweither \; \inst^* \; \inst^* & \mbox{Either: $\inst_1^*$ Or: $\inst_2^*$}\\
 && \mid&
-  \kwenter \; \expr \; \expr \; \inst^* & \mbox{Enter $\expr_1$ with label $\expr_2$\ :\ $\inst^*$}\\
+  \kwenter \; \expr \; \expr \; \inst^* & \mbox{Enter $\expr_1$ with $\expr_2$\ :\ $\inst^*$}\\
 && \mid&
   \kwassert \; \cond  & \mbox{Assert: Due to validation, $\cond$.}\\
 && \mid&
@@ -134,7 +134,7 @@ so that algorithmic representations can be generated.
 && \mid&
   \expr \kwsl \qual \kwsr \; \kwass \; \expr & \mbox{$\expr_1$ with $\qual$ replaced by $\expr_2$}\\
 && \mid&
-  \expr \kwsl \qual \kwsr \; \kwext \; \expr & \mbox{$\expr_1$ with $\qual$ prepended/appended by $\expr_2$}\\
+  \expr \kwsl \qual \kwsr \; \kwext \; \expr & \mbox{$\expr_1$ with $\qual$ appended by $\expr_2$}\\
 && \mid&
   \kwcl (\varx \mapsto \expr)^* \kwcr & \{\ (\varx:\expr)^*\ \}\\
 && \mid&
@@ -186,10 +186,10 @@ An \al program $\prog$ is a sequence of algorithms $\alg^*$,
 which denotes the Wasm semantics in algorithmic form.
 An algorithm $\alg$ consists of a name $\varx$, parameters~$\expr^*$,
 and body instructions $\inst^*$. An algorithm denotes the semantics of a
-certain Wasm instruction or an auxilirary helper function used to describe the language semantics.
+certain Wasm instruction or an auxiliary helper function used to describe the language semantics.
 An instruction~$\inst$ denotes a prose statement in the Wasm specification.
 An expression $\expr$ denotes a prose expression that is evaluated to a value, and
-a condition $\cond$ denotes a prose expression that is evaluated to a boolean value.
+a condition $\cond$ denotes a prose condition that is evaluated to a boolean value.
 The figure also shows prose rendering of instructions and expressions.
 The Wasm specification often uses specific phrases like ``the current frame'' and
 ``a label is now on the top of the stack.''
@@ -210,7 +210,7 @@ in Fig.~\ref{fig:dsl} corresponds to the following in \al:
 \end{array}
 \]
 
-The semantics of $\al$ is conventional,
+The semantics of $\al$ is conventional.
 The interpretation of a program $\prog$ starts by calling one of its algorithms,
 $\kwalg \; \varx \kwrl \expr^* \kwrr \; \kwcl \inst^* \kwcr$,
 which sequentially executes its body instructions $\inst^*$.
@@ -239,8 +239,8 @@ in the group to make them the same, and
 so that every variable is bound exactly once before its uses.
 
 \medskip
-The first preprocessing step is to make the left-hand sides of
-the reduction rules in each group identical.
+The first preprocessing step is to unify the the left-hand sides of
+the reduction rules so that the left-hand sides in each group become identical.
 Most Wasm definitions satisfy this precondition, but some do not, such as the following
 DSL reduction rules for the \inblue{\ensuremath{\mathsf{br}}} instruction:
 
@@ -257,53 +257,52 @@ DSL reduction rules for the \inblue{\ensuremath{\mathsf{br}}} instruction:
 \noindent
 which corresponds to the following in \dl:
 \[
-\begin{array}{l@{~}l@{~}c@{~}l}
-\rho_1 = &(\bot, (\ssf{LABEL\_} \; n \; i'^*\; v'^*\; v^n\; (\ssf{BR\; 0})\; i^*)) &\leadsto&
- (\bot,\; v^n\; i^*)\ \mbox{---}\ []\\
-\rho_2 = &(\bot, (\ssf{LABEL\_} \; n \; i'^*\; v^*\; (\ssf{BR\; (}l\ssf{+1)})\; i^*)) &\leadsto&
- (\bot,\; v^*\; (\ssf{BR}\; l))\ \mbox{---}\ []
+\begin{array}{l@{~}l@{~}l@{~}l}
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n \; x_i'^*\; x_v'^*\; x_v^{n}\; (\ssf{BR\; 0})\; x_i^*)) &\leadsto
+ (\bot,\; x_v^{n}\; i^*)\ & \mbox{---}\ []\\
+\rho_2 = &(\bot, (\ssf{LABEL\_} \; n \; x_i'^*\; x_v^*\; (\ssf{BR\; (}x_l\ssf{+1)})\; x_i^*)) &\leadsto
+ (\bot,\; x_v^*\; (\ssf{BR}\; x_l))\ & \mbox{---}\ []
 \end{array}
 \]
 
-For each group of reduction rules $\rho^* =
-(\eta_1, \eta' _1) \leadsto \gamma_1\ \mbox{---}\ \pi_1^*\
-\cdots\
-(\eta_n, \eta' _n) \leadsto \gamma_n\ \mbox{---}\ \pi_n^*$,
-the unification algorithm \unify takes a list of expressions to unify,
-$\eta'_1\ \cdots\ \eta'_n$, and returns a pair of
-a unified expression~$\eta$ and a list of additional premises $\pi'^*_1 \cdots \pi'^*_n$.
-For the \inblue{\ensuremath{\mathsf{br}}} instruction, for example,
-\unify takes two expressions
-{$(\ssf{LABEL\_} \; n \; i'^*\; v'^*\; v^n\; (\ssf{BR\; 0})\; i^*)$} and
-{$(\ssf{LABEL\_} \; n \; i'^*\; v^*\; (\ssf{BR\; (}l\ssf{+1)})\; i^*$)}.
+For each group of reduction rules,
+the unification algorithm \unify takes a list of left-hand side expressions as an input.
+ For the \inblue{\ensuremath{\mathsf{br}}} instruction, for example,
+ \unify takes two expressions:
+\[
+\begin{array}{l}
+\eta_1 = (\ssf{LABEL\_} \; n \; x_i'^*\; x_v'^*\; x_v^{n}\; (\ssf{BR\; 0})\; x_i^*)\\
+\eta_2 = (\ssf{LABEL\_} \; n \; x_i'^*\; x_v^*\; (\ssf{BR\; (}x_l\ssf{+1)})\; x_i^*)
+\end{array}
+\]
 
 For a list of expressions to unify $\eta_1\ \cdots\ \eta_n$,
 \unify 1) generates a unified expression $\eta$ possibly containing some fresh variables
-and then 2) generates premises $\pi_k^*\ (1\le k \le n)$ using the fresh variables to make
-each $\eta_k$ be the same as $\eta$ with $\pi_k^*$.
+and then 2) generates premises $\pi_i^*\ (1\le i \le n)$ using the fresh variables to make
+each $\eta_i$ be the same as $\eta$ with $\pi_i^*$.
 More specifically, the unified expression~$\eta$ is the most common expression of
 the expressions to unify $\eta_1\ \cdots\ \eta_n$,
 replacing the different components with fresh variables.
 For example, the unified expression for the reduction rules for \inblue{\ensuremath{\mathsf{br}}} is
-{$(\ssf{LABEL\_} \; n \; i'^*\; t\; (\ssf{BR}\; t')\; i^*$)} with two fresh variables $t$ and $t'$.
-After generating the unified expression, \unify generates premises $\pi_k^*$
-for each $\eta_k$ so that $\eta_k$ is an instance of the unified expression satisfying $\pi_k^*$.
+{$(\ssf{LABEL\_} \; n \; x_i'^*\; y\; (\ssf{BR}\; y')\; x_i^*$)} with two fresh variables $y$ and $y'$.
+After generating the unified expression, \unify generates premises $\pi_i^*$
+for each $\eta_i$ so that $\eta_i$ is an instance of the unified expression satisfying $\pi_i^*$.
 For example, to make the unified expression for \inblue{\ensuremath{\mathsf{br}}}
 same as the left-hand sides of $\rho_1$ and $\rho_2$, \unify infers the conditions
-$[t = v'^*\; v^n,\ t' = 0]$ and $[t = v^*,\ t' = l\ssf{+1}]$, respectively.
+$[y = x_v'^*\; x_v^{n},\ y' = 0]$ and $[y = x_v^*,\ y' = x_l\ssf{+1}]$, respectively.
 Finally, the unification result of the rules for the \inblue{\ensuremath{\mathsf{br}}} instruction is as follows:
 \[
-\begin{array}{l@{~}l@{~}c@{~}l}
-\rho_1 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
- (\bot, v^n\; \eta^*)\ \mbox{---}\ [t = v'^*\; v^n,\ t' = 0]\\
-\rho_2 = &(\bot, (\ssf{LABEL\_} \; n) \; \eta'^*\; t\; (\ssf{BR}\; t')\; \eta^*) &\leadsto&
- (\bot, v^*\; (\ssf{BR}\; l))\ \mbox{---}\ [t = v^*,\ t' = l\ssf{+1}]
+\begin{array}{l@{~}l@{~}l@{~}l}
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n) \; x_i'^*\; y\; (\ssf{BR}\; y')\; x_i^*) &\leadsto
+ (\bot, v^n\; x_i^*)\ & \mbox{---}\ [y = x_v'^*\; x_v^{n},\ y' = 0]\\
+\rho_2 = &(\bot, (\ssf{LABEL\_} \; n) \; x_i'^*\; y\; (\ssf{BR}\; y')\; x_i^*) &\leadsto
+ (\bot, x_v^*\; (\ssf{BR}\; x_l))\ & \mbox{---}\ [y = x_v^*,\ y' = x_l\ssf{+1}]
 \end{array}
 \]
-Thanks to the fresh variables $t$ and $t'$, both rules $\rho_1$ and $\rho_2$ now have
-the same left-hand sides. The definitions of $t$ and $t'$ are available as premises:
-$[t = v'^*\; v^n,\ t' = 0]$ for $\rho_1$ and
-$[t = v^*,\ t' = l\ssf{+1}]$ for~$\rho_2$.
+Thanks to the fresh variables $y$ and $y'$, both rules $\rho_1$ and $\rho_2$ now have
+the same left-hand sides. The definitions of $y$ and $y'$ are available as premises:
+$[y = x_v'^*\; x_v^{n},\ y' = 0]$ for $\rho_1$ and
+$[y = x_v^*,\ y' = x_l\ssf{+1}]$ for~$\rho_2$.
 
 
 \medskip
@@ -320,27 +319,27 @@ and reorders premises so that preceding premises bind all free variables in each
 For example, consider the first rule for the \inblue{\ensuremath{\mathsf{br}}} instruction again:
 \[
 \begin{array}{l@{~}l@{~}c@{~}l}
-\rho_1 = &(\bot, (\ssf{LABEL\_} \; n \; i'^*\; t\; (\ssf{BR}\; t')\; i^*)) &\leadsto&
- (\bot, v^n\; \eta^*)\ \mbox{---}\ [t = v'^*\; v^n,\ t' = 0]\\
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n \; x_i'^*\; y\; (\ssf{BR}\; y')\; x_i^*)) &\leadsto&
+ (\bot, x_v^{n}\; x_i^*)\ \mbox{---}\ [y = x_v'^*\; x_v^{n},\ y' = 0]\\
 \end{array}
 \]
-The second premise $t' = 0$ is an equality check codition,
-while the first rule is a binding of fresh variables $v$ and $v'$.
+The second premise $y' = 0$ is an equality check codition,
+while the first premise is a binding of fresh variables $x_v$ and $x_v'$.
 Therefore, this step changes the rule as follows:
 \[
 \begin{array}{l@{~}l@{~}c@{~}l}
-\rho_1 = &(\bot, (\ssf{LABEL\_} \; n \; i'^*\; t\; (\ssf{BR}\; t')\; i^*)) &\leadsto&
- (\bot, v^n\; \eta^*)\ \mbox{---}\ [v'^*\; v^n \leftarrow t,\ t' = 0]\\
+\rho_1 = &(\bot, (\ssf{LABEL\_} \; n \; x_i'^*\; y\; (\ssf{BR}\; y')\; x_i^*)) &\leadsto&
+ (\bot, x_v^{n}\; x_i^*)\ \mbox{---}\ [x_v'^*\; x_v^{n} \leftarrow y,\ y' = 0]\\
 \end{array}
 \]
-which clearly indicates that fresh variables $v$ and $v'$ are newly introduced in this premise.
+which clearly indicates that fresh variables $x_v$ and $x_v'$ are newly introduced in the first premise.
 Once the variable binding occurrences in premises are identified,
 reordering the premises is a simple def-use dataflow analysis.
 
-The main problem is now reduced to identifying each variable's binding occurrence in premises,
+The primary challange now lies in identifying each variable's binding occurrence in premises,
 which turns out to be a \textit{NP-hard} problem.
 This is especially because a single premise can bind more than two variables at once,
-as in $v'^*\; v^n \leftarrow t$.
+as in $[x_1, x_2] \leftarrow y$.
 We prove it by reduction from a known NP-hard problem, the \textit{exact cover} problem~\cite{exactcover}:
 \begin{quote}
 The exact cover problem aims at deciding whether it is possible to select some subsets within a given collection of subsets in such a way that each element of a given set belongs to exactly one selected subset. This problem is NP-complete~\cite{karp72}.
@@ -350,7 +349,7 @@ Here, we provide the formal definition of the exact cover problem:
 An instance of the \textit{Exact Cover Problem} (EC) is defined by a tuple $(X, S)$
 such that $X$ is a set of elements and $S \subseteq \mathcal{P}(X)$ is a collection of subsets of $X$.
 EC aims at deciding if there exists a subcollection $P \subseteq S$ which is a partition of $X$,
-that is, $\forall a \in X.\ |\{ u \in P \mid a \in u \}| = 1$.
+that is, $\forall x \in X.\ |\{ s \in P \mid x \in s \}| = 1$.
 \end{definition}
 
 \noindent
@@ -409,7 +408,7 @@ by collecting the binding premises, $\{\{a, b\}, \{c, d, e\}\}$, giving the answ
 
 \begin{algorithm}[t]
 \DontPrintSemicolon
-\KwIn{A list of premises $\pi^*$ and a set of bound variables $X$}
+\KwIn{A list of premises $\pi^*$ and a set of bound variables $V$}
 \KwOut{A list of preprocessed premises $\pi'^*$}
 $S \gets \emptyset$\;
 \For{$i \gets 1$ \textbf{to} $|\pi^*|$}{
@@ -418,14 +417,14 @@ $S \gets \emptyset$\;
     \lElse{$S_i \gets \{\{i\}\}$}
 $S \gets S \cup S_i$\;
 }
-$P \gets \mathit{Knuth}(S \cup X)$\;
+$P \gets \mathit{Knuth}(S \cup \{X\})$\;
 \For{$p \in P$}{
     $\pi'^* \gets \mathit{replaceVariableBinding}(\pi^*, p)$\;
     \lIf{reordering $\pi'^*$ succeeds}
     {\Return{reordered $\pi'^*$}}
 }
 where $\mathit{free}(\eta)$ returns free variables in $\eta$ and
-$\mathit{Knuth}(S)$ returns partitions of $S$
+$\mathit{Knuth}(S)$ returns partitions of $\bigcup S$
 \caption{Preprocess Premises}
 \label{algo:preminfer}
 \end{algorithm}
@@ -448,7 +447,7 @@ where a solution to EC of the encoded collection corresponds to the solution to 
 
 Algorithm~\ref{algo:preminfer} describes the process.
 It takes two inputs, a list of premises $\pi^*$ in reduction rules
-and a set of already bound variables $X$, and returns a list of new premises $\pi'^*$.
+and a set of already bound variables $V$, and returns a list of new premises $\pi'^*$.
 First, it encodes premises as a collection of subsets of $X$,
 where $X = \{1, \cdots, |\pi^*|\} \cup \mathit{free}(\pi^*)$
 is a set of the numbers from $1$ to the size of premises
@@ -464,7 +463,7 @@ For example, if the first premise is $x = y$, it is encoded as three subsets: $\
 If $\pi_i$ is not an equality expression, it is encoded as only one subset, $\{i\}$,
 meaning $\pi_i$ does not bind any variables but checks some non-equality condition.
 Then, the Knuth algorithm takes the collection $S$ containing all the encoded subsets and
-the set of bound variables $X$ and returns their partitions $P$.
+the set of bound variables $V$ and returns the partitions $P$ of the set $X$.
 Note that the Knuth algorithm may not return a unique partion.
 In addition, due to the definition of partition, for any partion $p$,
 there should be exactly one subset that contains a number $i$ for $1 \le i \le n$.
