@@ -239,7 +239,7 @@ in the group to make them the same, and
 so that every variable is bound exactly once before its uses.
 
 \medskip
-The first preprocessing step is to unify the the left-hand sides of
+The first preprocessing step is to unify the left-hand sides of
 the reduction rules so that the left-hand sides in each group become identical.
 Most Wasm definitions satisfy this precondition, but some do not, such as the following
 DSL reduction rules for the \inblue{\ensuremath{\mathsf{br}}} instruction:
@@ -498,17 +498,12 @@ If a set $\{3, y\}$ is in $p$ and the third premise is $x = y$,
 then the third premise is replaced with $y \leftarrow x$.
 For preprocessed premises $\pi'^*$, Algorithm~\ref{algo:preminfer} tries to reorder them
 so that all variables are bound before their uses.
-If reordering $\pi'^*$ succeeds, the algorithm returns the reordered $\pi'^*$.
 Reordering premises may fail, if they contain cyclic bindings like $x \leftarrow f(y)$ and $y \leftarrow g(x)$.
-If that happens, the algorithm tries with the next partition.
-%Preprocessing premises succeed for all the Wasm semantic definitions.
-\inred{
-If the reordering fails for every possible partition, this means that
-the original intention was indeed having a cyclic bindings, which SpecTec cannot handle yet.
-One of the auxiliary helper function in the official specification contained this
-cyclic definition, and we re-defined that function in a way that avoids cyclic binding.
-Except for that, the preprocessing succeed for all the Wasm semantic definitions.
-}
+If reordering $\pi'^*$ succeeds, the algorithm returns the reordered $\pi'^*$;
+otherwise, it tries with the next partition.
+If the reordering fails for every possible partition, the translation from \dl to \al fails.
+In such cases, the \dl definitions should be rewritten to remove cyclic bindings in premises.
+
 
 \subsubsection{\al Generation}
 After preprocessing, \dl definitions satisfy two preconditions:
