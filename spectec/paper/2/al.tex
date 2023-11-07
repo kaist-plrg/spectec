@@ -501,7 +501,14 @@ so that all variables are bound before their uses.
 If reordering $\pi'^*$ succeeds, the algorithm returns the reordered $\pi'^*$.
 Reordering premises may fail, if they contain cyclic bindings like $x \leftarrow f(y)$ and $y \leftarrow g(x)$.
 If that happens, the algorithm tries with the next partition.
-Preprocessing premises succeed for all the Wasm semantic definitions.
+%Preprocessing premises succeed for all the Wasm semantic definitions.
+\inred{
+If the reordering fails for every possible partition, this means that
+the original intention was indeed having a cyclic bindings, which SpecTec cannot handle yet.
+One of the auxiliary helper function in the official specification contained this
+cyclic definition, and we re-defined that function in a way that avoids cyclic binding.
+Except for that, the preprocessing succeed for all the Wasm semantic definitions.
+}
 
 \subsubsection{\al Generation}
 After preprocessing, \dl definitions satisfy two preconditions:
