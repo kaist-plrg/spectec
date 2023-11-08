@@ -7,24 +7,31 @@
 \label{fig:genprose}
 \end{figure}
 
-\al is designed to generate prose notation easily,
-so the English prose specification can be generated directly from the semantics described in \al.
-Fig.~\ref{fig:genprose} shows the prose pseudocode generated from the specification in Fig.~\ref{fig:dsl},
-which is very close to the original handwritten prose description in Fig.~\ref{fig:spec1}.
+As \al is designed to resemble prose notation, 
+generating the English prose specification from \al algorithms is a straightforward task.
+Fig.~\ref{fig:genprose} shows the prose pseudocode of \inblue{\ensuremath{\mathsf{ref.is\_null}}} instruction,
+generated from the specification in Fig.~\ref{fig:dsl},
+which is very close to the original handwritten prose in Fig~\ref{fig:spec1}.
+AL algorithms are rendered into prose specification document through three steps.
+First, the semantics described in \al is printed into English prose in reStructuredText markup.
+For example, the third step of \inblue{\ensuremath{\mathsf{ref.is\_null}}} is printed as follows:
+\begin{verbatim}
+3. If :math:`val` is of the case \
+   :math:`\xref{exec/runtime}{syntax-ref}{\mathsf{ref{.}null}}`, then:
+\end{verbatim}
+Next, as in the LaTeX backend, prose in reStructuredText are spliced into a skeleton specification document.
+Finally, the spliced document is processed by the Sphinx documentation tool~\cite{sphinx},
+producing human-frieldnly formats like PDF and HTML.
 
-\begin{itemize}
-\item How to generate PDF with cross references
-\item cf) error-prone generation of references done manually
-\item systematic naming and bug detection?
-\end{itemize}
-
-Note that an \al expression may have a different prose rendering
-depending on where it appears. For example, $|e|$ is rendered as 
-``$|\expr|$'' or ``the length of $\expr$'' depending on whether it appears in
-a mathematical context or not.
-To support intuitive prose notation, some \al conditions are specially rendered.
-For example, while ``$\kwnot$'' is rendered as ``not'' and ``$\kwisvalid\;\expr$''
-is rendered as ``$\expr$ is valid,''
-``$\kwnot \; (\kwisvalid \; \expr)$'' is rendered as ``$\expr$ is not valid''
-rather than ``not $\expr$ is valid.''
-
+Note that prose in reStructuredText is not simple plaintext,
+but has inline math blocks as denoted by the \texttt{:math:} markup.
+Expressions in math blocks are typesetted with LaTeX, thereby
+making a clear distinction between specification elements and ordinary English phrases.
+Furthermore, the prose backend embeds cross-references into the math blocks 
+with \texttt{\textbackslash xref\{doc\}\{section\}\{text\}}.
+This serves as a reference to a \texttt{section}
+in some reStructuredText file \texttt{doc}, to be rendered as \texttt{text}.
+As in the original specification document, 
+\inblue{\ensuremath{\mathsf{ref{.}null}}} in the third step references its syntax production rule in a separate file.
+This systematic insertion of references rules out
+possibilities of missing, broken, or misplaced links when inserted manually.
