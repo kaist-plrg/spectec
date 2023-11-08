@@ -8,25 +8,25 @@
 \end{figure}
 
 As \al is designed to resemble prose notation, 
-generating the English prose specification from \al algorithms is a straightforward task.
+generating an English prose specification from \al algorithms is a straightforward task.
 Fig.~\ref{fig:genprose} shows the prose pseudocode of \inblue{\ensuremath{\mathsf{ref.is\_null}}} instruction,
 generated from the specification in Fig.~\ref{fig:dsl},
 which is very close to the original handwritten prose in Fig~\ref{fig:spec1}.
-AL algorithms are rendered into prose specification document through three steps.
+AL algorithms are rendered into a prose specification document through three steps.
 First, the semantics described in \al is printed into English prose in reStructuredText markup.
 For example, the third step of \inblue{\ensuremath{\mathsf{ref.is\_null}}} is printed as follows:
 \begin{verbatim}
-3. If :math:`val` is of the case \
-   :math:`\xref{exec/runtime}{syntax-ref}{\mathsf{ref{.}null}}`, then:
+    3. If :math:`val` is of the case \
+       :math:`\xref{exec/runtime}{syntax-ref}{\mathsf{ref{.}null}}`, then:
 \end{verbatim}
-Next, as in the LaTeX backend, prose in reStructuredText are spliced into a skeleton specification document.
+Next, as in the LaTeX backend, prose in reStructuredText is spliced into a skeleton specification document.
 Finally, the spliced document is processed by the Sphinx documentation tool~\cite{sphinx},
 producing human-frieldnly formats like PDF and HTML.
 
 Note that prose in reStructuredText is not simple plaintext,
 but has inline math blocks as denoted by the \texttt{:math:} markup.
 Expressions in math blocks are typesetted with LaTeX, thereby
-making a clear distinction between specification elements and ordinary English phrases.
+making a clear distinction between mathematical notation and ordinary English phrases.
 Furthermore, the prose backend embeds cross-references into the math blocks 
 with \texttt{\textbackslash xref\{doc\}\{section\}\{text\}}.
 This serves as a reference to a \texttt{section}
