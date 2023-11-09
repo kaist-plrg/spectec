@@ -1,168 +1,217 @@
 \section{Evaluation}
 \label{sec:eval}
 
-\begin{itemize}
-  \item SIMD, numerics, one helper function is not specified yet
-  \item Slightly different with actual spec: bubbling up br, return / non cyclic module instantiation
-  \item use reference interpreter for numerics (with version)
-  \item explanation about the helper function
-  \item manually write AL for the helper function
-\end{itemize}
-
 \subsection{Setup}
+We perform the evaluation based on the most up-to-date version of Wasm
+standard, Wasm 2.0. We have crafted \specdsl, which is the description of the
+syntax, validation, and execution semantics of Wasm 2.0, written in DSL.
+which plays the role of the initial input of SpecTec framework.
+In order to focus on the core of the Wasm 2.0 semantics,  we made
+the deliberate choice to omit the SIMD instructions. We also omitted the
+auxiliary functions for numeric instructions, mainly related to the bit level
+manipulation of Wasm values. Instead of writing these numeric functions in DSL,
+we decided to borrow the implementations from the reference interpreter.
+In addition, some rules or auxiliary helper functions are specified in
+different way in \specdsl compared to the official specification.  For
+example, the current standard of Wasm 2.0 uses the evaluation context to
+describe the behavior of `br` and `return` instructions, so that multiple block
+contexts can be popped at once. Instead, we use \textit{bubble-up style} for
+describing the rules for these instructions, which escape one context at
+applying one reduction rule. Also, the auxiliary functions for instantiation
+of modules, \textit{instantiate}, are rewritten in a way that avoid the cyclic
+bindings within premises. We have confirmed that our rewritten rules are
+equivalent to original rules by the Wasm spec developers.  The overall Lines of
+Code (LoC) for the entire \specdsl amounted \inred{1,147}. This represents a
+significant reduction compared to the ten thousand of LoC present in the
+ReStructuredText document for actual specification.
 
-\textbf{Input Spec File}
-The baseline input spec is based on Wasm 2.0, the most up-to-date version of
-Wasm standard. We described the syntax, validation, and execution semantics of
-Wasm 2.0 using DSL, which plays the role of the initial input of SpecTec
-framework.  In order to focus on the core of the Wasm 2.0 semantics,  we made
-the deliberate choice to omit certain features, such as SIMD instructions or
-auxilirary functions for numeric instructions.  In addition, some rules or
-auxilirary helper functions are described in different way.  For example, the
-current standard of Wasm 2.0 uses the evaluation context to describe the
-behavior of `br` and `return` instructions, but we use bubble-up style in DSL.
-Also, the auxilirary functions used for instantiation of modules are rewritten
-in a way that avoid the cyclic definitions whitin premises. We have confirmed
-that our re-written rules are equivalnet to original rules by the Wasm spec
-developers.
+In the subsequent sections, we will showcase the capabilities of SpecTec in the following aspects:
+1) Generation of two artefacts: LaTeX and Prose specification
+2) Meta-level execution of Wasm test suite
+3) Ability to detect and prevent spec errors
+4) Generality towards new proposals.
 
-\subsection{Correctness}
-Wasm official test is written in Wast\textcolor{red}{(reference of Wast)}, scripting language for testing Wasm, which mainly consists of definitions and assertions.
-Definitions are Wasm module definition to run, and assertions check the possible result of \textcolor{red}{executing} a Wasm module.
-There are 7 kinds of assertions: AssertMalformed, AssertInvalid, AssertUnlinkable, AssertUninstantiable, AssertTrap, AssertReturn, and AssertExhaustion.
-Among them, AssertMalformed, AssertInvalid, and AssertUnlinkable are related to static semantics, so we exclude these assertions.
-AssertUninstantiable and AssertTrap are assertion that \textcolor{red}{executing} the module traps.
-AssertReturn is an assertion that \textcolor{red}{executing} the module returns an expected value.
-One interesting assertion is the AssertExhaustion, an assertion that a module falls into call stack overflow.
-Because there is no rule about call stack overflow in the Wasm DSL and current Wasm specification, the exact behavior from the specification is running forever.
-Therefore, our tool cannot detect call stack overflow, so we exclude AssertExhaustion.
-Long story short, we targeted 3 kinds of assertions named AssertUninstantiable, AssertReturn, and AssertTrap in Wasm official test excluding SIMD.
+\subsection{Generation of LaTeX and Prose Specification}:
+The \specdsl was successfully transformed into LaTeX, including all of syntax,
+validation, and execution semantics.  Also, the prose for the execution
+semantics was successfully generated.  This includes the prose for both of each
+reduction rules of Wasm instructions, and the module instantiation functions.
+The automatically generated PDF document, including both formal and prose
+notations, is available as the supplementary material[?].  The result indicates
+the capability of SpecTec to generate formal notation specifications from DSL
+representations, contributing to the ease of documentation.
 
-To evaluate the correctness of \textcolor{red}{SpecTec}, we tested the generated AL by executing the Wasm official test using our \textcolor{red}{test driver}.
-The AL interpreter and generated AL pass 21,363 AssertReturn, 2354 AssertTrap, and 34 AssertUninstantiable from the official test in \textcolor{red}{???} seconds, which shows the correctness of generated AL.
+\subsection{Meta-level execution of Wasm Test Suite}
+In this section we illustrate the result of interpreting official Wasm test suite[?]
+with our meta-level Wasm interpreter.  This evaluation serves dual purposes: 1) It
+demonstrates the ability of the meta-level interpreter to interpret the actual,
+real-world Wasm program, and 2) It provides assurance regarding the correctness of
+all of the \specdsl we crafted, the translation process of \specdsl into \al,
+and the resulting generated prose specification.
 
-\subsection{Usefulness}
-To assess the effectiveness of SpecTec in preventing human errors, we conducted
-an in-depth investigation into actual errors that had previously occurred in
-the main branch of the repository for Wasm standard. Our objective was to
-determine whether SpecTec could have prevented these errors. We classified the
-investigated errors into four distinct categories.
+The official test of Wasm is written in `.wast' format[?], which is a scripting
+language designed for testing Wasm implementations.  A `.wast' file consists of
+one or more Wasm modules, and a sequence of assertions that verify if the actual
+behavior matches the expected behavior.  Among seven kinds of assertions, we
+exclude three kinds of assertions that are related to parsing and validation
+phase of Wasm, which we currently do not support.  Also, we exclude one more
+kind of assertion that is designed to test if an invocation of Wasm function
+results in an infinite loop.  As a result, we target three kinds of assertions:
+\textit{AssertUninstantiable} which tests if a module instantiation results in
+a Trap, \textit{AssertTrap} which tests if a function invocations results in a
+Trap, and \textit{AssertReturn} which tests if a function invocation returns a
+expected value.
+
+There were 90 test scripts, comprising \inred{21,363} AssertReturn,
+\inred{2,354} AssertTrap, and \inred{34} AssertUninstantiable.  The entire test
+suite took \inred{???} seconds to run. Remarkably, the test pass rate was
+100\%. Every target assertion passed, indicating that every module instantiation
+and function invocation exhibited the expected behaviors.  This result
+highlights two key points: firstly, SpecTec is indeed capable of effectively
+executing real-world Wasm programs. Secondly, the specification we manually
+crafted in DSL, and the process that translates DSL into \al, are both correct.
+
+\subsection{Detecting and Preventing Errors}
+To assess the effectiveness of SpecTec in preventing human errors in
+documenting the specification, we conducted an in-depth investigation into
+actual errors that had previously occurred in the main branch of the repository
+for Wasm standard~\cite{wasmspecrepo}. Our objective was to determine whether
+SpecTec could have prevented these errors. We classified the investigated
+errors into four distinct categories.
 
 \textbf{Type Errors}
-Two fixes were attributed to type errors within the specification. These
-instances included an arity mismatch when invoking the auxiliary helper
-function runelem, and an omission of the field TYPE during the initialization
-of the element instance in the elem.drop execution semantics. We artificially
-introduced each of these errors into the DSL spec document and applied SpecTec.
-Subsequently, we confirmed that SpecTec effectively identified and reported the
-TypeErrors. In addition, the error message gives the information about the
-exact location of the error within the specification, and the reason for the
-error correctly.  This result signifies its capability to detect mistakes made
-by spec writers.
+This category represents the spec errors that could have been prevented by the
+type checker of SpecTec. There were two errors in this category, as illustrated
+in \inred{figure ?.?}. These instances included an arity mismatch when invoking
+the auxiliary helper function \textit{runelem}, and an omission of the field
+\textit{TYPE} during the initialization of the element instance in the
+\textit{elem.drop} execution semantics. We artificially injected each of these
+errors into the \specdsl and applied type checker of SpecTec.  Subsequently, we
+figured out that SpecTec successfully identified and reported the Type Errors.
+The error message gives the information about the exact location of the error
+within the specification, and the exact reason for the error.  This result
+signifies its capability to detect mistakes made by spec writers, and aid
+fixing it.
 
 \textbf{Prose Errors}
-Five errors were found to occur within the prose notation. These errors
-encompassed free identifier issues, the absence of an immediate value after an
-instruction name, and outdated steps that introduced a new variable which was
-never utilized. Our automatic prose generation process proved to be free from
-these types of errors, and we verified that the corresponding prose was
-generated accurately, devoid of any such issues.
+This category represents errors in the prose that could have been prevented by
+automatic prose generation from the first place. There were five errors in this
+category as illustrated in \inred{figure ?.?.}. These five errors encompassed
+free identifier issues, the absence of an immediate value after
+\textit{table.set}, and outdated steps that introduced a new variable which was
+never utilized for function invocation. Our automatic prose generation process
+is free from these types of errors due to the nature of automatic generation,
+and we verified that the corresponding prose was generated accurately, devoid
+of any such issues.
 
 \textbf{Semantics Errors}
-Three errors resulted in incorrect behavior of the WebAssembly specification.
-We manually introduced these errors into the DSL, and subsequently executed the
-official tests against them using our indirect interpreter. In all cases, the
-tests returned failures as expected, indicating that our indirect interpreter
-was proficient in detecting these errors.
+This category represents semantics errors within semantics that incurs the
+incorrect behavior of Wasm, which could have been prevented by the meta-level
+interpretation with SpecTec.  There were three errors in this category as
+illustrated in \inred{figure ?.?}. These include using a wrong arity when
+exiting from a \textit{label}, missing a value in the value stack of lhs of a
+reduction rule of \textit{table.grow}, or using a wrong memory index for
+\textit{memory.fill} and \textit{memory.init}.  We manually injected these
+errors into the \specdsl, and subsequently executed the official tests against them
+using our indirect interpreter. In all cases, the corresponding tests resulted
+in a failure as expected, indicating that our indirect interpreter was proficient
+in detecting these errors.
 
 \textbf{Editorial Fixes}
-A total of \inred{ten} editorial fixes were identified. While these fixes did
-not impact the behavior of the specification, they addressed typographical
-errors in LaTeX or ensured consistency in writing style. Once again, SpecTec
-can effectively address these types of issues.  Additionally, the consistency
-in writing style within the generated spec is guaranteed by design.
+In addition to the specification errors that directly impacts its behavior, we
+also identified numerous editorial fixes that addresses the presentational
+issues such as typographical errors in LaTeX or inconsistency in writing style
+within the document. Once again, SpecTec can effectively address these types of
+issues because because it ensures that the generated specifications adhere to a
+predefined structure and style, eliminating the likelihood of manual errors or
+inconsistencies.
 
-The evaluation results demonstrate that SpecTec is effective at preventing a wide
-range of human errors within the WebAssembly specification.  Its capabilities
-extend to detecting and addressing type errors, prose errors, semantics errors,
-as well as editorial fixes. This is a strong evidence that leveraging SpecTec
-can significantly enhance the robustness and reliability of the specification
-writing process.
+These emperical results demonstrate that SpecTec is effective at preventing a
+wide range of human errors within the WebAssembly specification.  Its
+capabilities extend to detecting and addressing type errors, prose errors,
+semantics errors, as well as editorial fixes. This is a strong evidence that
+leveraging SpecTec can significantly enhance the robustness and reliability of
+the specification writing process.
 
 \subsection{Generality}
 In this section, we present the generality of SpecTec, by applying it to five
-WebAssembl proposals currently at or about to enter phase 4 at the time of
-writing. These proposals include Tail Call[?], Extended Constant
+%WebAssembly proposals currently at or about to enter phase 4 at the time of
+WebAssembly proposals that are about to be officially standardized in Wasm at
+the time of writing. These proposals include Tail Call[?], Extended Constant
 Expressions[?], Typed Function References[?], Garbage Collection[?], and
 Multiple Memories[?].
 
-The process involved two main steps. First, we manually extended the
-specification files for each of these proposals. Next, we used SpecTec to
-automatically generate both LaTeX and Prose backends. The necessary
-modifications in SpecTec were minimal, primarily involving the addition of new
-custom operators for notations specific to some of proposals.
+First, we extended the DSL-spec for each of these proposals. Each
+of the five proposals was successfully described using DSL.  Despite the fact
+that the new proposals were not heavily considered during the initial design
+process of SpecTec, the required modifications in SpecTec were minimal,
+primarily involving the addition of new custom operators for notations specific
+to some of proposals. This demonstrates the versatility and adaptability of
+SpecTec in effectively expressing the semantics of diverse Wasm features.
 
-The results of our evaluation are as follows:
+Next, we used SpecTec to automatically generate both LaTeX and Prose
+specifications.  All proposals were successfully transformed into LaTeX format,
+mainly thanks to the clever design of DSL.  Out of the 34 Wasm instructions
+that are either newly introduced or modified by the proposals, all but two had
+their semantics correctly translated into \al, and subsequently into prose. For
+the two Wasm instructions with incorrect translations, \inred{we revised the
+corresponding reduction rules to be compatible with the DSL-to-AL translator,
+albeit making the reduction rules slightly less concise.} Our objective is to
+enhance the translator's capability to handle more concise reduction rules in
+the future. The proposal also introduced dozens of new auxiliary helper
+functions, all of which were translated without any issues.  These results
+affirm the robustness of LaTeX and prose generation against the introduced
+proposals.
 
-\textbf{Successful Description using DSL}: Each of the five proposals was
-successfully described using the WebAssembly Domain Specific Language (DSL).
-This demonstrates the versatility and adaptability of SpecTec in effectively
-capturing the semantics of diverse Wasm features.
+Following the generation of \al, we conducted testing using the tests of
+proposals against the generated \al.  The only component we needed to borrow
+from the reference interpreter was the calculation of subtyping of Wasm types,
+introduced by Garbage Collection proposal. This was necessary because the
+subtyping rules of Wasm is located in the validation section of specification,
+which we have not yet extract into an executable algorithm yet.  Given this
+consideration, the interpretation was successful: the indirect interpreter was
+able to instantiate the Wasm modules in the tests and invoke the Wasm functions
+of assertions.  The pass rate achieved was again 100\%.  This confirms that the
+meta-level interpreter we have developed can be extended to handle the new
+proposals, indicating the potential of our approach in providing assurance
+regarding the correctness of the semantics of new Wasm features.
 
-\textbf{Transformation into LaTeX}: The descriptions of all proposals were
-successfully transformed into LaTeX format. This indicates the capability of
-SpecTec to generate formal notation specifications from DSL representations,
-contributing to the ease of documentation.
-
-\textbf{Semantic Translation Accuracy in AL and Prose}: Out of the 34
-instructions affected by the proposals, all but three instructions had their
-semantics correctly translated into Algorithmic Language (AL), and subsequently
-into prose. For the three instructions with incorrect translations, we
-performed a manual correction. Notably, the required changes were minimal, with
-a line diff of only nine.
-
-\textbf{Rigorous Testing and \inred{100\%} Pass Rate}: Following the manual
-fixes, we conducted comprehensive testing using the tests of proposals against
-the generated prose. The pass rate achieved was an impressive 100\%. This
-confirms the accuracy and reliability of the generated prose descriptions,
-demonstrating their alignment with the intended behavior specified in DSL.
+Furthermore, during the comparison of the artifacts generated by SpecTec with
+the actual proposals, we identified certain discrepancies. Upon closer
+examination, we found that these disparities arose from errors within the
+official proposals themselves, encompassing both formal and prose notations. In
+total, we identified and reported \inred{five} such errors to the specification
+writer, all of which were subsequently rectified.  This discovery emphasizes
+that SpecTec's capacity to produce more reliable artifacts is not limited to
+the current version of Wasm, but extends to future proposals as well.
 
 Overall, the evaluation results indicate that the SpecTec approach is highly
-effective and generalizable. It successfully accommodates a range of Wasm
+generalizable and adaptable. It successfully accommodates a range of Wasm
 proposals, accurately capturing their semantics in both formal and prose
 notations. The minimal manual intervention required further underscores the
-efficiency and reliability of SpecTec. These findings affirm the potential of
-SpecTec as a transformative tool, not only within the domain of current version
-of WebAssembly but also in broader contexts.
+efficiency and reliability of SpecTec.  In addition, the demonstrated
+capability of SpecTec to interpret the tests and identify errors of actual
+proposals further supports its generality.  These findings affirm the
+potential of SpecTec as a effective tool for streamlining the specification
+process, not only for the current state of WebAssembly but also for
+accommodating future advancements and extensions in the language.
 
-Furthermore, in the course of comparing the artifacts generated by SpecTec with
-the actual proposals, we identified certain discrepancies. Upon closer
-examination, it became evident that these disparities arose from errors within
-the official proposals themselves, encompassing both formal and prose
-notations. In total, we identified and reported four such errors to the
-specification writer, all of which were subsequently rectified. This discovery
-underscores the capacity of SpecTec to produce more reliable artifacts in
-comparison to the potentially error-prone manual process. It highlights the
-potential for SpecTec to not only streamline the specification generation
-process but also enhance the overall accuracy and trustworthiness of the
-resulting documentation in general.
-
-\subsection{Others}
-\begin{itemize}
-\item anecdotal evidence
-\begin{itemize}
-\item no need to write prose
-\item code review: readability
-\end{itemize}
-
-\item qualitative evaluation?
-\begin{itemize}
-\item compactness of writing? LoC?
-\item arity issues?
-\end{itemize}
-
-\item more quantitative evaluation
-\begin{itemize}
-\item coverage of the prose/LaTeX specification
-\end{itemize}
-\end{itemize}
+%\subsection{Others}
+%\begin{itemize}
+%\item anecdotal evidence
+%\begin{itemize}
+%\item no need to write prose
+%\item code review: readability
+%\end{itemize}
+%
+%\item qualitative evaluation?
+%\begin{itemize}
+%\item compactness of writing? LoC?
+%\item arity issues?
+%\end{itemize}
+%
+%\item more quantitative evaluation
+%\begin{itemize}
+%\item coverage of the prose/LaTeX specification
+%\end{itemize}
+%\end{itemize}
