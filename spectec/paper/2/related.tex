@@ -1,0 +1,30 @@
+%!TEX root = main.tex
+
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Wasm Semantics in Existing Language Frameworks}
+The closest effort to executing the Wasm semantics definition can be found in PLT-Redex and the K framework.
+There are two PLT-Redex models of Wasm, wasm-redex~\cite{wasm-redex-asumu} and Wasm-Redex~\cite{wasm-redex-adam},
+both based on the paper model of Wasm~\cite{wasm-pldi17}.
+PLT-Redex actuates the rewrite system, defined by the collection of Wasm reduction rules.
+Their shortcoming is that the module semantics is not specified,
+thus complete execution of a Wasm program is not available.
+KWasm~\cite{wasm-k} specifies Wasm utilizing the K framework.
+Wasm runtime semantics, including the module semantics, is brought together 
+into a single rewrite system in the K framework.
+Yet, subtleties of the Wasm semantics is not entirely modeled in KWasm,
+therefore it fails for a number of tests in the official Wasm test suite.
+% Despite the rewrite systems in wasm-redex, Wasm-Redex, and KWasm are
+% designed to resemble the formal notations in the specification,
+% the inherent lack of expressibility in specification languages versus mathematical language 
+% limits their executability.
+% the statement above is quite wild ...
+\dslname takes a different approach to executing Wasm semantics.
+Instead of executing the rewrite system by itself,
+it provides indirect interpretation over an algorithmic representation of the semantics,
+The complete runtime semantics specified in \dslname is 
+% technically, it is not complete ... (ex. SIMD)
+systematically spelled out into an algorithmic form.
+Thus, \dslname can thoroughly execute Wasm semantics,
+from instantiating a module to invoking a function inside the module.
