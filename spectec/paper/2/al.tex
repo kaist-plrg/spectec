@@ -337,21 +337,19 @@ Once the variable binding occurrences in premises are identified,
 reordering the premises is a simple def-use dataflow analysis.
 
 The primary challange now lies in identifying each variable's binding occurrence in premises.
-An interesting complication arises due to the fact of a \textit{parital
-binding}, where, among the free variables appearing on one side of an equality
-expression, some are identified as binding occurrences, while others are not.
-For example, when we have the premise $(x_1, x_2) = y$, it is possible to
-identify only $x_1$ as binding occurence but not $x_2$.
-Unfortunately, such partial bindings incurs the introduction
-of fresh variables when generating prose. In the aformentioned exmaple,
-the premise wwould to a rendeing like ``1. Let ($x_1$, $t$) be $y$; 2. If $t$ =
-$x_2$, then: ...'', introducing a new free variable $t$.  The excessive use of such
-fresh variables could result in a prose specification that deviates significantly from the
-current prose specification, eventaully leading to a less readable document.
+An intriguing difficulty emerges because of \textit{partial binding},
+in which certain free variables on one side of an equality expression are binding occurrences but others are not.
+In a premise $(x_1, x_2) = y$, for example, only $x_1$ might be a binding occurrence but not $x_2$.
+Unfortunately, such partial bindings introduce fresh variables while generating prose.
+The prose rendering of the premise $(x_1, x_2) = y$ would be
+``1. Let ($x_1$, $t$) be $y$. 2. If $t =x_2$, then: $\cdots$'', introducing the free variable $t$.
+Overuse of such fresh variables may result in a prose
+specification that is very different from the current prose specification,
+leading to a less readable document.
 
-Therefore, it is desirable to minimize the number of partial bindings when
-identifying the binding occurences, which is not a trivial task.
-In fact, this turns out to be a \textit{NP-hard problem}.
+Therefore, it is preferable to minimize the number of partial bindings when
+identifying the binding occurrences, which is not a trivial task.
+It turns out that this is actually an \textit{NP-hard problem}.
 We prove it by reduction from a known NP-hard problem, the \textit{exact cover} problem~\cite{exactcover}:
 \begin{quote}
 The exact cover problem aims at deciding whether it is possible to select some subsets within a given collection of subsets in such a way that each element of a given set belongs to exactly one selected subset. This problem is NP-complete~\cite{karp72}.
