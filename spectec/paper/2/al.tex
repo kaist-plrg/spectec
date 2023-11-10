@@ -336,10 +336,22 @@ which clearly indicates that fresh variables $x_v$ and $x_v'$ are newly introduc
 Once the variable binding occurrences in premises are identified,
 reordering the premises is a simple def-use dataflow analysis.
 
-The primary challange now lies in identifying each variable's binding occurrence in premises,
-which turns out to be a \textit{NP-hard} problem.
-This is especially because a single premise can bind more than two variables at once,
-as in $[x_1, x_2] \leftarrow y$.
+The primary challange now lies in identifying each variable's binding occurrence in premises.
+An interesting complication arises due to the fact of a \textit{parital
+binding}, where, among the free variables appearing on one side of an equality
+expression, some are identified as binding occurrences, while others are not.
+For example, when we have the premise $(x_1, x_2) = y$, it is possible to
+identify only x_1 as binding occurence but not $x_2$.
+Unfortunately, such partial bindings incurs the introduction
+of fresh variables when generating prose. In the aformentioned exmaple,
+the premise wwould to a rendeing like ``1. Let ($x_1$, $t$) be $y$; 2. If $t$ =
+$x_2$, then: ...'', introducing a new free variable $t$.  The excessive use of such
+fresh variables could result in a prose specification that deviates significantly from the
+current prose specification, eventaully leading to a less readable document.
+
+Therefore, it is desirable to minimize the number of partial bindings when
+identifying the binding occurences, which is not a trivial task.
+In fact, this turns out to be a \textit{NP-hard problem}.
 We prove it by reduction from a known NP-hard problem, the \textit{exact cover} problem~\cite{exactcover}:
 \begin{quote}
 The exact cover problem aims at deciding whether it is possible to select some subsets within a given collection of subsets in such a way that each element of a given set belongs to exactly one selected subset. This problem is NP-complete~\cite{karp72}.
@@ -366,7 +378,7 @@ we can prove that the problem of identifying each variable's binding occurrence 
 if we can reduce EC into the problem in polynomial time.
 
 \begin{theorem}\label{thm:np-hard}
-The problem of identifying each variable's binding occurrence in premises is NP-hard.
+The problem of identifying each variable's binding occurrence in premises with minimal partial binding is NP-hard.
 \end{theorem}
 \begin{proof}
 Assume that we are given EC with a set $X$ and
@@ -377,12 +389,20 @@ where $\gamma = (\bot,\ v_n, v_{n-1}, \cdots, v_1)$,
 $\gamma' = (\bot,\ [])$, and
 the $i$-th premise of $\pi^*$ be $v_i = (x_{i1}, x_{i2}, ..., x_{ij})$.
 Note that this reduction rule can be constructed in linear time.
-The claim is that when we identify each variable's binding occurrence in $\pi^*$,
+The claim is that when we identify each variable's binding occurrence in $\pi^*$
+with the minimal number of partiall binding,
 this gives a solution to EC.
+Specifically, the answer to EC is YES if and only if the if the minimum nuber is zero.
 Note that every variable must be bound exactly once.
-Thus, if we collect all premises that bind new variables,
+Thus, given that there is no partial binding,
+when we collect all premises that bind new variables,
 then the subsets $S_i$ corresponding to such premises
 would form a subcollection of $S$, which is a partition of $X$.
+Conversely, if an exact cover exists for the given collection, then the
+identification of variable's binding occurence in premises can be done
+without any partial bindings, by regarding every variables in the
+premises that corresponds to the sets in the exact cover as binding
+occurence, and regarding anything else as not.
 \end{proof}
 
 \textbf{Example.}
@@ -403,7 +423,7 @@ If we successfully solve the problem, then the result should look like the follo
 [(a,b) \leftarrow v_1, (c, d, e) \leftarrow v_3, v_2 = (b,c)]
 \end{array}
 \]
-From the result, we can reconstruct the partition of the set $X$
+which does not have any partial bindings. From the result, we can reconstruct the partition of the set $X$
 by collecting the binding premises, $\{\{a, b\}, \{c, d, e\}\}$, giving the answer to EC.
 
 \begin{algorithm}[t]
@@ -438,7 +458,11 @@ Another solution is to use an SMT solver like Z3~\cite{z3},
 since this problem can be treated as a constraint solving problem.
 However, the performance overhead of Z3 does not apply to this problem either.
 
-As a practical solution to the NP-hard problem,
+As a practical solution to this NP-hard problem,
+we adopt an all-or-nothing heuristic approach.
+We first try to solve the problem under a condition that the partial bindings are not allowed,
+and if that fails, we resort to a greedy algorithm, inevitably introducing some fresh variables.
+In order to solve the problem with the constraint of no-partial bindings,
 we reduce the problem into EC\footnote{Note that the direction is opposite with
 the proof} and then adopt the Knuth algorithm~\cite{knuth2000dancing},
 a well-known and effective algorithm for solving EC.
@@ -457,8 +481,8 @@ it is encoded as three subsets: $\{\{i\},\ \{i\}\cup\mathit{free}(\eta),\ \{i\}\
 which denotes its possible interpretations.
 The first set $\{i\}$ denotes when the $i$-th premise does not bind any variables,
 meaning $\pi_i$ is an equality check condition.
-The second set $\{i\} \cup \mathit{free}(\eta)$ denotes when $\pi_i$ binds all the variables in $\eta$ and
-the third set $\{i\} \cup \mathit{free}(\eta')$ denotes when $\pi_i$ binds all the variables in $\eta'$.
+The second set $\{i\} \cup \mathit{free}(\eta)$ denotes when $\pi_i$ binds ALL the variables in $\eta$ and
+the third set $\{i\} \cup \mathit{free}(\eta')$ denotes when $\pi_i$ binds ALL the variables in $\eta'$.
 For example, if the first premise is $x = y$, it is encoded as three subsets: $\{1\}$, $\{1, x\}$, and $\{1, y\}$.
 If $\pi_i$ is not an equality expression, it is encoded as only one subset, $\{i\}$,
 meaning $\pi_i$ does not bind any variables but checks some non-equality condition.
