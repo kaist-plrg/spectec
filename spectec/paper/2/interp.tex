@@ -18,19 +18,18 @@ we can indirectly execute JavaScript programs.
 A parser parses a Wasm program into an AST, which an \al algorithm takes as input.
 Unlike ESMeta, \dslname does not generate a Wasm parser,
 but uses the parser of the reference interpreter~\cite{wasmparser}.
-The executable semantics written in \al is automaitcally extractd as described in Section~\ref{sec:dl2al}.
-Based on the AL semantics~\cite{il-tr}, we developed an \al interpreter in OCaml,
-which takes the extracted Wasm semantics and a parsed AST as input
-and returns a resulting value or produces a \textit{trap}.
-%Specifically, we can specify which \al algorithm to execute as a main entry of the extracted semantics.
-%Currently, the Wasm specification has two main entry algorithms:
-%$\mathit{instantiate}$ and $\mathit{invoke}$. 
-%The $\mathit{instantiate}$ algorithm instantiates the Wasm module into the module instance,
-%and the $\mathit{invoke}$ algorithm invokes one of the Wasm functions within the Wasm module.
-%These algorithms in turn recursively call other algorithms,
-%including those corresponding to the semantics of individual Wasm instructions like `REF.IS\_NULL'.
-%This result constitutes the final result of executing the Wasm program,
-%encompassing both the instantiation of the Wasm module and the invocation of the Wasm function.
+The executable semantics written in \al is automaitcally extractd as described in Sec.~\ref{sec:dl2al}.
+Based on the \al semantics~\cite{il-tr}, we developed an \al interpreter in OCaml.
+By executing the extracted semantics written in \al using the parsed AST as input to the semantics,
+we can indirectly execute Wasm programs.
+
+As described in Sec.~\ref{sec:aldef}, we can execute an \al program by calling one of its algorithms.
+A Wasm program is executed when instantiating a module~\cite[Sec. 4.5.4]{wasmspec} or
+invoking a function on a module instance~\cite[Sec. 4.5.5]{wasmspec}.
+Thus, the \al interpreter calls the $\mathit{instantiate}$ algorithm to instantiate a module
+or the $\mathit{invoke}$ algorithm to invoke one of the functions within the module.
+After calling the algorithm, it returns a value or produces a \textit{trap},
+which is the result of executing the Wasm program.
 
 %\begin{itemize}
 %\item Borrowed implementation from the reference interpreter
