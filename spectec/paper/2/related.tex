@@ -1,30 +1,51 @@
 %!TEX root = main.tex
 
+\newpage
 \section{Related Work}
 \label{sec:related}
 
+\textbf{Programming Language Frameworks}
+Researchers have presented numerous frameworks to mechanize the
+definitions of programming languages.
+Once language definitions are mechanized, frameworks can provide various support
+such as LaTeX typesetting and type checking of language definitions,
+reference implementation in another language, and 
+proof assistant code for theorem provers.
+Ott~\cite{ott} allows language designers to specify the semantics in inference rules,
+and generates code for Coq, HOL, and Isabelle/HOL.
+It has been used for case studies like a large fragment of OCaml.
+Spoofax~\cite{spoofax} supports agile development of textual
+domain-specific languages with the Eclipse IDE support.
+Skeleton~\cite{skeleton} specifies language semantics in big-step semantics
+and constructs both concrete abstract interpretation.
+PLTRedex~\cite{pltredex} describes language semantics in reduction rules,
+and It has specified the semantics of Scheme~\cite{r6rs}.
+The K framework~\cite{k} can generate various tools,
+including interpreters, model checkers, and verifiers, from a language specification
+written in its language K. It has specified the core semantics of real-world programming languages
+such as C~\cite{kc}, Java~\cite{kjava}, Python~\cite{kpython}, and JavaScript~\cite{kjs}.
+While the aforementioned frameworks aim to support general-purpose languages
+with declarative semantics, ESMeta~\cite{esmeta} is designed to
+support JavaScript with imperative semantics.
+By devising a specific algorithmic language, \ires,
+to specify the semantics described in the prose ECMAScript standard,
+ESMeta can automatically generate diverse tools~\cite{jiset,jest,jstar,jsaver}.
+While existing language frameworks are dedicated to a certain semantics style,
+\dslname can handle both declarative and algorithmic styles.
+
 \textbf{Wasm Semantics in Existing Language Frameworks}
-The closest effort to executing the Wasm semantics definition can be found in PLT-Redex and the K framework.
-There are two PLT-Redex models of Wasm, wasm-redex~\cite{wasm-redex-asumu} and Wasm-Redex~\cite{wasm-redex-adam},
-both based on the paper model of Wasm~\cite{wasm-pldi17}.
-PLT-Redex actuates the rewrite system, defined by the collection of Wasm reduction rules.
-Their shortcoming is that the module semantics is not specified,
-thus complete execution of a Wasm program is not available.
-KWasm~\cite{wasm-k} specifies Wasm utilizing the K framework.
-Wasm runtime semantics, including the module semantics, is brought together 
-into a single rewrite system in the K framework.
-Yet, subtleties of the Wasm semantics is not entirely modeled in KWasm,
-therefore it fails for a number of tests in the official Wasm test suite.
-% Despite the rewrite systems in wasm-redex, Wasm-Redex, and KWasm are
-% designed to resemble the formal notations in the specification,
-% the inherent lack of expressibility in specification languages versus mathematical language 
-% limits their executability.
-% the statement above is quite wild ...
-\dslname takes a different approach to executing Wasm semantics.
-Instead of executing the rewrite system by itself,
-it provides indirect interpretation over an algorithmic representation of the semantics,
-The complete runtime semantics specified in \dslname is 
-% technically, it is not complete ... (ex. SIMD)
-systematically spelled out into an algorithmic form.
-Thus, \dslname can thoroughly execute Wasm semantics,
-from instantiating a module to invoking a function inside the module.
+The Wasm semantics have been mechanized in PLT-Redex and K.
+Two PLT-Redex models specify a large core of Wasm~\cite{wasm-pldi17}:
+wasm-redex~\cite{wasm-redex-asumu} and Wasm-Redex~\cite{wasm-redex-adam}.
+The Wasm semantics defined by the collection of reduction rules is implemented
+by the rewrite system of PLT-Redex.
+Both models do not specify the Wasm module semantics, thus complete execution of
+Wasm programs is not available.
+KWasm~\cite{wasm-k} specifies the Wasm runtime semantics, including the module semantics,
+in a single rewrite system in the K framework.
+Since it does not model the entire Wasm semantics yet,
+it fails for a number of tests in the official Wasm test suite.
+While both PLT-Redex and K execute the Wasm semantics using their rewriting engines,
+\dslname provides indirect interpretation over an algorithmic representation of the semantics.
+
+\textbf{Wasm Semantics Mechanizations}
