@@ -1,0 +1,182 @@
+\documentclass[sigconf,nonacm]{acmart}
+\usepackage{xspace}
+\usepackage{xcolor}
+\usepackage{pgfplots}
+\usepackage{subcaption}
+\usepackage[capitalise,nameinlink]{cleveref}
+\pgfplotsset{compat=1.16}
+
+\usetikzlibrary{shapes.geometric}
+\usetikzlibrary{arrows}
+\usetikzlibrary{decorations.pathmorphing}
+\usetikzlibrary{quotes}
+
+\tikzset{every edge quotes/.style =
+          { fill = white}}
+          
+\makeatletter
+\pgfdeclareshape{document}{
+\inheritsavedanchors[from=rectangle]
+\inheritanchorborder[from=rectangle]
+\inheritanchor[from=rectangle]{center}
+\inheritanchor[from=rectangle]{north}
+\inheritanchor[from=rectangle]{south}
+\inheritanchor[from=rectangle]{west}
+\inheritanchor[from=rectangle]{east}
+\inheritanchor[from=rectangle]{north east}
+\backgroundpath{
+\southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+\northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+\pgf@xc=\pgf@xb \advance\pgf@xc by-10pt
+\pgf@yc=\pgf@yb \advance\pgf@yc by-10pt
+\pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+\pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yb}}
+\pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+\pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+\pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+\pgfpathclose
+\pgfpathmoveto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+\pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+\pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+\pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+}
+}
+\makeatother
+          
+\tikzstyle{doc}=[%
+draw,
+thick,
+align=center,
+color=black,
+shape=document,
+minimum width=20mm,
+minimum height=28.2mm,
+shape=document,
+inner sep=2ex,
+]
+
+\newcommand{\gearmacro}[5]{%
+\foreach \i in {1,...,#1} {%
+  [rotate=(\i-1)*360/#1]  (0:#2)  arc (0:#4:#2) {[rounded corners=1.5pt]
+             -- (#4+#5:#3)  arc (#4+#5:360/#1-#5:#3)} --  (360/#1:#2)
+}}  
+
+\newcommand{\chaptergear}{\begin{tikzpicture}
+   \fill[gray] (0,0) circle (2cm);
+   \draw[thick,rotate=12,fill=gray] \gearmacro{8}{2}{2.4}{20}{2};
+   \draw[thick,fill=white] (0cm,0cm) circle(1.35cm);
+ \end{tikzpicture}}
+ 
+ \newsavebox\gearbox
+\sbox\gearbox{\raisebox{-0.4em}{\resizebox{!}{1.5em}{\chaptergear}}}
+  
+\hyphenation{Web-Assembly}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    Bib\TeX}}}
+
+\setcopyright{acmcopyright}
+\copyrightyear{2024}
+\acmYear{2024}
+\acmDOI{XXXXXXX.XXXXXXX}
+
+\begin{document}
+
+\title{Wasm SpecTec: Engineering a Formal Language Standard}
+
+\author{Joachim Breitner}
+\affiliation{%
+  \institution{Independent}
+  \country{Germany}}
+\email{mail@joachim-breitner.de}
+
+\author{Philippa Gardner}
+\affiliation{%
+  \institution{Imperial College London}
+  \country{United Kingdom}}
+\email{p.gardner@imperial.ac.uk}
+
+\author{Jaehyun Lee}
+\affiliation{%
+  \institution{KAIST}
+  \country{South Korea}}
+\email{99jaehyunlee@kaist.ac.kr}
+
+\author{Sam Lindley}
+\affiliation{%
+  \institution{The University of Edinburgh}
+  \country{United Kingdom}}
+\email{Sam.Lindley@ed.ac.uk}
+
+\author{Matija Pretnar}
+\affiliation{%
+  \institution{University of Ljubljana}
+  \country{Slovenia}}
+\email{matija.pretnar@fmf.uni-lj.si}
+
+\author{Xiaojia Rao}
+\affiliation{%
+  \institution{Imperial College London}
+  \country{United Kingdom}}
+\email{xiaojia.rao19@imperial.ac.uk}
+
+\author{Andreas Rossberg}
+\affiliation{%
+  \institution{Independent}
+  \country{Germany}}
+\email{rossberg@mpi-sws.org}
+
+\author{Sukyoung Ryu}
+\affiliation{%
+  \institution{KAIST}
+  \country{South Korea}}
+\email{sryu.cs@kaist.ac.kr}
+
+\author{Wonho Shin}
+\affiliation{%
+  \institution{KAIST}
+  \country{South Korea}}
+\email{new170527@kaist.ac.kr}
+
+\author{Conrad Watt}
+\affiliation{%
+  \institution{University of Cambridge}
+  \country{United Kingdom}}
+\email{conrad.watt@cl.cam.ac.uk}
+
+\author{Dongjun Youn}
+\affiliation{%
+  \institution{KAIST}
+  \country{South Korea}}
+\email{f52985@kaist.ac.kr}
+
+%\renewcommand{\shortauthors}{TODO: we will need this}
+
+\newcommand{\dslname}{SpecTec\xspace}
+\newcommand{\todo}[1]{{\color{red}#1}}
+
+\crefformat{section}{#2\S{}#1#3}
+\crefname{figure}{Figure}{Figures}
+\crefname{lstlisting}{Listing}{Listings}
+\crefname{algorithm}{Algorithm}{Algorithms}
+\crefname{table}{Table}{Tables}
+\Crefname{line}{Line}{Lines}
+\crefname{line}{line}{lines}
+
+\input{abstract}
+\maketitle
+\input{figs/fig-structure}
+\input{intro}
+\input{structure}
+\input{future}
+\input{conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\balance
+\bibliography{ref}
+
+\end{document}
+\endinput
+%%
+%% End of file `main.tex'.

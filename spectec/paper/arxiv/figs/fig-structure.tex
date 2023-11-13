@@ -1,0 +1,50 @@
+%!TEX root = ../main.tex
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}
+
+\draw (9,2) node[draw,doc, minimum height=.8cm,minimum width=3cm]
+(FILES) {SpecTec Files (DSL)};
+
+\draw (5,1) node[draw,rectangle, rounded corners, minimum height=.8cm,minimum width=3cm] (EXT) {\begin{tabular}{c}External\\Representation\end{tabular} (EL)};
+
+\draw (5,-1) node[draw,rectangle, rounded corners, minimum height=.8cm,minimum width=3cm] (INT) {\begin{tabular}{c}Internal\\Representation\end{tabular} (IL)};
+
+\draw (5,-3) node[draw,rectangle, rounded corners, minimum height=.8cm,minimum width=3cm] (ALG) {\begin{tabular}{c}Algorithmic\\Representation\end{tabular} (AL)};
+
+\draw (-3,-4.8) node[draw,doc, minimum height=.8cm,minimum width=3cm] (FORM) {Formalism (LaTeX)};
+
+\draw (1,-4.8) node[draw,doc, minimum height=.8cm,minimum width=3cm] (PROSE) {Prose (Sphinx)};
+
+\draw (5,-4.8) node[draw,rectangle, minimum height=.8cm,minimum width=3cm] (ARINT) {AL Interpreter};
+
+\draw (11,-4.5) node[draw,doc, minimum height=.8cm,minimum width=3cm] (MECH) {\begin{tabular}{c}Mechanisations\\(Coq/Isabelle/Agda/Lean)\end{tabular}};
+
+\draw (5,-6.4) node[draw,doc, minimum height=.8cm,minimum width=3cm] (TEST) {Test Suite / Fuzzer};
+
+\draw (11,-6.4) node[draw,doc, minimum height=.8cm,minimum width=3cm] (PROOF) {Proof Obligations};
+
+\draw [line width=0.4mm, -stealth] (FILES.south) to[out=270,in=0, distance=0.5cm] node[below right, yshift=1.0ex]{\hspace{0.0em} \usebox{\gearbox} parsing} (EXT.east);
+\draw [line width=0.6mm, -stealth] (EXT.south) to node[right, yshift=0.7ex]{\hspace{0.0em} \usebox{\gearbox} checking, elaboration} (INT.north);
+\draw [line width=0.6mm, -stealth] (INT.south) to node[right, yshift=0.7ex]{\hspace{0.0em} \usebox{\gearbox} animation} (ALG.north);
+\draw [line width=0.6mm, -stealth] (ALG.south) -- (ARINT.north);
+
+\draw [line width=0.6mm, -stealth, dashed] (TEST.north) -- (ARINT.south);
+\draw [line width=0.6mm, -stealth,dashed] (PROOF.north) -- (MECH.south);
+
+\draw [line width=0.6mm, -stealth] (ALG.west) to[out=180,in=90, distance=1.5cm,"\usebox{\gearbox} prose backend", pos=.8] (PROSE.north);
+
+\draw [line width=0.6mm, -stealth] (INT.east) to[out=0,in=90, distance=3cm,"\usebox{\gearbox} prover backends", pos=.7] (MECH.north);
+
+\draw [line width=0.6mm, -stealth] (EXT.west) to[out=180,in=90, distance=4cm, "\usebox{\gearbox} LaTeX backend"] (FORM.north);
+
+\draw [line width=0.6mm, -stealth] (INT.north west) to[out=135,in=225, distance=1cm] node[left]{\usebox{\gearbox} transforms} (INT.south west);
+
+\draw [line width=0.6mm, -stealth] (INT.east) to[out=0,in=45, distance=2.5cm] (TEST.north east);
+
+\end{tikzpicture}
+\caption{An overview of Wasm \dslname}
+\label{fig:structure}
+\vspace{-0.0\baselineskip}
+\end{figure*}

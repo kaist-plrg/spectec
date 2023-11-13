@@ -1,0 +1,17 @@
+\section{Future Plans}
+\label{sec:future}
+
+The key measure of \dslname's success is its level of adoption and ongoing support by the industrial stakeholders of the WebAssembly Community Group.
+%
+Our ultimate aim is for the normative definition of Wasm to be written using \dslname, and for all of the specification artefacts which are currently manually generated and maintained separately to be instead automatically generated from this \dslname definition as a single source of truth.
+
+
+We now plan to gather feedback from industrial stakeholders, and evaluate how easily we can extend our definitions written in \dslname to cover additional features.
+Wasm 3.0, an upcoming edition of the specification, may include Exception Handling~\cite{wasm-exc}, Garbage Collected Types~\cite{wasm-gc}, and Threads~\cite{wasm-threads}.
+Because these features contain far more ambitious extensions to the Wasm virtual machine,
+and are expected to lay the groundwork on which many future proposals will be built,
+investigating the extent to which our \dslname definitions can be extended to cover these features would be the strongest possible validation of our approach.
+%
+The associated changes to the Wasm virtual machine will be wide ranging enough that we expect modifications to \dslname itself may be necessary to make it sufficiently expressive, although we are already making a best effort to anticipate the future effects of these proposals in our current design.
+%
+Succeeding in expressing all of these features as \dslname definitions would be a strong signal to industry stakeholders that \dslname can be seriously considered for official adoption.
