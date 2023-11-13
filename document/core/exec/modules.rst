@@ -1,164 +1,11 @@
 Modules
 -------
 
-For modules, the execution semantics primarily defines :ref:`instantiation <exec-instantiation>`, which :ref:`allocates <alloc>` instances for a module and its contained definitions, initializes :ref:`tables <syntax-table>` and :ref:`memories <syntax-mem>` from contained :ref:`element <syntax-elem>` and :ref:`data <syntax-data>` segments, and invokes the :ref:`start function <syntax-start>` if present. It also includes :ref:`invocation <exec-invocation>` of exported functions.
-
-Instantiation depends on a number of auxiliary notions for :ref:`type-checking imports <exec-import>` and :ref:`allocating <alloc>` instances.
-
-
-.. index:: external value, external type, validation, import, store
-.. _valid-externval:
-
-External Typing
-~~~~~~~~~~~~~~~
-
-For the purpose of checking :ref:`external values <syntax-externval>` against :ref:`imports <syntax-import>`,
-such values are classified by :ref:`external types <syntax-externtype>`.
-The following auxiliary typing rules specify this typing relation relative to a :ref:`store <syntax-store>` :math:`S` in which the referenced instances live.
-
-
-.. index:: function type, function address
-.. _valid-externval-func:
-
-:math:`\EVFUNC~a`
-.................
-
-* The store entry :math:`S.\SFUNCS[a]` must exist.
-
-* Then :math:`\EVFUNC~a` is valid with :ref:`external type <syntax-externtype>` :math:`\ETFUNC~S.\SFUNCS[a].\FITYPE`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashexternval \EVFUNC~a : \ETFUNC~S.\SFUNCS[a].\FITYPE
-   }
-
-
-.. index:: table type, table address
-.. _valid-externval-table:
-
-:math:`\EVTABLE~a`
-..................
-
-* The store entry :math:`S.\STABLES[a]` must exist.
-
-* Then :math:`\EVTABLE~a` is valid with :ref:`external type <syntax-externtype>` :math:`\ETTABLE~S.\STABLES[a].\TITYPE`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashexternval \EVTABLE~a : \ETTABLE~S.\STABLES[a].\TITYPE
-   }
-
-
-.. index:: memory type, memory address
-.. _valid-externval-mem:
-
-:math:`\EVMEM~a`
-................
-
-* The store entry :math:`S.\SMEMS[a]` must exist.
-
-* Then :math:`\EVMEM~a` is valid with :ref:`external type <syntax-externtype>` :math:`\ETMEM~S.\SMEMS[a].\MITYPE`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashexternval \EVMEM~a : \ETMEM~S.\SMEMS[a].\MITYPE
-   }
-
-
-.. index:: global type, global address, value type, mutability
-.. _valid-externval-global:
-
-:math:`\EVGLOBAL~a`
-...................
-
-* The store entry :math:`S.\SGLOBALS[a]` must exist.
-
-* Then :math:`\EVGLOBAL~a` is valid with :ref:`external type <syntax-externtype>` :math:`\ETGLOBAL~S.\SGLOBALS[a].\GITYPE`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashexternval \EVGLOBAL~a : \ETGLOBAL~S.\SGLOBALS[a].\GITYPE
-   }
-
-
-.. index:: value, value type, validation
-.. _valid-val:
-
-Value Typing
-~~~~~~~~~~~~
-
-For the purpose of checking argument :ref:`values <syntax-externval>` against the parameter types of exported :ref:`functions <syntax-func>`,
-values are classified by :ref:`value types <syntax-valtype>`.
-The following auxiliary typing rules specify this typing relation relative to a :ref:`store <syntax-store>` :math:`S` in which possibly referenced addresses live.
-
-.. _valid-num:
-
-:ref:`Numeric Values <syntax-val>` :math:`t.\CONST~c`
-.....................................................
-
-* The value is valid with :ref:`number type <syntax-numtype>` :math:`t`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashval t.\CONST~c : t
-   }
-
-.. _valid-ref:
-
-:ref:`Null References <syntax-ref>` :math:`\REFNULL~t`
-......................................................
-
-* The value is valid with :ref:`reference type <syntax-reftype>` :math:`t`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashval \REFNULL~t : t
-   }
-
-
-:ref:`Function References <syntax-ref>` :math:`\REFFUNCADDR~a`
-..............................................................
-
-* The :ref:`external value <syntax-externval>` :math:`\EVFUNC~a` must be :ref:`valid <valid-externval>`.
-
-* Then the value is valid with :ref:`reference type <syntax-reftype>` :math:`\FUNCREF`.
-
-.. math::
-   \frac{
-     S \vdashexternval \EVFUNC~a : \ETFUNC~\functype
-   }{
-     S \vdashval \REFFUNCADDR~a : \FUNCREF
-   }
-
-
-:ref:`External References <syntax-ref.extern>` :math:`\REFEXTERNADDR~a`
-.......................................................................
-
-* The value is valid with :ref:`reference type <syntax-reftype>` :math:`\EXTERNREF`.
-
-.. math::
-   \frac{
-   }{
-     S \vdashval \REFEXTERNADDR~a : \EXTERNREF
-   }
-
-
-.. index:: ! allocation, store, address
 .. _alloc:
 
 Allocation
 ~~~~~~~~~~
 
-New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tableinst>`, :ref:`memories <syntax-meminst>`, and :ref:`globals <syntax-globalinst>` are *allocated* in a :ref:`store <syntax-store>` :math:`S`, as defined by the following auxiliary functions.
-
-
-.. index:: function, function instance, function address, module instance, function type
 .. _alloc-func:
 
 :ref:`Functions <syntax-funcinst>`
@@ -187,39 +34,6 @@ New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tablei
    S' &=& S \compose \{\SFUNCS~\funcinst\} \\
    \end{array}
 
-
-.. index:: host function, function instance, function address, function type
-.. _alloc-hostfunc:
-
-:ref:`Host Functions <syntax-hostfunc>`
-.......................................
-
-1. Let :math:`\hostfunc` be the :ref:`host function <syntax-hostfunc>` to allocate and :math:`\functype` its :ref:`function type <syntax-functype>`.
-
-2. Let :math:`a` be the first free :ref:`function address <syntax-funcaddr>` in :math:`S`.
-
-3. Let :math:`\funcinst` be the :ref:`function instance <syntax-funcinst>` :math:`\{ \FITYPE~\functype, \FIHOSTCODE~\hostfunc \}`.
-
-4. Append :math:`\funcinst` to the |SFUNCS| of :math:`S`.
-
-5. Return :math:`a`.
-
-.. math::
-   ~\\[-1ex]
-   \begin{array}{rlll}
-   \allochostfunc(S, \functype, \hostfunc) &=& S', \funcaddr \\[1ex]
-   \mbox{where:} \hfill \\
-   \funcaddr &=& |S.\SFUNCS| \\
-   \funcinst &=& \{ \FITYPE~\functype, \FIHOSTCODE~\hostfunc \} \\
-   S' &=& S \compose \{\SFUNCS~\funcinst\} \\
-   \end{array}
-
-.. note::
-   Host functions are never allocated by the WebAssembly semantics itself,
-   but may be allocated by the :ref:`embedder <embedder>`.
-
-
-.. index:: table, table instance, table address, table type, limits
 .. _alloc-table:
 
 :ref:`Tables <syntax-tableinst>`
@@ -247,8 +61,6 @@ New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tablei
    S' &=& S \compose \{\STABLES~\tableinst\} \\
    \end{array}
 
-
-.. index:: memory, memory instance, memory address, memory type, limits, byte
 .. _alloc-mem:
 
 :ref:`Memories <syntax-meminst>`
@@ -276,8 +88,6 @@ New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tablei
    S' &=& S \compose \{\SMEMS~\meminst\} \\
    \end{array}
 
-
-.. index:: global, global instance, global address, global type, value type, mutability, value
 .. _alloc-global:
 
 :ref:`Globals <syntax-globalinst>`
@@ -303,7 +113,6 @@ New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tablei
    \end{array}
 
 
-.. index:: element, element instance, element address
 .. _alloc-elem:
 
 :ref:`Element segments <syntax-eleminst>`
@@ -329,7 +138,6 @@ New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tablei
   \end{array}
 
 
-.. index:: data, data instance, data address
 .. _alloc-data:
 
 :ref:`Data segments <syntax-datainst>`
@@ -355,7 +163,6 @@ New instances of :ref:`functions <syntax-funcinst>`, :ref:`tables <syntax-tablei
   \end{array}
 
 
-.. index:: table, table instance, table address, grow, limits
 .. _grow-table:
 
 Growing :ref:`tables <syntax-tableinst>`
@@ -391,7 +198,6 @@ Growing :ref:`tables <syntax-tableinst>`
    \end{array}
 
 
-.. index:: memory, memory instance, memory address, grow, limits
 .. _grow-mem:
 
 Growing :ref:`memories <syntax-meminst>`
@@ -429,15 +235,10 @@ Growing :ref:`memories <syntax-meminst>`
    \end{array}
 
 
-.. index:: module, module instance, function instance, table instance, memory instance, global instance, export instance, function address, table address, memory address, global address, function index, table index, memory index, global index, type, function, table, memory, global, import, export, external value, external type, matching
 .. _alloc-module:
 
 :ref:`Modules <syntax-moduleinst>`
 ..................................
-
-The allocation function for :ref:`modules <syntax-module>` requires a suitable list of :ref:`external values <syntax-externval>` that are assumed to :ref:`match <match-externtype>` the :ref:`import <syntax-import>` vector of the module,
-a list of initialization :ref:`values <syntax-val>` for the module's :ref:`globals <syntax-global>`,
-and list of :ref:`reference <syntax-ref>` vectors for the module's :ref:`element segments <syntax-elem>`.
 
 1. Let :math:`\module` be the :ref:`module <syntax-module>` to allocate and :math:`\externval_{\F{im}}^\ast` the vector of :ref:`external values <syntax-externval>` providing the module's imports, :math:`\val^\ast` the initialization :ref:`values <syntax-val>` of the module's :ref:`globals <syntax-global>`, and :math:`(\reff^\ast)^\ast` the :ref:`reference <syntax-ref>` vectors of the module's :ref:`element segments <syntax-elem>`.
 
@@ -558,18 +359,6 @@ where:
      \qquad\!\!\! (\where x^\ast = \edglobals(\export^\ast)) \\
    \end{array}
 
-.. scratch
-   Here, in slight abuse of notation, :math:(`\F{allocxyz}(S, \dots))^\ast` is taken to express multiple allocations with the updates to the store :math:`S` being threaded through, i.e.,
-
-  .. math::
-   \begin{array}{rlll}
-   (\F{allocxyz}^\ast(S_0, \dots))^n &=& S_n, a^n \\[1ex]
-   \mbox{where for all $i < n$:} \hfill \\
-   S_{i+1}, a^n[i] &=& \F{allocxyz}(S_i, \dots)
-   \end{array}
-
-Here, the notation :math:`\F{allocx}^\ast` is shorthand for multiple :ref:`allocations <alloc>` of object kind :math:`X`, defined as follows:
-
 .. math::
    \begin{array}{rlll}
    \F{allocx}^\ast(S_0, X^n, \dots) &=& S_n, a^n \\[1ex]
@@ -577,26 +366,11 @@ Here, the notation :math:`\F{allocx}^\ast` is shorthand for multiple :ref:`alloc
    S_{i+1}, a^n[i] &=& \F{allocx}(S_i, X^n[i], \dots)
    \end{array}
 
-Moreover, if the dots :math:`\dots` are a sequence :math:`A^n` (as for globals or tables), then the elements of this sequence are passed to the allocation function pointwise.
-
-.. note::
-   The definition of module allocation is mutually recursive with the allocation of its associated functions, because the resulting module instance :math:`\moduleinst` is passed to the function allocator as an argument, in order to form the necessary closures.
-   In an implementation, this recursion is easily unraveled by mutating one or the other in a secondary step.
-
-
-.. index:: ! instantiation, module, instance, store, trap
 .. _exec-module:
 .. _exec-instantiation:
 
 Instantiation
 ~~~~~~~~~~~~~
-
-Given a :ref:`store <syntax-store>` :math:`S`, a :ref:`module <syntax-module>` :math:`\module` is instantiated with a list of :ref:`external values <syntax-externval>` :math:`\externval^n` supplying the required imports as follows.
-
-Instantiation checks that the module is :ref:`valid <valid>` and the provided imports :ref:`match <match-externtype>` the declared types,
-and may *fail* with an error otherwise.
-Instantiation can also result in a :ref:`trap <trap>` from initializing a table or memory from an active segment or from executing the start function.
-It is up to the :ref:`embedder <embedder>` to define how such conditions are reported.
 
 1. If :math:`\module` is not :ref:`valid <valid-module>`, then:
 
@@ -738,35 +512,10 @@ where:
      \instr^\ast~(\I32.\CONST~0)~(\I32.\CONST~n)~(\MEMORYINIT~i)~(\DATADROP~i) \\
    \end{array}
 
-.. note::
-   Module :ref:`allocation <alloc-module>` and the :ref:`evaluation <exec-expr>` of :ref:`global <syntax-global>` initializers and :ref:`element segments <syntax-elem>` are mutually recursive because the global initialization :ref:`values <syntax-val>` :math:`\val^\ast` and element segment contents :math:`(\reff^\ast)^\ast` are passed to the module allocator while depending on the module instance :math:`\moduleinst` and store :math:`S'` returned by allocation.
-   However, this recursion is just a specification device.
-   In practice, the initialization values can :ref:`be determined <exec-initvals>` beforehand by staging module allocation such that first, the module's own :ref:`function instances <syntax-funcinst>` are pre-allocated in the store, then the initializer expressions are evaluated, then the rest of the module instance is allocated, and finally the new function instances' :math:`\AMODULE` fields are set to that module instance.
-   This is possible because :ref:`validation <valid-module>` ensures that initialization expressions cannot actually call a function, only take their reference.
-
-   All failure conditions are checked before any observable mutation of the store takes place.
-   Store mutation is not atomic;
-   it happens in individual steps that may be interleaved with other threads.
-
-   :ref:`Evaluation <exec-expr>` of :ref:`constant expressions <valid-constant>` does not affect the store.
-
-
-.. index:: ! invocation, module, module instance, function, export, function address, function instance, function type, value, stack, trap, store
 .. _exec-invocation:
 
 Invocation
 ~~~~~~~~~~
-
-Once a :ref:`module <syntax-module>` has been :ref:`instantiated <exec-instantiation>`, any exported function can be *invoked* externally via its :ref:`function address <syntax-funcaddr>` :math:`\funcaddr` in the :ref:`store <syntax-store>` :math:`S` and an appropriate list :math:`\val^\ast` of argument :ref:`values <syntax-val>`.
-
-Invocation may *fail* with an error if the arguments do not fit the :ref:`function type <syntax-functype>`.
-Invocation can also result in a :ref:`trap <trap>`.
-It is up to the :ref:`embedder <embedder>` to define how such conditions are reported.
-
-.. note::
-   If the :ref:`embedder <embedder>` API performs type checks itself, either statically or dynamically, before performing an invocation, then no failure other than traps can occur.
-
-The following steps are performed:
 
 1. Assert: :math:`S.\SFUNCS[\funcaddr]` exists.
 

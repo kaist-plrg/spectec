@@ -1,21 +1,11 @@
 Modules
 -------
 
-:ref:`Modules <syntax-module>` are valid when all the components they contain are valid.
-Furthermore, most definitions are themselves classified with a suitable type.
-
-
-.. index:: function, local, function index, local index, type index, function type, value type, expression, import
-   pair: abstract syntax; function
-   single: abstract syntax; function
 .. _valid-local:
 .. _valid-func:
 
 Functions
 ~~~~~~~~~
-
-Functions :math:`\func` are classified by :ref:`function types <syntax-functype>` of the form :math:`[t_1^\ast] \to [t_2^\ast]`.
-
 
 :math:`\{ \FTYPE~x, \FLOCALS~t^\ast, \FBODY~\expr \}`
 .....................................................
@@ -47,16 +37,10 @@ Functions :math:`\func` are classified by :ref:`function types <syntax-functype>
      C \vdashfunc \{ \FTYPE~x, \FLOCALS~t^\ast, \FBODY~\expr \} : [t_1^\ast] \to [t_2^\ast]
    }
 
-
-.. index:: table, table type
-   pair: validation; table
-   single: abstract syntax; table
 .. _valid-table:
 
 Tables
 ~~~~~~
-
-Tables :math:`\table` are classified by :ref:`table types <syntax-tabletype>`.
 
 :math:`\{ \TTYPE~\tabletype \}`
 ...............................
@@ -72,16 +56,10 @@ Tables :math:`\table` are classified by :ref:`table types <syntax-tabletype>`.
      C \vdashtable \{ \TTYPE~\tabletype \} : \tabletype
    }
 
-
-.. index:: memory, memory type
-   pair: validation; memory
-   single: abstract syntax; memory
 .. _valid-mem:
 
 Memories
 ~~~~~~~~
-
-Memories :math:`\mem` are classified by :ref:`memory types <syntax-memtype>`.
 
 :math:`\{ \MTYPE~\memtype \}`
 .............................
@@ -97,17 +75,10 @@ Memories :math:`\mem` are classified by :ref:`memory types <syntax-memtype>`.
      C \vdashmem \{ \MTYPE~\memtype \} : \memtype
    }
 
-
-.. index:: global, global type, expression
-   pair: validation; global
-   single: abstract syntax; global
 .. _valid-global:
 
 Globals
 ~~~~~~~
-
-Globals :math:`\global` are classified by :ref:`global types <syntax-globaltype>` of the form :math:`\mut~t`.
-
 
 :math:`\{ \GTYPE~\mut~t, \GINIT~\expr \}`
 .........................................
@@ -131,18 +102,12 @@ Globals :math:`\global` are classified by :ref:`global types <syntax-globaltype>
      C \vdashglobal \{ \GTYPE~\mut~t, \GINIT~\expr \} : \mut~t
    }
 
-
-.. index:: element, table, table index, expression, function index
-   pair: validation; element
-   single: abstract syntax; element
-   single: table; element
-   single: element; segment
 .. _valid-elem:
 
 Element Segments
 ~~~~~~~~~~~~~~~~
 
-Element segments :math:`\elem` are classified by the :ref:`reference type <syntax-reftype>` of their elements.
+* The element mode is valid with any :ref:`reference type <syntax-reftype>`.
 
 :math:`\{ \ETYPE~t, \EINIT~e^\ast, \EMODE~\elemmode \}`
 .......................................................
@@ -157,7 +122,6 @@ Element segments :math:`\elem` are classified by the :ref:`reference type <synta
 
 * Then the element segment is valid with :ref:`reference type <syntax-reftype>` :math:`t`.
 
-
 .. math::
    \frac{
      (C \vdashexpr e : [t])^\ast
@@ -169,20 +133,16 @@ Element segments :math:`\elem` are classified by the :ref:`reference type <synta
      C \vdashelem \{ \ETYPE~t, \EINIT~e^\ast, \EMODE~\elemmode \} : t
    }
 
-
 .. _valid-elemmode:
 
 :math:`\EPASSIVE`
 .................
-
-* The element mode is valid with any :ref:`reference type <syntax-reftype>`.
 
 .. math::
    \frac{
    }{
      C \vdashelemmode \EPASSIVE : \reftype
    }
-
 
 :math:`\EACTIVE~\{ \ETABLE~x, \EOFFSET~\expr \}`
 ................................................
@@ -221,19 +181,10 @@ Element segments :math:`\elem` are classified by the :ref:`reference type <synta
      C \vdashelemmode \EDECLARATIVE : \reftype
    }
 
-
-
-.. index:: data, memory, memory index, expression, byte
-   pair: validation; data
-   single: abstract syntax; data
-   single: memory; data
-   single: data; segment
 .. _valid-data:
 
 Data Segments
 ~~~~~~~~~~~~~
-
-Data segments :math:`\data` are not classified by any type but merely checked for well-formedness.
 
 :math:`\{ \DINIT~b^\ast, \DMODE~\datamode \}`
 ....................................................
@@ -249,7 +200,6 @@ Data segments :math:`\data` are not classified by any type but merely checked fo
      C \vdashdata \{ \DINIT~b^\ast, \DMODE~\datamode \} \ok
    }
 
-
 .. _valid-datamode:
 
 :math:`\DPASSIVE`
@@ -262,7 +212,6 @@ Data segments :math:`\data` are not classified by any type but merely checked fo
    }{
      C \vdashdatamode \DPASSIVE \ok
    }
-
 
 :math:`\DACTIVE~\{ \DMEM~x, \DOFFSET~\expr \}`
 ..............................................
@@ -286,16 +235,10 @@ Data segments :math:`\data` are not classified by any type but merely checked fo
      C \vdashdatamode \DACTIVE~\{ \DMEM~x, \DOFFSET~\expr \} \ok
    }
 
-
-.. index:: start function, function index
-   pair: validation; start function
-   single: abstract syntax; start function
 .. _valid-start:
 
 Start Function
 ~~~~~~~~~~~~~~
-
-Start function declarations :math:`\start` are not classified by any type.
 
 :math:`\{ \SFUNC~x \}`
 ......................
@@ -306,7 +249,6 @@ Start function declarations :math:`\start` are not classified by any type.
 
 * Then the start function is valid.
 
-
 .. math::
    \frac{
      C.\CFUNCS[x] = [] \to []
@@ -314,18 +256,11 @@ Start function declarations :math:`\start` are not classified by any type.
      C \vdashstart \{ \SFUNC~x \} \ok
    }
 
-
-.. index:: export, name, index, function index, table index, memory index, global index
-   pair: validation; export
-   single: abstract syntax; export
 .. _valid-exportdesc:
 .. _valid-export:
 
 Exports
 ~~~~~~~
-
-Exports :math:`\export` and export descriptions :math:`\exportdesc` are classified by their :ref:`external type <syntax-externtype>`.
-
 
 :math:`\{ \ENAME~\name, \EDESC~\exportdesc \}`
 ..............................................
@@ -341,7 +276,6 @@ Exports :math:`\export` and export descriptions :math:`\exportdesc` are classifi
      C \vdashexport \{ \ENAME~\name, \EDESC~\exportdesc \} : \externtype
    }
 
-
 :math:`\EDFUNC~x`
 .................
 
@@ -355,7 +289,6 @@ Exports :math:`\export` and export descriptions :math:`\exportdesc` are classifi
    }{
      C \vdashexportdesc \EDFUNC~x : \ETFUNC~\functype
    }
-
 
 :math:`\EDTABLE~x`
 ..................
@@ -371,7 +304,6 @@ Exports :math:`\export` and export descriptions :math:`\exportdesc` are classifi
      C \vdashexportdesc \EDTABLE~x : \ETTABLE~\tabletype
    }
 
-
 :math:`\EDMEM~x`
 ................
 
@@ -385,7 +317,6 @@ Exports :math:`\export` and export descriptions :math:`\exportdesc` are classifi
    }{
      C \vdashexportdesc \EDMEM~x : \ETMEM~\memtype
    }
-
 
 :math:`\EDGLOBAL~x`
 ...................
@@ -401,18 +332,11 @@ Exports :math:`\export` and export descriptions :math:`\exportdesc` are classifi
      C \vdashexportdesc \EDGLOBAL~x : \ETGLOBAL~\globaltype
    }
 
-
-.. index:: import, name, function type, table type, memory type, global type
-   pair: validation; import
-   single: abstract syntax; import
 .. _valid-importdesc:
 .. _valid-import:
 
 Imports
 ~~~~~~~
-
-Imports :math:`\import` and import descriptions :math:`\importdesc` are classified by :ref:`external types <syntax-externtype>`.
-
 
 :math:`\{ \IMODULE~\name_1, \INAME~\name_2, \IDESC~\importdesc \}`
 ..................................................................
@@ -427,7 +351,6 @@ Imports :math:`\import` and import descriptions :math:`\importdesc` are classifi
    }{
      C \vdashimport \{ \IMODULE~\name_1, \INAME~\name_2, \IDESC~\importdesc \} : \externtype
    }
-
 
 :math:`\IDFUNC~x`
 .................
@@ -445,7 +368,6 @@ Imports :math:`\import` and import descriptions :math:`\importdesc` are classifi
      C \vdashimportdesc \IDFUNC~x : \ETFUNC~[t_1^\ast] \to [t_2^\ast]
    }
 
-
 :math:`\IDTABLE~\tabletype`
 ...........................
 
@@ -459,7 +381,6 @@ Imports :math:`\import` and import descriptions :math:`\importdesc` are classifi
    }{
      C \vdashimportdesc \IDTABLE~\tabletype : \ETTABLE~\tabletype
    }
-
 
 :math:`\IDMEM~\memtype`
 .......................
@@ -475,7 +396,6 @@ Imports :math:`\import` and import descriptions :math:`\importdesc` are classifi
      C \vdashimportdesc \IDMEM~\memtype : \ETMEM~\memtype
    }
 
-
 :math:`\IDGLOBAL~\globaltype`
 .............................
 
@@ -490,21 +410,10 @@ Imports :math:`\import` and import descriptions :math:`\importdesc` are classifi
      C \vdashimportdesc \IDGLOBAL~\globaltype : \ETGLOBAL~\globaltype
    }
 
-
-.. index:: module, type definition, function type, function, table, memory, global, element, data, start function, import, export, context
-   pair: validation; module
-   single: abstract syntax; module
 .. _valid-module:
 
 Modules
 ~~~~~~~
-
-Modules are classified by their mapping from the :ref:`external types <syntax-externtype>` of their :ref:`imports <syntax-import>` to those of their :ref:`exports <syntax-export>`.
-
-A module is entirely *closed*,
-that is, its components can only refer to definitions that appear in the module itself.
-Consequently, no initial :ref:`context <context>` is required.
-Instead, the context :math:`C` for validation of the module's content is constructed from the definitions in the module.
 
 * Let :math:`\module` be the module to validate.
 

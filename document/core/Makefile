@@ -89,7 +89,7 @@ bikeshed-keep:
 	  echo Downloaded Bikeshed.
 
 
-GENERATED = appendix/index-instructions.rst
+GENERATED = 
 .INTERMEDIATE: $(GENERATED)
 
 %.rst: %.py
