@@ -151,3 +151,5 @@ type instr =
 type algorithm =                          (* `algorithm` x`(`expr*`)` `{`instr*`}` *)
   | RuleA of kwd * expr list * instr list (* reduction rule *)
   | FuncA of id * expr list * instr list  (* helper function *)
+
+type script = algorithm list

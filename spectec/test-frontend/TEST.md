@@ -407,10 +407,9 @@ syntax binop_numtype =
   | _I(binopIXX)
   | _F(binopFXX)
 
-;; 1-syntax.watsup:242.1-242.54
+;; 1-syntax.watsup:242.1-242.39
 syntax testop_numtype =
   | _I(testopIXX)
-  | _F(testopFXX)
 
 ;; 1-syntax.watsup:243.1-243.51
 syntax relop_numtype =

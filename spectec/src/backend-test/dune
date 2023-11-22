@@ -1,0 +1,8 @@
+(library
+  (name backend_test)
+  (libraries el il al util)
+  (modules
+    flag
+    gen
+    )
+)

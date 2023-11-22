@@ -238,7 +238,7 @@ $$
 & {{\mathit{refop}}_{{\mathsf{fxx}}}} &::=& \mathsf{eq} ~|~ \mathsf{ne} ~|~ \mathsf{lt} ~|~ \mathsf{gt} ~|~ \mathsf{le} ~|~ \mathsf{ge} \\
 & {\mathit{unop}}_{{\mathit{numtype}}} &::=& {{\mathit{unop}}_{{\mathsf{ixx}}}} ~|~ {{\mathit{unop}}_{{\mathsf{fxx}}}} \\
 & {\mathit{binop}}_{{\mathit{numtype}}} &::=& {{\mathit{binop}}_{{\mathsf{ixx}}}} ~|~ {{\mathit{binop}}_{{\mathsf{fxx}}}} \\
-& {\mathit{testop}}_{{\mathit{numtype}}} &::=& {{\mathit{testop}}_{{\mathsf{ixx}}}} ~|~ {{\mathit{testop}}_{{\mathsf{fxx}}}} \\
+& {\mathit{testop}}_{{\mathit{numtype}}} &::=& {{\mathit{testop}}_{{\mathsf{ixx}}}} \\
 & {\mathit{relop}}_{{\mathit{numtype}}} &::=& {{\mathit{relop}}_{{\mathsf{ixx}}}} ~|~ {{\mathit{refop}}_{{\mathsf{fxx}}}} \\
 & {\mathit{cvtop}} &::=& \mathsf{convert} ~|~ \mathsf{reinterpret} ~|~ \mathsf{convert\_sat} \\
 \end{array}

@@ -239,7 +239,7 @@ syntax relopFXX hint(show refop_FXX) = | EQ | NE | LT | GT | LE | GE
 
 syntax unop_numtype = | _I unopIXX | _F unopFXX
 syntax binop_numtype = | _I binopIXX | _F binopFXX
-syntax testop_numtype = | _I testopIXX | _F testopFXX
+syntax testop_numtype = | _I testopIXX ;;| _F testopFXX
 syntax relop_numtype = | _I relopIXX | _F relopFXX
 syntax cvtop = | CONVERT | REINTERPRET | CONVERT_SAT
 

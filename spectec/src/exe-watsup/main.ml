@@ -15,6 +15,7 @@ type target =
  | Prose
  | Splice of Backend_splice.Config.config
  | Interpreter
+ | Test
 
 let target = ref Latex
 
@@ -118,6 +119,7 @@ let argspec = Arg.align
     " Splice Sphinx";
   "--prose", Arg.Unit (fun () -> target := Prose), " Generate prose";
   "--interpreter", Arg.Unit (fun () -> target := Interpreter), " Generate interpreter";
+  "--test", Arg.Unit (fun () -> target := Test), " Generate test suite";
 
   "--print-el", Arg.Set print_el, " Print EL";
   "--print-il", Arg.Set print_elab_il, " Print IL (after elaboration)";
@@ -127,8 +129,11 @@ let argspec = Arg.align
 ] @ List.map pass_argspec all_passes @ [
   "--all-passes", Arg.Unit (fun () -> List.iter enable_pass all_passes)," Run all passes";
 
+  (* TODO: Refactor these flags *)
   "--root", Arg.String (fun s -> Backend_interpreter.Tester.root := s), " Set the root of watsup. Defaults to current directory";
   "--test-interpreter", Arg.String (fun s -> Backend_interpreter.Tester.test_name := s), " The name of .wast test file for interpreter";
+
+  "--test:out", Arg.String (fun s -> Backend_test.Flag.out := s), " Set the output directory of test generation, default to `out`";
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";
@@ -222,6 +227,18 @@ let () =
       Backend_interpreter.Ds.init al;
       log "Interpreting AL...";
       Backend_interpreter.Tester.test_all ()
+    | Test ->
+      if not (PS.mem Animate !selected_passes) then
+        failwith "Test generatiron requires `--animate` flag."
+      else
+      log "Translating to AL...";
+      let al = Backend_interpreter.(
+        Translate.translate il @ Manual.manual_algos
+      ) in
+      if !print_al then
+        List.iter (fun algo -> Al.Print.string_of_algorithm algo |> print_endline) al;
+      log "Generating tests...";
+      Backend_test.Gen.gen_test el il al
     );
     log "Complete."
   with
