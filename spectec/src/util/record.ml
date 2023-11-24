@@ -12,7 +12,7 @@ module Record = struct include List
     map (fun (k, _) -> k) r
 
   let mem = mem_assoc
-  
+
   let size = length
 
   let add k v r =
@@ -32,6 +32,9 @@ module Record = struct include List
 
   let map fv =
     map (fun (k, v) -> k, !v |> fv |> ref)
+
+  let iter f =
+    iter (fun (k, v) -> f (k, !v))
 
   let fold f r acc =
     fold_left (fun acc (k, v) -> f k !v acc) acc r

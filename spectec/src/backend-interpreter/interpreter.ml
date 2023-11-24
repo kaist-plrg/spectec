@@ -104,14 +104,14 @@ let rec create_sub_al_context names iter env =
   |> transpose
   |> List.map (fun vs -> List.fold_right2 Env.add names vs env)
 
-and access_path env base path = match path with
+and access_path expr env base path = match path with
   | IdxP e' ->
       let a = base |> value_to_array in
       let i = eval_expr env e' |> value_to_int in
       begin try Array.get a i with
       | Invalid_argument _ ->
-        Printf.sprintf "Failed Array.get during accessing path: %s[%s]"
-          (string_of_value base)
+        Printf.sprintf "Failed Array.get during accessing path: %s (%s)"
+          (string_of_expr expr)
           (string_of_int i)
         |> failwith
       end
@@ -210,13 +210,13 @@ and eval_expr env expr =
       StrV (Record.of_list vlist)
   | AccE (e, p) ->
       let base = eval_expr env e in
-      access_path env base p
+      access_path expr env base p
   | ExtE (e1, ps, e2, dir) ->
       let v_new = eval_expr env e2 |> value_to_array in
       let rec extend base ps = (
         match ps with
         | path :: rest ->
-            let v_new = extend (access_path env base path) rest in
+            let v_new = extend (access_path expr env base path) rest in
             replace_path env base path v_new
         | [] ->
             let a = base |> value_to_array in
@@ -235,7 +235,7 @@ and eval_expr env expr =
       let rec replace base ps = (
         match ps with
         | path :: rest ->
-            let v_new = replace (access_path env base path) rest in
+            let v_new = replace (access_path expr env base path) rest in
             replace_path env base path v_new
         | [] -> v_new)
       in
