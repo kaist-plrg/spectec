@@ -110,7 +110,7 @@ and access_path env base path = match path with
       let i = eval_expr env e' |> value_to_int in
       begin try Array.get a i with
       | Invalid_argument _ ->
-        Printf.sprintf "Failed Array.get during ReplaceE: %s[%s]"
+        Printf.sprintf "Failed Array.get during accessing path: %s[%s]"
           (string_of_value base)
           (string_of_int i)
         |> failwith
@@ -894,13 +894,13 @@ let init_context () =
   AL_Context.init_context ();
   WasmContext.init_context ()
 
-let instantiation (args: value list): value =
+let call_instantiate (args: value list): value =
   init_context();
   match call_algo "instantiate" args with
   | AL_Context.Some module_inst -> module_inst
-  | _ -> failwith "Instantiation doesn't return module instance"
-let invocation (args: value list): value =
+  | _ -> failwith "Instantiation didn't return module instance"
+let call_invoke (args: value list): value =
   init_context();
   match call_algo "invoke" args with
   | AL_Context.Some v -> v
-  | _ -> failwith "Invocation doesn't return value"
+  | _ -> failwith "Invocation didn't return value"

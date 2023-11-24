@@ -32,6 +32,8 @@ let numV i = Al.Ast.NumV (i |> Int64.of_int)
 let optV_none = Al.Ast.OptV None
 let optV_some v = Al.Ast.OptV (Some v)
 
+(** Seed generation **)
+
 (* Generate specific syntax from input IL *)
 let rec gen name =
   let syn = find_syn name in
@@ -67,6 +69,9 @@ let rec gen name =
     Al.Ast.StrV rec_
   (* CaseV *)
   | VariantT typcases ->
+    (* HARDCODE: Remove V128 *)
+    let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "V128") typcases in
+    let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "BOT") typcases in
     let typcase = choose typcases in
     let (atom, (_, typs, _), _) = typcase in
     let name = Il.Print.string_of_atom atom in
@@ -95,6 +100,9 @@ and gen_typs typs = match typs.it with
   | TupT typs' -> List.map gen_typ typs'
   | _ -> [ gen_typ typs ]
 
+(** Mutation **)
+let mutate modules = modules (* TODO *)
+
 (* Generate tests *)
 
 let gen_test el' il' al' =
@@ -103,10 +111,23 @@ let gen_test el' il' al' =
   il := flatten_rec il';
   al := al';
 
-  (* Initialize RNG *)
+  (* Initialize *)
   Random.init !seed;
+  Backend_interpreter.Ds.init !al;
 
   (* Generate tests *)
-  let tests = List.init !test_num (fun _ -> gen "module") in
+  let seeds = List.init !test_num (fun _ -> gen "module") in
 
-  tests |> List.iter (fun m -> print_endline (Al.Print.string_of_value m))
+  (* Mutatiion *)
+  let tests = mutate seeds in
+
+  (* Result *)
+  tests |> List.iter (fun m ->
+    print_endline "================";
+    print_endline (Al.Print.string_of_value m);
+    try
+      Backend_interpreter.Interpreter.call_instantiate [ m; listV [] ] |> ignore;
+      print_endline "Instantiation success"
+    with e ->
+      print_endline ("Instantiation fail due to " ^ Printexc.to_string e)
+  )

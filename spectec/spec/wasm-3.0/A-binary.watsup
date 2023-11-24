@@ -755,7 +755,7 @@ grammar Bmodule : module =
 
     data^m:Bdatasec
     Bcustomsec* =>
-      MODULE type* import* func^n global* table* mem* elem* data^m start* export*
+      MODULE type* import* func^n global* table* mem* elem* data^m start? export*
     -- if m'* = epsilon \/ $free_dataidx_funcs(func^n) = epsilon
     -- if m = $sum(m'*)
     -- if (func = FUNC typeidx local* expr)*

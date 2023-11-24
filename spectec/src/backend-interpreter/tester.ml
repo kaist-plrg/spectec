@@ -220,7 +220,7 @@ let do_action act = match act.it with
     ) in
     Printf.eprintf "[Invoking %s %s...]\n" (Utf8.encode name) (Al.Print.string_of_value args);
 
-    Interpreter.invocation [funcaddr; args]
+    Interpreter.call_invoke [funcaddr; args]
   | Get (module_name_opt, name) ->
     let module_name = get_module_name module_name_opt in
     let exports = find_export module_name in
@@ -360,7 +360,7 @@ let test_assertion assertion =
       let al_module = Construct.al_of_module (extract_module def) in
       let externvals = get_externvals al_module in
       Printf.eprintf "[Trying instantiating module...]\n";
-      Interpreter.instantiation [ al_module ; externvals ] |> ignore;
+      Interpreter.call_instantiate [ al_module ; externvals ] |> ignore;
 
       fail expected"Module instantiation success"
     with
@@ -381,7 +381,7 @@ let test_module module_name m =
 
     (* Instantiate and store exports *)
     Printf.eprintf "[Instantiating module...]\n";
-    let module_inst = Interpreter.instantiation [ al_module ; externvals ] in
+    let module_inst = Interpreter.call_instantiate [ al_module ; externvals ] in
 
     (* Store module instance in the register *)
     (match module_name with
