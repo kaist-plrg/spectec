@@ -16,6 +16,8 @@ let choose l =
 
 let contains x = List.exists (fun x' -> x = x')
 
+let hds xs = xs |> List.rev |> List.tl |> List.rev
+
 let flatten_rec = List.concat_map (fun def ->
   match def.it with
   | Il.Ast.RecD defs -> defs
@@ -47,30 +49,34 @@ let top s = List.hd !s
 
 (** Initialize **)
 
-type dim = Exactly of int | AtLeast of int
+type valtype = T of string | SubT of string * string | TopT | BotT | SeqT
+type restype = valtype list
 
-let dims = ref Record.empty
+let rts = ref Record.empty
 
-let print_dims () =
-  let string_of_dim = function
-    | Exactly v -> string_of_int v
-    | AtLeast v -> string_of_int v ^ "+" in
+let string_of_vt = function
+| T x -> x
+| SubT (x, sub) -> x ^ "<:" ^ sub
+| TopT -> "_"
+| BotT -> "_"
+| SeqT -> "_*"
+let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
+let print_rts () =
   Record.iter (fun (k, v) ->
-    let (v1, v2) = v in
-    Printf.sprintf "%s : %s -> %s" k (string_of_dim v1) (string_of_dim v2) |> print_endline
-  ) !dims
+    let (rt1, rt2) = v in
+    Printf.sprintf "%s : %s -> %s" k (string_of_rt rt1) (string_of_rt rt2) |> print_endline
+  ) !rts
 
-let estimate_dim () = Il.Ast.(
-  let rec get_dim e = match e.it with
-  | ListE es -> Exactly (List.length es)
-  | VarE _ -> Exactly 1
-  | IterE (_, (Il.Ast.List, _)) -> AtLeast 0
-  | CatE (e1, e2) -> ( match get_dim e1, get_dim e2 with
-    | Exactly n1, Exactly n2 -> Exactly (n1 + n2)
-    | Exactly n1, AtLeast n2
-    | AtLeast n1, Exactly n2
-    | AtLeast n1, AtLeast n2 -> AtLeast (n1 + n2) )
-  | _ -> failwith "unexpected type, can not get dimension of it" in
+let estimate_rt () = Il.Ast.(
+  let rec get_rt e = match e.it with
+  | CaseE (atom, { it = TupE []; _}) -> [ T (string_of_atom atom) ]
+  | ListE es -> List.concat_map get_rt es
+  | VarE id -> [ SubT (id.it, Il.Print.string_of_typ e.note) ]
+  | SubE ({ it = VarE id; _ }, { it = VarT id'; _ }, _)  -> [ SubT (id.it, id'.it) ]
+  | IterE (_, (Il.Ast.List, _)) -> [ SeqT ]
+  | CatE (e1, e2) -> get_rt e1 @ get_rt e2
+  | CaseE (Atom "REF", { it = TupE [_; e']; _ }) -> get_rt e'
+  | _ -> [ TopT ] in
 
   let expected e kind =
     Printf.sprintf "Expected %s to be %s" (Il.Print.string_of_exp e) kind |> failwith
@@ -84,9 +90,9 @@ let estimate_dim () = Il.Ast.(
             | MixE (_, args) -> ( match args.it with
               | TupE [t1; t2] | TupE [t1; _; t2] ->
                 let name = String.split_on_char '-' id.it |> List.hd |> String.uppercase_ascii in
-                let n1 = get_dim t1 in
-                let n2 = get_dim t2 in
-                dims := Record.add name (n1, n2) !dims;
+                let rt1 = get_rt t1 in
+                let rt2 = get_rt t2 in
+                rts := Record.add name (rt1, rt2) !rts;
               | _ -> expected args "t1, t2 or t1, x*, t2" )
             | _ -> expected rhs "e1 -> e2" )
           | _ -> expected exp "C |- lhs : rhs" )
@@ -95,15 +101,39 @@ let estimate_dim () = Il.Ast.(
   ) !il
 )
 
-let dim_stack = ref []
-let update_dim diff =
-  match !dim_stack with
-  | [] -> failwith "dim_stack is empty"
-  | (cur, target) :: tl -> dim_stack := (cur + diff, target) :: tl
+let rt_stack = ref []
+let update_rt rt1 rt2 =
+  match !rt_stack with
+  | [] -> failwith "rt_stack is empty"
+  | (st, target) :: tl ->
+    let st1 = List.fold_right (fun _ st -> List.tl st) rt1 st in
+    let st2 = List.fold_left  (fun st t -> t :: st) st1 rt2 in
+    rt_stack := (st2, target) :: tl
 
-let fix_n = function
-| Exactly n -> n
-| AtLeast n -> n + Random.int 3
+let matches vt1 vt2 = match vt1, vt2 with
+| TopT, _ | _, TopT -> true
+| BotT, _ -> false
+| _, BotT -> true
+| T x1, T x2 -> x1 = x2
+| _ -> failwith "Unreachable: SeqT/SubT should be fixed by fix_rt by now"
+
+let rec matches_all vts1 vts2 = match vts1, vts2 with
+| [], [] -> true
+| hd1 :: tl1, hd2 :: tl2 -> matches_all tl1 tl2 && matches hd1 hd2
+| _ -> false
+
+let poppable rt =
+  let rec aux l1 l2 = match l1, l2 with
+  | [], _ -> true
+  | hd1 :: tl1, hd2 :: tl2 -> matches hd1 hd2 && aux tl1 tl2
+  | _ -> false in
+
+  aux (List.rev rt) (top rt_stack |> fst)
+
+let rec al_to_rt v = match v with
+| Al.Ast.CaseV (x, []) -> T x
+| Al.Ast.CaseV ("REF", [_; v']) -> al_to_rt v'
+| _ -> BotT
 
 let consts = ref []
 let const_ctxs = ref []
@@ -142,7 +172,10 @@ let rec gen name =
   let syn = find_syn name in
 
   (* HARDCODE: Wasm expression *)
-  if name = "expr" then gen_wasm_expr 0 (if top case_stack = "FUNC" then None else Some 1) else
+  if name = "expr" then gen_wasm_expr [] ( match top case_stack with
+    | "FUNC" -> None
+    | "ACTIVE" -> Some [T "I32"]
+    | _ -> Some [TopT] ) else
 
   (* HARDCODE: name *)
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
@@ -182,7 +215,6 @@ let rec gen name =
   (* CaseV *)
   (* HARDCODE: Wasm instruction *)
   | VariantT typcases when name = "instr" ->
-    let (stack_size, _) = top dim_stack in
     (* HARDCODE: checks if currently in a context that requires const instrution *)
     let typcases' = if not (contains (top case_stack) !const_ctxs) then typcases else
       let is_const (atom, _, _) = contains (string_of_atom atom) !consts in
@@ -192,20 +224,20 @@ let rec gen name =
       let typcase = choose typcases' in
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
-      let (t1, t2) = !dims |> Record.find case in
-      let n1 = fix_n t1 in
-      let n2 = fix_n t2 in
-      if n1 > stack_size then
+      let (t1, t2) = !rts |> Record.find case in
+      let rt1, rt2 = fix_rts t1 t2 in
+      if not (poppable rt1) then
         try_instr ()
       else (
+        (* print_endline (Printf.sprintf "%s: %s -> %s" case (string_of_rt rt1) (string_of_rt rt2)); *)
         push case case_stack;
         let args = match case with
         | "BLOCK"
-        | "LOOP" -> [ gen "blocktype"; gen_wasm_expr n1 (Some n2) ]
-        | "IF" -> [ gen "blocktype"; gen_wasm_expr (n1-1) (Some n2); gen_wasm_expr (n1-1) (Some n2) ]
+        | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 (Some rt2) ]
+        | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
         | _ -> gen_typs typs in
         pop case_stack;
-        update_dim (n2 - n1);
+        update_rt rt1 rt2;
         Al.Ast.CaseV (case, args) )
     in try_instr ()
   | VariantT typcases ->
@@ -221,17 +253,17 @@ let rec gen name =
     Al.Ast.CaseV (case, args)
   | _ -> failwith ("TODO: gen of " ^ Il.Print.string_of_deftyp syn ^ Il.Print.structured_string_of_deftyp syn)
 
-and gen_wasm_expr n1 n2_opt =
+and gen_wasm_expr rt rt_opt =
   let rec try_expr life =
-    dim_stack := (n1, n2_opt) :: !dim_stack;
+    push (rt, rt_opt) rt_stack;
     let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
     let ret = List.init n (fun _ -> gen "instr") |> listV in
-    let (actual, expected) = List.hd !dim_stack in
-    dim_stack := List.tl !dim_stack;
+    let (actual, expected) = List.hd !rt_stack in
+    pop rt_stack;
     match actual, expected with
     | _, None -> ret
-    | n, Some m when n = m -> ret
-    | _ when life > 0 -> try_expr (life - 1)
+    | r, Some r' when matches_all r r' -> ret
+    | _ when life > 0 -> try_expr (life - 1) (* TODO: This is THE source of inefficiency *)
     | _ -> ret
   in
   try_expr 100
@@ -257,6 +289,16 @@ and gen_typs typs = match typs.it with
   | TupT typs' -> List.map gen_typ typs'
   | _ -> [ gen_typ typs ]
 
+and fix_rts rt1 rt2 : (restype * restype) =
+  let cache = ref Record.empty in
+  let fix_rt = List.concat_map (fun vt -> match vt with
+    | SeqT -> List.init (Random.int 3) (fun _ -> BotT)
+    | SubT (x, _) when Record.keys !cache |> contains x -> [ Record.find x !cache ]
+    | SubT (x, sub) -> let vt = gen sub |> al_to_rt in cache := Record.add x vt !cache; [ vt ]
+    | t -> [ t ]
+  ) in
+  (fix_rt rt1, fix_rt rt2)
+
 (** Mutation **)
 let mutate modules = modules (* TODO *)
 
@@ -271,11 +313,15 @@ let gen_test el' il' al' =
   (* Initialize *)
   Random.init !seed;
   Backend_interpreter.Ds.init !al;
-  estimate_dim ();
+  estimate_rt ();
+  (* print_rts(); *)
   estimate_const ();
 
   (* Generate tests *)
-  let seeds = List.init !test_num (fun _ -> gen "module") in
+  let seeds = List.init !test_num (fun _i ->
+    prerr_endline ("Generatring " ^ string_of_int _i ^ "th module...");
+    gen "module"
+  ) in
 
   (* Mutatiion *)
   let tests = mutate seeds in
@@ -288,7 +334,7 @@ let gen_test el' il' al' =
     print_endline (string_of_module m);
     try
       let externvals = listV (
-        List.init 7 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
+        List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
         @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
       ) in (*TODO *)
       Backend_interpreter.Interpreter.call_instantiate [ m; externvals ] |> ignore;
