@@ -204,7 +204,7 @@ and eval_expr env expr =
   | LenE e ->
       let a = eval_expr env e |> value_to_array in
       NumV (I64.of_int_u (Array.length a))
-  | StrE r -> 
+  | StrE r ->
       let elist = Record.to_list r in
       let vlist = List.map (fun (k, e) -> ((string_of_kwd k), !e |> eval_expr env |> ref)) elist in
       StrV (Record.of_list vlist)
@@ -729,7 +729,7 @@ and interp_instr (env: env) (instr: instr): env =
     let rec pop_all acc =
       if WasmContext.get_value_stack () |> List.length > 0 then
         WasmContext.pop_value () :: acc |> pop_all
-      else 
+      else
         acc
     in
     let vs = pop_all [] |> listV in
@@ -834,10 +834,12 @@ and interp_instrs (env: env) (il: instr list): env =
       interp_instrs new_env t
     else
       new_env
-      
+
 
 
 (* Algorithm *)
+
+and algo_name_stack = ref []
 
 (* TODO: move to ds.ml *)
 
@@ -861,6 +863,9 @@ and call_algo (name: string) (args: value list): AL_Context.return_value =
   AL_Context.string_of_context_stack () |> print_endline;
   print_endline "";
   *)
+
+  algo_name_stack := name :: !algo_name_stack;
+
   let depth = !AL_Context.context_stack_length in
   if depth > 70_000 then
     failwith "Stack overflow";
@@ -885,6 +890,8 @@ and call_algo (name: string) (args: value list): AL_Context.return_value =
   print_endline "";
   *)
 
+  algo_name_stack := List.tl !algo_name_stack;
+
   assert (depth = 0);
   return_value
 
@@ -892,7 +899,8 @@ and call_algo (name: string) (args: value list): AL_Context.return_value =
 
 let init_context () =
   AL_Context.init_context ();
-  WasmContext.init_context ()
+  WasmContext.init_context ();
+  algo_name_stack := []
 
 let call_instantiate (args: value list): value =
   init_context();

@@ -10,8 +10,11 @@ let al: Al.Ast.script ref = ref []
 (* Helpers *)
 let choose l =
   let n = List.length l in
+  assert (n > 0);
   let i = Random.int n in
   List.nth l i
+
+let contains x = List.exists (fun x' -> x = x')
 
 let flatten_rec = List.concat_map (fun def ->
   match def.it with
@@ -37,6 +40,10 @@ let string_of_module m = match m with
 | Al.Ast.CaseV ("MODULE", args) ->
   "(MODULE\n  " ^ (List.map Al.Print.string_of_value args |> String.concat "\n  ") ^ "\n)"
 | _ -> failwith "Unreachable"
+
+let push v s = s := v :: !s
+let pop s = s := List.tl !s
+let top s = List.hd !s
 
 (** Initialize **)
 
@@ -98,14 +105,47 @@ let fix_n = function
 | Exactly n -> n
 | AtLeast n -> n + Random.int 3
 
+let consts = ref []
+let const_ctxs = ref []
+let estimate_const () = Il.Ast.(
+  List.iter (fun def -> match def.it with
+    | RelD (id, _, _, rules) when id.it = "Instr_const" ->
+      List.iter (fun rule -> match rule.it with
+        | RuleD (id, _, _, _, _) -> push (String.uppercase_ascii id.it) consts
+      ) rules
+    | RelD (_, _, _, rules) ->
+      List.iter (fun rule -> match rule.it with
+        | RuleD (_, _, _, args, prems) when
+          let rec is_const_checking prem = match prem.it with
+          | RulePr (id, _, _) -> id.it = "Expr_ok_const"
+          | IterPr (prem', _) -> is_const_checking prem'
+          | _ -> false in
+          List.exists is_const_checking prems -> ( match args.it with
+            | TupE [_; e; _] | TupE [_; e] -> ( match e.it with
+              | CaseE (atom, _) | MixE ([atom] :: _, _) ->
+                push (atom |> string_of_atom |> String.uppercase_ascii) const_ctxs
+              | _ -> () )
+            | _ -> () )
+        | _ -> () ) rules
+    | _ -> ()
+  ) !il
+)
+
+let print_consts () = List.iter (fun i -> print_endline i) !consts
+
 (** Seed generation **)
+
+let case_stack = ref []
 
 (* Generate specific syntax from input IL *)
 let rec gen name =
   let syn = find_syn name in
 
   (* HARDCODE: Wasm expression *)
-  if name = "expr" then gen_wasm_expr 0 (Some 1) else
+  if name = "expr" then gen_wasm_expr 0 (if top case_stack = "FUNC" then None else Some 1) else
+
+  (* HARDCODE: name *)
+  if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
 
   match syn.it with
   | AliasT typ -> gen_typ typ
@@ -126,7 +166,9 @@ let rec gen name =
   | NotationT ((atom :: _) :: _, typs)
   | NotationT ([[]; [atom]], typs) (* Hack for I8 *) ->
     let case = string_of_atom atom in
+    push case case_stack;
     let args = gen_typs typs in
+    pop case_stack;
     Al.Ast.CaseV (case, args)
   (* StrV *)
   | StructT typfields ->
@@ -138,11 +180,16 @@ let rec gen name =
     ) typfields Record.empty in
     Al.Ast.StrV rec_
   (* CaseV *)
+  (* HARDCODE: Wasm instruction *)
   | VariantT typcases when name = "instr" ->
-    (* HARDCODE: Wasm instruction *)
-    let (stack_size, _) = List.hd !dim_stack in
+    let (stack_size, _) = top dim_stack in
+    (* HARDCODE: checks if currently in a context that requires const instrution *)
+    let typcases' = if not (contains (top case_stack) !const_ctxs) then typcases else
+      let is_const (atom, _, _) = contains (string_of_atom atom) !consts in
+      List.filter is_const typcases
+    in
     let rec try_instr () =
-      let typcase = choose typcases in
+      let typcase = choose typcases' in
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
       let (t1, t2) = !dims |> Record.find case in
@@ -150,14 +197,16 @@ let rec gen name =
       let n2 = fix_n t2 in
       if n1 > stack_size then
         try_instr ()
-      else
+      else (
+        push case case_stack;
         let args = match case with
         | "BLOCK"
         | "LOOP" -> [ gen "blocktype"; gen_wasm_expr n1 (Some n2) ]
         | "IF" -> [ gen "blocktype"; gen_wasm_expr (n1-1) (Some n2); gen_wasm_expr (n1-1) (Some n2) ]
         | _ -> gen_typs typs in
+        pop case_stack;
         update_dim (n2 - n1);
-        Al.Ast.CaseV (case, args)
+        Al.Ast.CaseV (case, args) )
     in try_instr ()
   | VariantT typcases ->
     (* HARDCODE: Remove V128 *)
@@ -166,7 +215,9 @@ let rec gen name =
     let typcase = choose typcases in
     let (atom, (_, typs, _), _) = typcase in
     let case = string_of_atom atom in
+    push case case_stack;
     let args = gen_typs typs in
+    pop case_stack;
     Al.Ast.CaseV (case, args)
   | _ -> failwith ("TODO: gen of " ^ Il.Print.string_of_deftyp syn ^ Il.Print.structured_string_of_deftyp syn)
 
@@ -221,6 +272,7 @@ let gen_test el' il' al' =
   Random.init !seed;
   Backend_interpreter.Ds.init !al;
   estimate_dim ();
+  estimate_const ();
 
   (* Generate tests *)
   let seeds = List.init !test_num (fun _ -> gen "module") in
@@ -229,12 +281,23 @@ let gen_test el' il' al' =
   let tests = mutate seeds in
 
   (* Result *)
+  Backend_interpreter.Tester.init_tester ();
+
   tests |> List.iter (fun m ->
     print_endline "================";
     print_endline (string_of_module m);
     try
-      Backend_interpreter.Interpreter.call_instantiate [ m; listV [] ] |> ignore;
+      let externvals = listV (
+        List.init 7 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
+        @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
+      ) in (*TODO *)
+      Backend_interpreter.Interpreter.call_instantiate [ m; externvals ] |> ignore;
       print_endline "Instantiation success"
     with e ->
-      print_endline ("Instantiation fail due to " ^ Printexc.to_string e)
+      print_endline (
+        "Instantiation fail due to "
+        ^ Printexc.to_string e
+        ^ " during "
+        ^ String.concat ", " !Backend_interpreter.Interpreter.algo_name_stack
+      )
   )

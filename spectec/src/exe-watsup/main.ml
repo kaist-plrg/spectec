@@ -133,6 +133,7 @@ let argspec = Arg.align
   "--root", Arg.String (fun s -> Backend_interpreter.Tester.root := s), " Set the root of watsup. Defaults to current directory";
   "--test-interpreter", Arg.String (fun s -> Backend_interpreter.Tester.test_name := s), " The name of .wast test file for interpreter";
 
+  "--test:n", Arg.Int (fun n -> Backend_test.Flag.test_num := n), " Set the number of test to generate, default to 10,000";
   "--test:out", Arg.String (fun s -> Backend_test.Flag.out := s), " Set the output directory of test generation, default to `out`";
 
   "-help", Arg.Unit ignore, "";
