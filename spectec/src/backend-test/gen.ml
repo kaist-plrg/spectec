@@ -7,6 +7,15 @@ let el: El.Ast.script ref = ref []
 let il: Il.Ast.script ref = ref []
 let al: Al.Ast.script ref = ref []
 
+type valtype =
+| T of string
+| RefT of valtype
+| SubT of string * string
+| TopT
+| BotT
+| SeqT
+type restype = valtype list
+
 (* Helpers *)
 let choose l =
   let n = List.length l in
@@ -47,16 +56,32 @@ let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
 
-(** Initialize **)
+let valid case args const (_rt1, rt2) = Al.Ast.(
+  (* Bunch of hardcoded heuristics to check if the given Wasm instruction is valid *)
+  match case with
+  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
+    | [ CaseV ("I32", []); CaseV ("_I", _) ], [ T "I32" ]
+    | [ CaseV ("I64", []); CaseV ("_I", _) ], [ T "I64" ] -> true
+    | [ CaseV ("F32", []); CaseV ("_F", _) ], [ T "F32" ]
+    | [ CaseV ("F64", []); CaseV ("_F", _) ], [ T "F64" ] -> not const
+    | _ -> false )
+  | "CONST" -> ( match args, rt2 with
+    | [ CaseV ("I32", []); _ ], [ T "I32" ]
+    | [ CaseV ("I64", []); _ ], [ T "I64" ]
+    | [ CaseV ("F32", []); _ ], [ T "F32" ]
+    | [ CaseV ("F64", []); _ ], [ T "F64" ] -> true
+    | _ -> false )
+  | "GLOBAL.GET" -> ( match args with
+    (* builtin globals *)
+    | [ NumV 0L ] -> rt2 = [ T "I32" ]
+    | [ NumV 1L ] -> rt2 = [ T "I64" ]
+    | [ NumV 2L ] -> rt2 = [ T "F32" ]
+    | [ NumV 3L ] -> rt2 = [ T "F64" ]
+    | _ -> true )
+  | _ -> true
+)
 
-type valtype =
-| T of string
-| RefT of valtype
-| SubT of string * string
-| TopT
-| BotT
-| SeqT
-type restype = valtype list
+(** Initialize **)
 
 let rts = ref Record.empty
 
@@ -223,30 +248,36 @@ let rec gen name =
   (* HARDCODE: Wasm instruction *)
   | VariantT typcases when name = "instr" ->
     (* HARDCODE: checks if currently in a context that requires const instrution *)
-    let typcases' = if not (contains (top case_stack) !const_ctxs) then typcases else
+    let const_required = (contains (top case_stack) !const_ctxs) in
+    let typcases' = if not const_required then typcases else
       let is_const (atom, _, _) = contains (string_of_atom atom) !consts in
       List.filter is_const typcases
     in
-    let rec try_instr () =
+    let rec try_instr life =
       let typcase = choose typcases' in
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
       let (t1, t2) = !rts |> Record.find case in
       let rt1, rt2 = fix_rts t1 t2 in
-      if not (poppable rt1) then
-        try_instr ()
-      else (
-        (* print_endline (Printf.sprintf "%s: %s -> %s" case (string_of_rt rt1) (string_of_rt rt2)); *)
-        push case case_stack;
-        let args = match case with
-        | "BLOCK"
-        | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 (Some rt2) ]
-        | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
-        | _ -> gen_typs typs in
-        pop case_stack;
-        update_rt rt1 rt2;
-        Al.Ast.CaseV (case, args) )
-    in try_instr ()
+      if not (poppable rt1) && life > 0 then
+        try_instr (life - 1)
+      else
+        let rec try_args life' =
+          if life' = 0 && life > 0 then try_instr (life - 1) else (
+          push case case_stack;
+          let args = match case with
+          | "BLOCK"
+          | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 (Some rt2) ]
+          | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
+          | _ -> gen_typs typs in
+          pop case_stack;
+          if not (valid case args const_required (rt1, rt2)) && life' > 0 then
+            try_args (life' - 1)
+          else (
+            update_rt rt1 rt2;
+            Al.Ast.CaseV (case, args) ) )
+        in try_args 10
+    in try_instr 100
   | VariantT typcases ->
     (* HARDCODE: Remove V128 *)
     let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "V128") typcases in
@@ -282,7 +313,7 @@ and gen_typ typ = match typ.it with
     numV i
   | IterT (typ', List) ->
     let n = Random.int 3 + 1 in (* 1, 2, 3 *)
-    let n = match typ'.it with VarT id when id.it = "TYPE" -> n + 1 | _ -> n in
+    let n = match typ'.it with VarT id when id.it = "type" -> n + 1 | _ -> n in
     let l = List.init n (fun _ -> gen_typ typ') in
     listV l
   | TupT typs -> List.map gen_typ typs |> listV

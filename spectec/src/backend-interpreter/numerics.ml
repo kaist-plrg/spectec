@@ -149,6 +149,21 @@ let binop : numerics =
           | TextV "ShrU" -> wrap_i32_binop I32.shr_u v1 v2
           | TextV "Rotl" -> wrap_i32_binop I32.rotl v1 v2
           | TextV "Rotr" -> wrap_i32_binop I32.rotr v1 v2
+          | CaseV ("_I", [ CaseV ("ADD", []) ]) -> wrap_i32_binop I32.add v1 v2
+          | CaseV ("_I", [ CaseV ("SUB", []) ]) -> wrap_i32_binop I32.sub v1 v2
+          | CaseV ("_I", [ CaseV ("MUL", []) ]) -> wrap_i32_binop I32.mul v1 v2
+          | CaseV ("_I", [ CaseV ("DIV", [ CaseV ("S", []) ]) ]) -> wrap_i32_binop_with_trap I32.div_s v1 v2
+          | CaseV ("_I", [ CaseV ("DIV", [ CaseV ("U", []) ]) ]) -> wrap_i32_binop_with_trap I32.div_u v1 v2
+          | CaseV ("_I", [ CaseV ("REM", [ CaseV ("S", []) ]) ]) -> wrap_i32_binop_with_trap I32.rem_s v1 v2
+          | CaseV ("_I", [ CaseV ("REM", [ CaseV ("U", []) ]) ]) -> wrap_i32_binop_with_trap I32.rem_u v1 v2
+          | CaseV ("_I", [ CaseV ("AND", []) ]) -> wrap_i32_binop I32.and_ v1 v2
+          | CaseV ("_I", [ CaseV ("OR", []) ]) -> wrap_i32_binop I32.or_ v1 v2
+          | CaseV ("_I", [ CaseV ("XOR", []) ]) -> wrap_i32_binop I32.xor v1 v2
+          | CaseV ("_I", [ CaseV ("SHL", []) ]) -> wrap_i32_binop I32.shl v1 v2
+          | CaseV ("_I", [ CaseV ("SHR", [ CaseV ("S", []) ]) ]) -> wrap_i32_binop I32.shr_s v1 v2
+          | CaseV ("_I", [ CaseV ("SHR", [ CaseV ("U", []) ]) ]) -> wrap_i32_binop I32.shr_u v1 v2
+          | CaseV ("_I", [ CaseV ("ROTL", []) ]) -> wrap_i32_binop I32.rotl v1 v2
+          | CaseV ("_I", [ CaseV ("ROTR", []) ]) -> wrap_i32_binop I32.rotr v1 v2
           | _ -> failwith ("Invalid binop: " ^ (Print.string_of_value op)))
         | "I64" -> (
           match op with
@@ -167,6 +182,21 @@ let binop : numerics =
           | TextV "ShrU" -> wrap_i64_binop I64.shr_u v1 v2
           | TextV "Rotl" -> wrap_i64_binop I64.rotl v1 v2
           | TextV "Rotr" -> wrap_i64_binop I64.rotr v1 v2
+          | CaseV ("_I", [ CaseV ("ADD", []) ]) -> wrap_i64_binop I64.add v1 v2
+          | CaseV ("_I", [ CaseV ("SUB", []) ]) -> wrap_i64_binop I64.sub v1 v2
+          | CaseV ("_I", [ CaseV ("MUL", []) ]) -> wrap_i64_binop I64.mul v1 v2
+          | CaseV ("_I", [ CaseV ("DIV", [ CaseV ("S", []) ]) ]) -> wrap_i64_binop_with_trap I64.div_s v1 v2
+          | CaseV ("_I", [ CaseV ("DIV", [ CaseV ("U", []) ]) ]) -> wrap_i64_binop_with_trap I64.div_u v1 v2
+          | CaseV ("_I", [ CaseV ("REM", [ CaseV ("S", []) ]) ]) -> wrap_i64_binop_with_trap I64.rem_s v1 v2
+          | CaseV ("_I", [ CaseV ("REM", [ CaseV ("U", []) ]) ]) -> wrap_i64_binop_with_trap I64.rem_u v1 v2
+          | CaseV ("_I", [ CaseV ("AND", []) ]) -> wrap_i64_binop I64.and_ v1 v2
+          | CaseV ("_I", [ CaseV ("OR", []) ]) -> wrap_i64_binop I64.or_ v1 v2
+          | CaseV ("_I", [ CaseV ("XOR", []) ]) -> wrap_i64_binop I64.xor v1 v2
+          | CaseV ("_I", [ CaseV ("SHL", []) ]) -> wrap_i64_binop I64.shl v1 v2
+          | CaseV ("_I", [ CaseV ("SHR", [ CaseV ("S", []) ]) ]) -> wrap_i64_binop I64.shr_s v1 v2
+          | CaseV ("_I", [ CaseV ("SHR", [ CaseV ("U", []) ]) ]) -> wrap_i64_binop I64.shr_u v1 v2
+          | CaseV ("_I", [ CaseV ("ROTL", []) ]) -> wrap_i64_binop I64.rotl v1 v2
+          | CaseV ("_I", [ CaseV ("ROTR", []) ]) -> wrap_i64_binop I64.rotr v1 v2
           | _ -> failwith ("Invalid binop: " ^ (Print.string_of_value op)))
         | "F32" -> (
           match op with
@@ -177,6 +207,13 @@ let binop : numerics =
           | TextV "Min" -> wrap_f32_binop F32.min v1 v2
           | TextV "Max" -> wrap_f32_binop F32.max v1 v2
           | TextV "CopySign" -> wrap_f32_binop F32.copysign v1 v2
+          | CaseV ("_F", [ CaseV ("ADD", []) ]) -> wrap_f32_binop F32.add v1 v2
+          | CaseV ("_F", [ CaseV ("SUB", []) ]) -> wrap_f32_binop F32.sub v1 v2
+          | CaseV ("_F", [ CaseV ("MUL", []) ]) -> wrap_f32_binop F32.mul v1 v2
+          | CaseV ("_F", [ CaseV ("DIV", []) ]) -> wrap_f32_binop F32.div v1 v2
+          | CaseV ("_F", [ CaseV ("MIN", []) ]) -> wrap_f32_binop F32.min v1 v2
+          | CaseV ("_F", [ CaseV ("MAX", []) ]) -> wrap_f32_binop F32.max v1 v2
+          | CaseV ("_F", [ CaseV ("COPYSIGN", []) ]) -> wrap_f32_binop F32.copysign v1 v2
           | _ -> failwith ("Invalid binop: " ^ (Print.string_of_value op)))
         | "F64" -> (
           match op with
@@ -187,6 +224,13 @@ let binop : numerics =
           | TextV "Min" -> wrap_f64_binop F64.min v1 v2
           | TextV "Max" -> wrap_f64_binop F64.max v1 v2
           | TextV "CopySign" -> wrap_f64_binop F64.copysign v1 v2
+          | CaseV ("_F", [ CaseV ("ADD", []) ]) -> wrap_f64_binop F64.add v1 v2
+          | CaseV ("_F", [ CaseV ("SUB", []) ]) -> wrap_f64_binop F64.sub v1 v2
+          | CaseV ("_F", [ CaseV ("MUL", []) ]) -> wrap_f64_binop F64.mul v1 v2
+          | CaseV ("_F", [ CaseV ("DIV", []) ]) -> wrap_f64_binop F64.div v1 v2
+          | CaseV ("_F", [ CaseV ("MIN", []) ]) -> wrap_f64_binop F64.min v1 v2
+          | CaseV ("_F", [ CaseV ("MAX", []) ]) -> wrap_f64_binop F64.max v1 v2
+          | CaseV ("_F", [ CaseV ("COPYSIGN", []) ]) -> wrap_f64_binop F64.copysign v1 v2
           | _ -> failwith ("Invalid binop: " ^ (Print.string_of_value op)))
         | _ -> failwith "Invalid type for binop")
       | _ -> failwith "Invalid binop");
