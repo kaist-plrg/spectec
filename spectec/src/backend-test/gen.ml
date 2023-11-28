@@ -49,13 +49,20 @@ let top s = List.hd !s
 
 (** Initialize **)
 
-type valtype = T of string | SubT of string * string | TopT | BotT | SeqT
+type valtype =
+| T of string
+| RefT of valtype
+| SubT of string * string
+| TopT
+| BotT
+| SeqT
 type restype = valtype list
 
 let rts = ref Record.empty
 
-let string_of_vt = function
+let rec string_of_vt = function
 | T x -> x
+| RefT t -> "REF " ^ string_of_vt t
 | SubT (x, sub) -> x ^ "<:" ^ sub
 | TopT -> "_"
 | BotT -> "_"
@@ -75,7 +82,7 @@ let estimate_rt () = Il.Ast.(
   | SubE ({ it = VarE id; _ }, { it = VarT id'; _ }, _)  -> [ SubT (id.it, id'.it) ]
   | IterE (_, (Il.Ast.List, _)) -> [ SeqT ]
   | CatE (e1, e2) -> get_rt e1 @ get_rt e2
-  | CaseE (Atom "REF", { it = TupE [_; e']; _ }) -> get_rt e'
+  | CaseE (Atom "REF", { it = TupE [_; e']; _ }) -> get_rt e' |> List.map (fun t -> RefT t)
   | _ -> [ TopT ] in
 
   let expected e kind =
@@ -110,12 +117,12 @@ let update_rt rt1 rt2 =
     let st2 = List.fold_left  (fun st t -> t :: st) st1 rt2 in
     rt_stack := (st2, target) :: tl
 
-let matches vt1 vt2 = match vt1, vt2 with
+let rec matches vt1 vt2 = match vt1, vt2 with
 | TopT, _ | _, TopT -> true
-| BotT, _ -> false
 | _, BotT -> true
 | T x1, T x2 -> x1 = x2
-| _ -> failwith "Unreachable: SeqT/SubT should be fixed by fix_rt by now"
+| RefT t1, RefT t2 -> matches t1 t2
+| _ -> false
 
 let rec matches_all vts1 vts2 = match vts1, vts2 with
 | [], [] -> true
@@ -271,10 +278,11 @@ and gen_wasm_expr rt rt_opt =
 and gen_typ typ = match typ.it with
   | VarT id -> gen id.it
   | NumT NatT ->
-    let i = Random.int 3 in (* 0, 1, 2 *)
+    let i = Random.int 2 in (* 0, 1 *)
     numV i
   | IterT (typ', List) ->
     let n = Random.int 3 + 1 in (* 1, 2, 3 *)
+    let n = match typ'.it with VarT id when id.it = "TYPE" -> n + 1 | _ -> n in
     let l = List.init n (fun _ -> gen_typ typ') in
     listV l
   | TupT typs -> List.map gen_typ typs |> listV
@@ -291,12 +299,13 @@ and gen_typs typs = match typs.it with
 
 and fix_rts rt1 rt2 : (restype * restype) =
   let cache = ref Record.empty in
-  let fix_rt = List.concat_map (fun vt -> match vt with
-    | SeqT -> List.init (Random.int 3) (fun _ -> BotT)
+  let rec fix_rt rt = List.concat_map (fun vt -> match vt with
+    | RefT t -> fix_rt [t] |> List.map (fun t' -> RefT t')
     | SubT (x, _) when Record.keys !cache |> contains x -> [ Record.find x !cache ]
     | SubT (x, sub) -> let vt = gen sub |> al_to_rt in cache := Record.add x vt !cache; [ vt ]
+    | SeqT -> List.init (Random.int 3) (fun _ -> BotT)
     | t -> [ t ]
-  ) in
+  ) rt in
   (fix_rt rt1, fix_rt rt2)
 
 (** Mutation **)
@@ -336,6 +345,8 @@ let gen_test el' il' al' =
       let externvals = listV (
         List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
         @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
+        @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i]))
+        @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i]))
       ) in (*TODO *)
       Backend_interpreter.Interpreter.call_instantiate [ m; externvals ] |> ignore;
       print_endline "Instantiation success"
