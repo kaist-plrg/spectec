@@ -143,7 +143,7 @@ and replace_path env base path v_new = match path with
       let a_new = Array.copy a in
       let i1 = eval_expr env e1 |> value_to_int in
       let i2 = eval_expr env e2 |> value_to_int in
-      Array.blit (v_new |> value_to_array) 0 a_new i1 (i2 - i1 + 1);
+      Array.blit (v_new |> value_to_array) 0 a_new i1 i2;
       ListV (ref a_new)
   | DotP (str, _) ->
       let r = (
@@ -243,7 +243,7 @@ and eval_expr env expr =
       replace base ps
   | CaseE ((tag, _), el) -> CaseV (tag, List.map (eval_expr env) el) |> check_i32_const
   | OptE opt -> OptV (Option.map (eval_expr env) opt)
-  | TupE (e1, e2) -> TupV (eval_expr env e1, eval_expr env e2)
+  | TupE el -> TupV (List.map (eval_expr env) el)
   (* Context *)
   | ArityE e -> (
       match eval_expr env e with
@@ -345,12 +345,12 @@ and eval_cond env cond =
   (* TODO : This sohuld be replaced with executing the validation algorithm *)
   | IsValidC e -> (
       let valid_lim k = function
-        | TupV (NumV n, NumV m) -> n <= m && m <= k
+        | TupV [ NumV n; NumV m ] -> n <= m && m <= k
         | _ -> false
       in
       match eval_expr env e with
       (* valid_tabletype *)
-      | TupV (lim, _) -> valid_lim 0xffffffffL lim
+      | TupV [ lim; _ ] -> valid_lim 0xffffffffL lim
       (* valid_memtype *)
       | CaseV ("I8", [ lim ]) -> valid_lim 0x10000L lim
       (* valid_other *)
@@ -467,9 +467,11 @@ and assign lhs rhs env =
       List.map (fun v -> assign e v Env.empty) rhs_list
       |> merge_envs_with_grouping default_env
       |> Env.union (fun _ _ v -> Some v) new_env
-  | TupE (lhs1, lhs2), TupV (rhs1, rhs2)
   | ArrowE (lhs1, lhs2), ArrowV (rhs1, rhs2) ->
       env |> assign lhs1 rhs1 |> assign lhs2 rhs2
+  | TupE lhs_s, TupV rhs_s
+    when List.length lhs_s = List.length rhs_s ->
+      List.fold_right2 assign lhs_s rhs_s env
   | ListE lhs_s, ListV rhs_s
     when List.length lhs_s = Array.length !rhs_s ->
       List.fold_right2 assign lhs_s (!rhs_s |> Array.to_list) env
@@ -621,6 +623,7 @@ and call_builtin name =
     | _ -> failwith "builtin doesn't return value"
   in
   let as_const ty = function
+  | CaseV ("CONST", [ CaseV (ty', []) ; n ])
   | OptV (Some (CaseV ("CONST", [ CaseV (ty', []) ; n ]))) when ty = ty' -> n
   | v -> failwith ("Not " ^ ty ^ ".CONST: " ^ string_of_value v) in
   match name with
@@ -649,18 +652,20 @@ and call_builtin name =
 
 and execute (wasm_instr: value): unit =
   match wasm_instr with
-  | CaseV ("REF.NULL", [ ht ]) ->
-    (* substitute heap type*)
-    let dummy_rt = CaseV ("REF", [ null; ht ]) in
-    let mm =
-      CallE ("moduleinst", [])
-      |> eval_expr (Env.add_store Env.empty)
-    in
-    begin match call_algo "inst_reftype" [ mm; dummy_rt ] with
-    | AL_Context.Some (CaseV ("REF", [ n; ht' ])) when n = null ->
-      CaseV ("REF.NULL", [ ht' ]) |> WasmContext.push_value
-    | _ -> raise Exception.MissingReturnValue
-    end
+  | CaseV ("REF.NULL", [ ht ]) -> ( match !version with
+    | 3 ->
+      (* substitute heap type*)
+      let dummy_rt = CaseV ("REF", [ null; ht ]) in
+      let mm =
+        CallE ("moduleinst", [])
+        |> eval_expr (Env.add_store Env.empty)
+      in
+      begin match call_algo "inst_reftype" [ mm; dummy_rt ] with
+      | AL_Context.Some (CaseV ("REF", [ n; ht' ])) when n = null ->
+        CaseV ("REF.NULL", [ ht' ]) |> WasmContext.push_value
+      | _ -> raise Exception.MissingReturnValue
+      end
+    | _ -> WasmContext.push_value wasm_instr )
   | CaseV ("CONST", _) ->
     WasmContext.push_value wasm_instr
   | CaseV (name, []) when is_builtin name ->
@@ -746,7 +751,9 @@ and interp_instr (env: env) (instr: instr): env =
     env
   | TrapI -> raise Exception.Trap
   | NopI -> env
-  | ReturnI None -> env
+  | ReturnI None ->
+    () |> AL_Context.set_return;
+    env
   | ReturnI (Some e) ->
     eval_expr env e |> AL_Context.set_return_value;
     env

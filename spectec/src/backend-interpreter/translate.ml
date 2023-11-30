@@ -49,6 +49,17 @@ let drop_state e =
     -> e'
   | _ -> e
 
+(* transform s; f; e into s *)
+let extract_store e = match e.it with
+  | Ast.MixE (* (s; f); e *)
+      ( [ []; [ Ast.Semicolon ]; [ Ast.Star ] ],
+        { it = Ast.TupE [ { it = Ast.MixE (
+          [[]; [ Ast.Semicolon ]; []],
+          { it = Ast.TupE [ s; _f ]; _ }
+        ); _ }; _e' ]; _ } )
+    -> s
+  | _ -> e
+
 (* Ast.exp -> Ast.exp list *)
 let rec flatten e =
   match e.it with
@@ -153,7 +164,7 @@ and exp2expr exp =
   (* CaseE *)
   | Ast.CaseE (Ast.Atom cons, arg) -> CaseE (name2kwd cons exp.note, exp2args arg)
   (* Tuple *)
-  | Ast.TupE exps -> ListE (List.map exp2expr exps)
+  | Ast.TupE exps -> TupE (List.map exp2expr exps)
   (* Call *)
   | Ast.CallE (id, inner_exp) -> CallE (id.it, exp2args inner_exp)
   (* Record expression *)
@@ -177,7 +188,7 @@ and exp2expr exp =
       | [ []; [ Ast.Semicolon ]; [] ], [ e1; e2 ]
       | [ []; [ Ast.Semicolon ]; [ Ast.Star ] ], [ e1; e2 ]
       | [ [ Ast.LBrack ]; [ Ast.Dot2 ]; [ Ast.RBrack ]], [ e1; e2 ] ->
-          TupE (exp2expr e1, exp2expr e2)
+          TupE [ exp2expr e1; exp2expr e2 ]
       | [ []; [ Ast.Star; Ast.Arrow ]; [ Ast.Star ] ], [ e1; e2 ]
       | [ []; [ Ast.Arrow ]; [] ], [ e1; e2 ] ->
           ArrowE (exp2expr e1, exp2expr e2)
@@ -189,10 +200,10 @@ and exp2expr exp =
           CaseE (("OK", "datatype"), [])
       | [ [ Ast.Atom "MUT" ]; [ Ast.Quest ]; [] ],
         [ { it = Ast.OptE (Some { it = Ast.TupE []; _ }); _}; t ] ->
-          TupE (CaseE (("MUT", "globaltype"), []), exp2expr t)
+          TupE [ CaseE (("MUT", "globaltype"), []); exp2expr t ]
       | [ [ Ast.Atom "MUT" ]; [ Ast.Quest ]; [] ],
         [ { it = Ast.IterE ({ it = Ast.TupE []; _ }, (Ast.Opt, [])); _}; t ] ->
-          TupE (IterE (VarE "mut", ["mut"], Opt), exp2expr t)
+          TupE [ IterE (VarE "mut", ["mut"], Opt); exp2expr t ]
       | [ Ast.Atom "MODULE" ] :: _, el ->
           CaseE (("MODULE", "module"), List.map exp2expr el)
       | [ [ Ast.Atom "IMPORT" ]; []; []; [] ], el ->
@@ -216,7 +227,7 @@ and exp2expr exp =
       | [ [ Ast.Atom "NULL" ]; [ Ast.Quest ] ], el ->
           CaseE (("NULL", "nul"), List.map exp2expr el)
       | [ Ast.Atom name ] :: ll, el
-        when List.for_all (fun l -> List.length l = 0) ll ->
+        when List.for_all (fun l -> l = [] || l = [ Ast.Star ] || l = [ Ast.Quest ]) ll ->
           CaseE ((name, String.lowercase_ascii name), List.map exp2expr el)
       | _ -> YetE (Print.structured_string_of_exp exp))
   | Ast.OptE inner_exp -> OptE (Option.map exp2expr inner_exp)
@@ -371,11 +382,11 @@ let rec rhs2instrs exp =
         {
           it =
             Ast.TupE
-              [ { it = Ast.VarE label_arity; _ }; instrs_exp1; instrs_exp2 ];
+              [ label_arity; instrs_exp1; instrs_exp2 ];
           _;
         }) -> (
       let label_expr =
-        LabelE (VarE label_arity.it, exp2expr instrs_exp1)
+        LabelE (exp2expr label_arity, exp2expr instrs_exp1)
       in
       match instrs_exp2.it with
       | Ast.CatE (valexp, instrsexp) ->
@@ -583,19 +594,22 @@ let rec expr2let lhs rhs targets cont =
     ]
   | VarE s when s = "f" || String.starts_with ~prefix:"f_" s ->
       letI (lhs, rhs) :: cont
+  | VarE s when s = "s" || String.starts_with ~prefix:"s'" s -> (* HARDCODE: hide state *)
+      ( match rhs with
+      | CallE (func, args) -> performI (func, args) :: cont
+      | _ -> letI (lhs, rhs) :: cont )
   | _ -> letI (lhs, rhs) :: cont
 
 (* HARDCODE: Translate each RulePr manually based on their names *)
 let rulepr2instrs id exp instrs = match id.it, exp2args exp with
-  | "Eval_expr", [z; lhs; _z; rhs] ->
+  | "Eval_expr", [_; lhs; _z; rhs] ->
     (* TODO: Name of f..? *)
-    letI (TupE (VarE "_", VarE "f"), z) ::
     enterI (
-      FrameE (None, VarE "f"),
+      FrameE (None, VarE "z"),
       ListE [CaseE (("FRAME_", ""), [])],
       [ letI (rhs, CallE ("eval_expr", [ lhs ])) ]
     ) :: instrs
-  | "Step_read", [TupE (TupE (_s, f), lhs); rhs] ->
+  | "Step_read", [ TupE [ TupE [ _s; f ]; lhs ]; rhs] ->
     enterI (
       FrameE (None, f),
       ListE [CaseE (("FRAME_", ""), [])],
@@ -612,7 +626,8 @@ let rec prem2instrs remain_lhs prem instrs =
   match prem.it with
   | Ast.IfPr exp -> [ ifI (exp2cond exp, instrs |> check_nop, []) ]
   | Ast.ElsePr -> [ otherwiseI (instrs |> check_nop) ]
-  | Ast.LetPr (exp1, exp2, targets) ->
+  | Ast.LetPr (exp1, exp2, ids) ->
+      let targets = List.map it ids in
       let instrs' = List.concat_map (bound_by exp1) remain_lhs @ instrs in
       init_lhs_id();
       expr2let (exp2expr exp1) (exp2expr exp2) targets instrs'
@@ -786,13 +801,13 @@ let rec reduction_group2algo (instr_name, reduction_group) =
 type reduction_group =
   string * (Ast.exp * Ast.exp * Ast.premise list * Ast.binds) list
 
-(* extract rules except Step/pure and Step/read *)
+(* extract rules except Steps/..., Step/pure and Step/read *)
 let extract_rules def =
   match def.it with
   | Ast.RelD (id, _, _, rules) when String.starts_with ~prefix:"Step" id.it ->
       let filter_context rule =
         let (Ast.RuleD (ruleid, _, _, _, _)) = rule.it in
-        ruleid.it <> "pure" && ruleid.it <> "read"
+        id.it <> "Steps" && ruleid.it <> "pure" && ruleid.it <> "read"
       in
       List.filter filter_context rules
   | _ -> []
@@ -865,7 +880,7 @@ let helpers2algo partial_funcs def =
   | Ast.DecD (id, _t1, _t2, clauses) ->
       let name = id.it in
       let unified_clauses = Il2il.unify_defs clauses in
-      let Ast.DefD (_, params, _, _) = (List.hd unified_clauses).it in
+      let Ast.DefD (_, params, rhs, _) = (List.hd unified_clauses).it in
       let al_params =
         (match params.it with Ast.TupE exps -> exps | _ -> [ params ])
         |> List.map exp2expr
@@ -873,7 +888,8 @@ let helpers2algo partial_funcs def =
       (* TODO: temporary hack for adding return instruction in instantation & invocation *)
       let translator =
         if id.it = "instantiate" then
-          [returnI (Some (VarE "mm"))] |> config_helper2instrs [] [] (NumE 0L)
+          let final_store = extract_store rhs |> exp2expr in
+          [returnI (Some (TupE [final_store; VarE "mm"]))] |> config_helper2instrs [] [] (NumE 0L)
         else if id.it = "invoke" then
           [returnI (Some (IterE (VarE "val", ["val"], ListN (VarE "k", None))))] |> config_helper2instrs [letI (VarE "k", LenE (IterE (VarE "t_2", ["t_2"], List)))] [popI (IterE (VarE "val", ["val"], ListN (VarE "k", None)))] (VarE "k")
         else

@@ -220,7 +220,7 @@ let rec gen name =
     let pair = gen_typs typs in
     let fst = List.hd pair in
     let snd = List.hd (List.tl pair) in
-    Al.Ast.TupV (fst, snd)
+    Al.Ast.TupV [ fst; snd ]
   (* ArrowV *)
   | NotationT ([[]; [Arrow]; []], typs) ->
     let pair = gen_typs typs in

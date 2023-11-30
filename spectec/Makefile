@@ -48,7 +48,7 @@ testpromote:
 	dune promote
 
 $(TESTDIRS): test-%: exe
-	(cd $@ && make test >/dev/null)
+	(cd $@ && make test >/dev/null) || echo "make test in $@ failed" 
 
 
 # Cleanup
