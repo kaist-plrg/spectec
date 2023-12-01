@@ -2,7 +2,7 @@ open Reference_interpreter
 open Al
 open Ast
 open Print
-open Construct
+open Al_util
 open Ds
 open Util.Record
 
@@ -652,7 +652,7 @@ and call_builtin name =
 
 and execute (wasm_instr: value): unit =
   match wasm_instr with
-  | CaseV ("REF.NULL", [ ht ]) -> ( match !version with
+  | CaseV ("REF.NULL", [ ht ]) -> ( match !Construct.version with
     | 3 ->
       (* substitute heap type*)
       let dummy_rt = CaseV ("REF", [ null; ht ]) in

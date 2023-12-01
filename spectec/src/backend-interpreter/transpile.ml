@@ -1,8 +1,8 @@
 open Al
 open Al.Ast
+open Al.Al_util
 open Util
 open Util.Record
-open Construct
 
 (** helper *)
 let (@@) (g: instr -> instr list) (f: instr -> instr list) (i: instr): instr list =

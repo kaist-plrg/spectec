@@ -140,7 +140,7 @@ syntax relop_FXX = | EQ | NE | LT | GT | LE | GE
 
 syntax unop_valtype = | _I unop_IXX | _F unop_FXX
 syntax binop_valtype = | _I binop_IXX | _F binop_FXX
-syntax testop_valtype = | _I testop_IXX | _F testop_FXX
+syntax testop_valtype = | _I testop_IXX ;; | _F testop_FXX
 syntax relop_valtype = | _I relop_IXX | _F relop_FXX
 syntax cvtop = | CONVERT | REINTERPRET
 

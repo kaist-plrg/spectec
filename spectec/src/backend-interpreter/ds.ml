@@ -1,7 +1,7 @@
 open Al
 open Ast
+open Al_util
 open Print
-open Construct
 open Util.Record
 
 (* Program *)
@@ -79,9 +79,9 @@ module Env = struct include Map.Make (String)
 
   (* Printer *)
   let string_of_env env =
-    Print.string_of_list
+    string_of_list
       (fun (k, v) ->
-        k ^ ": " ^ Print.string_of_value v)
+        k ^ ": " ^ string_of_value v)
       "\n{" ",\n  " "\n}"
       (bindings env)
 
@@ -94,7 +94,7 @@ module Env = struct include Map.Make (String)
       |> prerr_endline;
       raise Not_found
 
-  let add_store = add "s" (Ast.StoreV store)
+  let add_store = add "s" (StoreV store)
 end
 
 type env = value Env.t

@@ -157,7 +157,7 @@ syntax relop_FXX = | EQ | NE | LT | GT | LE | GE
 
 syntax unop_numtype = | _I unop_IXX | _F unop_FXX
 syntax binop_numtype = | _I binop_IXX | _F binop_FXX
-syntax testop_numtype = | _I testop_IXX | _F testop_FXX
+syntax testop_numtype = | _I testop_IXX ;; | _F testop_FXX
 syntax relop_numtype = | _I relop_IXX | _F relop_FXX
 syntax cvtop = | CONVERT | REINTERPRET | CONVERT_SAT
 
@@ -290,7 +290,7 @@ syntax import hint(desc "import") =
   IMPORT name name externtype
 
 syntax module hint(desc "module") =
-  MODULE type* import* func* global* table* mem* elem* data* start* export*
+  MODULE type* import* func* global* table* mem* elem* data* start? export*
 
 
 var ty : type

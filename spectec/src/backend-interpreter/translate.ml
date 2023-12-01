@@ -1,7 +1,7 @@
 open Il
 open Printf
 open Al.Ast
-open Construct
+open Al.Al_util
 open Util.Source
 open Util.Record
 

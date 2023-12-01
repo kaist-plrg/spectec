@@ -595,3 +595,7 @@ let structured_string_of_algorithm = function
           "" params
       ^ ":\n"
       ^ structured_string_of_instrs 1 instrs
+
+(* Print *)
+let print_value v = v |> string_of_value |> print_endline
+let prerr_value v = v |> string_of_value |> prerr_endline

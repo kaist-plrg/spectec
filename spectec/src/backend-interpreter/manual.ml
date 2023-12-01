@@ -1,5 +1,5 @@
 open Al.Ast
-open Construct
+open Al.Al_util
 open Util.Record
 
 let eval_expr =

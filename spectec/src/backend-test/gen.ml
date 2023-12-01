@@ -1,6 +1,8 @@
 open Flag
 open Util.Source
 open Util.Record
+open Backend_interpreter
+open Al.Al_util
 
 (* Specs *)
 let el: El.Ast.script ref = ref []
@@ -27,11 +29,15 @@ let contains x = List.exists (fun x' -> x = x')
 
 let hds xs = xs |> List.rev |> List.tl |> List.rev
 
+let option_flatmap f opt = Option.bind opt f
+
 let flatten_rec = List.concat_map (fun def ->
   match def.it with
   | Il.Ast.RecD defs -> defs
   | _ -> [ def ]
 )
+
+let (<~) f side_effect x = let v = (f x) in side_effect v; v
 
 let find_syn name =
   let syn_opt = List.find_map (fun def -> match def.it with
@@ -41,7 +47,6 @@ let find_syn name =
   | Some syn -> syn
   | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 
-let listV l = Al.Ast.ListV (l |> Array.of_list |> ref)
 let numV i = Al.Ast.NumV (i |> Int64.of_int)
 let optV_none = Al.Ast.OptV None
 let optV_some v = Al.Ast.OptV (Some v)
@@ -199,13 +204,29 @@ let print_consts () = List.iter (fun i -> print_endline i) !consts
 
 let case_stack = ref []
 
+let types_cache = ref []
+let typeidx_cache = ref (numV 0)
+let cache_if cond ref v = if cond then ref := v; v
+
+let estimate_out_dim tid types = try (
+  al_to_int tid
+  |> List.nth types
+  |> arg_of_case "TYPE" 0
+  |> arg_of_tup 1 (* Wasm 2.0 *)
+  |> al_to_list
+  |> List.map (function
+    (* | Al.Ast.CaseV (t, []) -> T t *)
+    | _ -> TopT )
+  |> Option.some
+) with _ -> None
+
 (* Generate specific syntax from input IL *)
 let rec gen name =
   let syn = find_syn name in
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then gen_wasm_expr [] ( match top case_stack with
-    | "FUNC" -> None
+    | "FUNC" -> estimate_out_dim !typeidx_cache !types_cache
     | "ACTIVE" -> Some [T "I32"]
     | _ -> Some [TopT] ) else
 
@@ -222,7 +243,8 @@ let rec gen name =
     let snd = List.hd (List.tl pair) in
     Al.Ast.TupV [ fst; snd ]
   (* ArrowV *)
-  | NotationT ([[]; [Arrow]; []], typs) ->
+  | NotationT ([[]; [Arrow]; []], typs)
+  | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
     let pair = gen_typs typs in
     let fst = List.hd pair in
     let snd = List.hd (List.tl pair) in
@@ -293,6 +315,8 @@ let rec gen name =
 
 and gen_wasm_expr rt rt_opt =
   let rec try_expr life =
+    if (life = 0) then
+      prerr_endline "life is 0..";
     push (rt, rt_opt) rt_stack;
     let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
     let ret = List.init n (fun _ -> gen "instr") |> listV in
@@ -304,17 +328,17 @@ and gen_wasm_expr rt rt_opt =
     | _ when life > 0 -> try_expr (life - 1) (* TODO: This is THE source of inefficiency *)
     | _ -> ret
   in
-  try_expr 100
+  try_expr 1000
 
 and gen_typ typ = match typ.it with
-  | VarT id -> gen id.it
+  | VarT id -> gen id.it |> cache_if (id.it = "typeidx") typeidx_cache
   | NumT NatT ->
-    let i = Random.int 2 in (* 0, 1 *)
+    let i = Random.int 2 (* 0, 1 *) in
     numV i
   | IterT (typ', List) ->
-    let n = Random.int 3 + 1 in (* 1, 2, 3 *)
-    let n = match typ'.it with VarT id when id.it = "type" -> n + 1 | _ -> n in
-    let l = List.init n (fun _ -> gen_typ typ') in
+    let is_types = match typ'.it with VarT id -> id.it = "type" | _ -> false in
+    let n = Random.int 3 + 1 (* 1, 2, 3 *) + if is_types then 1 else 0 in
+    let l = List.init n (fun _ -> gen_typ typ') |> cache_if is_types types_cache in
     listV l
   | TupT typs -> List.map gen_typ typs |> listV
   | IterT (typ', Opt) ->
@@ -342,6 +366,83 @@ and fix_rts rt1 rt2 : (restype * restype) =
 (** Mutation **)
 let mutate modules = modules (* TODO *)
 
+(** Injection **)
+type invoke = string * Al.Ast.value list
+type exn' = exn * string list
+type invoke_result = (Al.Ast.value list, exn') result
+type assertion = invoke * invoke_result
+type instant_result = (assertion list, exn') result
+
+let mk_assertion funcinst =
+  let name = field_of_str "NAME" funcinst |> al_to_string in
+  let addr = field_of_str "VALUE" funcinst |> arg_of_case "FUNC" 0 in
+  let n = try
+    !Ds.store
+    |> Record.find "FUNC"
+    |> al_to_list
+    |> (fun l -> List.nth l (al_to_int addr))
+    |> field_of_str "TYPE"
+    |> arg_of_tup 0 (* Wasm 2.0 *)
+    |> al_to_list
+    |> List.length
+  with _ -> 3 in
+  let args = List.init n (fun i -> Al.Ast.CaseV ("CONST", [ singleton "I32"; numV (i+1) ])) in (*TODO *)
+  let invoke = (name, args) in
+
+  try
+    let returns = Interpreter.call_invoke [ addr; args |> listV ] in
+    invoke, Ok (al_to_list returns)
+  with
+    | e -> invoke, Error (e, !Interpreter.algo_name_stack)
+
+let print_assertion ((f, args), result) =
+  print_endline (match result with
+  | Ok returns -> Printf.sprintf "(assert_return (invoke %s [%s]) [%s])"
+    f
+    (args |> List.map Al.Print.string_of_value |> String.concat " ")
+    (returns |> List.map Al.Print.string_of_value |> String.concat " ")
+  | Error (Exception.Trap, _) -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
+    f
+    (args |> List.map Al.Print.string_of_value |> String.concat " ")
+  | Error (e, stack) -> Printf.sprintf "Invocation of %s failed due to %s during %s"
+    f
+    (Printexc.to_string e)
+    (String.concat "," stack) )
+
+let get_instant_result m : instant_result = try
+  let externvals = listV (
+    List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
+    @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
+    @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i]))
+    @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i]))
+  ) in (*TODO *)
+  let mm = Interpreter.call_instantiate [ m; externvals ] in
+  let exported_funcs =
+    mm
+    |> field_of_str "EXPORT"
+    |> al_to_list
+    |> List.filter (fun inst -> inst |> field_of_str "VALUE" |> is_case "FUNC")
+  in
+  Ok (List.map mk_assertion exported_funcs)
+with
+  | e -> Error (e, !Interpreter.algo_name_stack)
+let inject m = (m, get_instant_result m)
+
+type module_ = Al.Ast.value
+type test = module_ * instant_result
+
+let print_test (m, result) =
+  print_endline (string_of_module m);
+  ( match result with
+  | Ok assertions ->
+    print_endline "Instantiation success";
+    List.iter print_assertion assertions
+  | Error (Exception.Trap, stack) ->
+    print_endline ("Instantiation trapped during " ^ (String.concat "," stack))
+  | Error (e, stack) ->
+    print_endline ("Instantiation failed: " ^ Printexc.to_string e ^ " during " ^ (String.concat "," stack)) );
+  print_endline "================"
+
 (* Generate tests *)
 
 let gen_test el' il' al' =
@@ -352,10 +453,10 @@ let gen_test el' il' al' =
 
   (* Initialize *)
   Random.init !seed;
-  Backend_interpreter.Ds.init !al;
+  Ds.init !al;
   estimate_rt ();
-  (* print_rts(); *)
   estimate_const ();
+  Tester.init_tester ();
 
   (* Generate tests *)
   let seeds = List.init !test_num (fun _i ->
@@ -364,28 +465,12 @@ let gen_test el' il' al' =
   ) in
 
   (* Mutatiion *)
-  let tests = mutate seeds in
+  let modules = mutate seeds in
 
-  (* Result *)
-  Backend_interpreter.Tester.init_tester ();
+  (* Injection *)
+  let tests = List.map inject modules in
 
-  tests |> List.iter (fun m ->
-    print_endline "================";
-    print_endline (string_of_module m);
-    try
-      let externvals = listV (
-        List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
-        @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
-        @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i]))
-        @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i]))
-      ) in (*TODO *)
-      Backend_interpreter.Interpreter.call_instantiate [ m; externvals ] |> ignore;
-      print_endline "Instantiation success"
-    with e ->
-      print_endline (
-        "Instantiation fail due to "
-        ^ Printexc.to_string e
-        ^ " during "
-        ^ String.concat ", " !Backend_interpreter.Interpreter.algo_name_stack
-      )
-  )
+  (* Print result *)
+  List.iter print_test tests;
+
+  ()

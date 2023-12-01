@@ -18,3 +18,6 @@ val structured_string_of_expr : expr -> string
 val structured_string_of_cond : cond -> string
 val structured_string_of_instr : int -> instr -> string
 val structured_string_of_algorithm : algorithm -> string
+
+val print_value : value -> unit
+val prerr_value : value -> unit
