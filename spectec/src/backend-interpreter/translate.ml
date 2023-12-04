@@ -198,12 +198,6 @@ and exp2expr exp =
           CaseE (("FUNC", "func"), List.map exp2expr exps)
       | [ [ Ast.Atom "OK" ] ], [] ->
           CaseE (("OK", "datatype"), [])
-      | [ [ Ast.Atom "MUT" ]; [ Ast.Quest ]; [] ],
-        [ { it = Ast.OptE (Some { it = Ast.TupE []; _ }); _}; t ] ->
-          TupE [ CaseE (("MUT", "globaltype"), []); exp2expr t ]
-      | [ [ Ast.Atom "MUT" ]; [ Ast.Quest ]; [] ],
-        [ { it = Ast.IterE ({ it = Ast.TupE []; _ }, (Ast.Opt, [])); _}; t ] ->
-          TupE [ IterE (VarE "mut", ["mut"], Opt); exp2expr t ]
       | [ Ast.Atom "MODULE" ] :: _, el ->
           CaseE (("MODULE", "module"), List.map exp2expr el)
       | [ [ Ast.Atom "IMPORT" ]; []; []; [] ], el ->

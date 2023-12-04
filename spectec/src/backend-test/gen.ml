@@ -37,8 +37,6 @@ let flatten_rec = List.concat_map (fun def ->
   | _ -> [ def ]
 )
 
-let (<~) f side_effect x = let v = (f x) in side_effect v; v
-
 let find_syn name =
   let syn_opt = List.find_map (fun def -> match def.it with
   | Il.Ast.SynD (id, deftyp) when id.it = name -> Some deftyp
@@ -61,14 +59,39 @@ let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
 
-let valid case args const (_rt1, rt2) = Al.Ast.(
+let correct_cvtop = Al.Ast.(function
+| [ CaseV (t2, []); CaseV (cvtop, []); CaseV (t1, []); OptV (sx_opt) ] ->
+  let x2 = String.sub t2 0 1 in
+  let n2 = String.sub t2 1 2 in
+  let x1 = String.sub t1 0 1 in
+  let n1 = String.sub t1 1 2 in
+  ( match (x2, n2, cvtop, x1, n1, sx_opt) with
+  | "I", "32", "WRAP", "I", "64", None
+  | "I", "64", "EXTEND", "I", "32", Some _
+  | "I", _, "TRUNC", "F", _, Some _
+  | "I", _, "TRUNC_SAT", "F", _, Some _
+  | "F", "32", "DEMOTE", "F", "64", None
+  | "F", "64", "PROMOTE", "F", "32", None
+  | "F", _, "CONVERT", "I", _, Some _ -> true
+  | _, _, "REINTERPRET", _, _, None -> x2 <> x1 && n2 = n1
+  | _ -> false )
+| _ -> false )
+
+let valid case args const (rt1, rt2) = Al.Ast.(
   (* Bunch of hardcoded heuristics to check if the given Wasm instruction is valid *)
   match case with
-  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
-    | [ CaseV ("I32", []); CaseV ("_I", _) ], [ T "I32" ]
-    | [ CaseV ("I64", []); CaseV ("_I", _) ], [ T "I64" ] -> true
-    | [ CaseV ("F32", []); CaseV ("_F", _) ], [ T "F32" ]
-    | [ CaseV ("F64", []); CaseV ("_F", _) ], [ T "F64" ] -> not const
+  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt1 with
+    | [ CaseV ("I32", []); CaseV ("_I", _) ], T "I32" :: _
+    | [ CaseV ("I64", []); CaseV ("_I", _) ], T "I64" :: _
+    | [ CaseV ("F32", []); CaseV ("_F", _) ], T "F32" :: _
+    | [ CaseV ("F64", []); CaseV ("_F", _) ], T "F64" :: _ -> not const || rt2 = [ T "I32" ] || rt2 = [ T "I64" ]
+    | _ -> false )
+  | "EXTEND" -> ( match args, rt1 with
+    | [ CaseV ("I32", []); _ ], [ T "I32" ]
+    | [ CaseV ("I64", []); _ ], [ T "I64" ] -> true
+    | _ -> false )
+  | "CVTOP" -> correct_cvtop args && ( match args, rt1, rt2 with
+    | [ CaseV (t2, []); _; CaseV (t1, []); _ ],  [ T t1' ], [ T t2' ] -> t1 = t1' && t2 = t2'
     | _ -> false )
   | "CONST" -> ( match args, rt2 with
     | [ CaseV ("I32", []); _ ], [ T "I32" ]
@@ -82,7 +105,10 @@ let valid case args const (_rt1, rt2) = Al.Ast.(
     | [ NumV 1L ] -> rt2 = [ T "I64" ]
     | [ NumV 2L ] -> rt2 = [ T "F32" ]
     | [ NumV 3L ] -> rt2 = [ T "F64" ]
-    | _ -> true )
+    | _ -> true (* Over-approximate *) )
+  | "CALL_REF" | "RETURN_CALL_REF" -> ( match args with
+    | [ OptV (Some _) ] -> true
+    | _ -> false )
   | _ -> true
 )
 
@@ -229,9 +255,14 @@ let rec gen name =
     | "FUNC" -> estimate_out_dim !typeidx_cache !types_cache
     | "ACTIVE" -> Some [T "I32"]
     | _ -> Some [TopT] ) else
-
   (* HARDCODE: name *)
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
+  (* HARDCODE: memidx to be always 0 *)
+  if name = "memidx" then numV 0 else
+  (* HARDCODE: pack_size to be 8/16/32/64 *)
+  if !case_stack > [] && contains (top case_stack)  [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
+    numV (choose [8; 16; 32; 64])
+  else
 
   match syn.it with
   | AliasT typ -> gen_typ typ
@@ -340,7 +371,7 @@ and gen_typ typ = match typ.it with
     let n = Random.int 3 + 1 (* 1, 2, 3 *) + if is_types then 1 else 0 in
     let l = List.init n (fun _ -> gen_typ typ') |> cache_if is_types types_cache in
     listV l
-  | TupT typs -> List.map gen_typ typs |> listV
+  | TupT typs -> TupV (List.map gen_typ typs)
   | IterT (typ', Opt) ->
     if Random.bool() then
       optV_none
@@ -431,6 +462,8 @@ let inject m = (m, get_instant_result m)
 type module_ = Al.Ast.value
 type test = module_ * instant_result
 
+(** Output **)
+
 let print_test (m, result) =
   print_endline (string_of_module m);
   ( match result with
@@ -442,6 +475,15 @@ let print_test (m, result) =
   | Error (e, stack) ->
     print_endline ("Instantiation failed: " ^ Printexc.to_string e ^ " during " ^ (String.concat "," stack)) );
   print_endline "================"
+
+let to_wast i (m, result) =
+  "Writing " ^ (string_of_int i) ^ "th module..." |> print_endline;
+  let file = Filename.concat !Flag.out (string_of_int i ^ ".wast") in
+  let oc = open_out file in
+  let ref_module = Construct.al_to_module m in
+
+  Reference_interpreter.Print.module_ oc 80 ref_module;
+  ignore result
 
 (* Generate tests *)
 
@@ -473,4 +515,5 @@ let gen_test el' il' al' =
   (* Print result *)
   List.iter print_test tests;
 
-  ()
+  (* Convert to Wast *)
+  List.iteri to_wast tests

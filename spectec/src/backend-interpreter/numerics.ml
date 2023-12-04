@@ -64,6 +64,13 @@ let unop: numerics =
           | TextV "Extend16S" -> wrap_i32_unop (I32.extend_s 16) v
           | TextV "Extend32S" -> wrap_i32_unop (I32.extend_s 32) v
           | TextV "Extend64S" -> wrap_i32_unop (I32.extend_s 64) v
+          | CaseV ("_I", [ CaseV ("CLZ", []) ]) -> wrap_i32_unop I32.clz v
+          | CaseV ("_I", [ CaseV ("CTZ", []) ]) -> wrap_i32_unop I32.ctz v
+          | CaseV ("_I", [ CaseV ("POPCNT", []) ]) -> wrap_i32_unop I32.popcnt v
+          | CaseV ("_I", [ CaseV ("EXTEND8S", []) ]) -> wrap_i32_unop (I32.extend_s 8) v
+          | CaseV ("_I", [ CaseV ("EXTEND16S", []) ]) -> wrap_i32_unop (I32.extend_s 16) v
+          | CaseV ("_I", [ CaseV ("EXTEND32S", []) ]) -> wrap_i32_unop (I32.extend_s 32) v
+          | CaseV ("_I", [ CaseV ("EXTEND64S", []) ]) -> wrap_i32_unop (I32.extend_s 64) v
           | _ -> failwith ("Invalid unop: " ^ (Print.string_of_value op)))
         | "I64" -> (
           match op with
@@ -74,6 +81,13 @@ let unop: numerics =
           | TextV "Extend16S" -> wrap_i64_unop (I64.extend_s 16) v
           | TextV "Extend32S" -> wrap_i64_unop (I64.extend_s 32) v
           | TextV "Extend64S" -> wrap_i64_unop (I64.extend_s 64) v
+          | CaseV ("_I", [ CaseV ("CLZ", []) ]) -> wrap_i64_unop I64.clz v
+          | CaseV ("_I", [ CaseV ("CTZ", []) ]) -> wrap_i64_unop I64.ctz v
+          | CaseV ("_I", [ CaseV ("POPCNT", []) ]) -> wrap_i64_unop I64.popcnt v
+          | CaseV ("_I", [ CaseV ("EXTEND8S", []) ]) -> wrap_i64_unop (I64.extend_s 8) v
+          | CaseV ("_I", [ CaseV ("EXTEND16S", []) ]) -> wrap_i64_unop (I64.extend_s 16) v
+          | CaseV ("_I", [ CaseV ("EXTEND32S", []) ]) -> wrap_i64_unop (I64.extend_s 32) v
+          | CaseV ("_I", [ CaseV ("EXTEND64S", []) ]) -> wrap_i64_unop (I64.extend_s 64) v
           | _ -> failwith ("Invalid unop: " ^ (Print.string_of_value op)))
         | "F32"  -> (
           match op with
@@ -84,6 +98,13 @@ let unop: numerics =
           | TextV "Trunc" -> wrap_f32_unop (F32.trunc) v
           | TextV "Nearest" -> wrap_f32_unop (F32.nearest) v
           | TextV "Sqrt" -> wrap_f32_unop (F32.sqrt) v
+          | CaseV ("_F", [ CaseV ("NEG", []) ]) -> wrap_f32_unop (F32.neg) v
+          | CaseV ("_F", [ CaseV ("ABS", []) ]) -> wrap_f32_unop (F32.abs) v
+          | CaseV ("_F", [ CaseV ("CEIL", []) ]) -> wrap_f32_unop (F32.ceil) v
+          | CaseV ("_F", [ CaseV ("FLOOR", []) ]) -> wrap_f32_unop (F32.floor) v
+          | CaseV ("_F", [ CaseV ("TRUNC", []) ]) -> wrap_f32_unop (F32.trunc) v
+          | CaseV ("_F", [ CaseV ("NEAREST", []) ]) -> wrap_f32_unop (F32.nearest) v
+          | CaseV ("_F", [ CaseV ("SQRT", []) ]) -> wrap_f32_unop (F32.sqrt) v
           | _ -> failwith ("Invalid unop: " ^ (Print.string_of_value op)))
         | "F64" -> (
           match op with
@@ -94,6 +115,13 @@ let unop: numerics =
           | TextV "Trunc" -> wrap_f64_unop (F64.trunc) v
           | TextV "Nearest" -> wrap_f64_unop (F64.nearest) v
           | TextV "Sqrt" -> wrap_f64_unop (F64.sqrt) v
+          | CaseV ("_F", [ CaseV ("NEG", []) ]) -> wrap_f64_unop (F64.neg) v
+          | CaseV ("_F", [ CaseV ("ABS", []) ]) -> wrap_f64_unop (F64.abs) v
+          | CaseV ("_F", [ CaseV ("CEIL", []) ]) -> wrap_f64_unop (F64.ceil) v
+          | CaseV ("_F", [ CaseV ("FLOOR", []) ]) -> wrap_f64_unop (F64.floor) v
+          | CaseV ("_F", [ CaseV ("TRUNC", []) ]) -> wrap_f64_unop (F64.trunc) v
+          | CaseV ("_F", [ CaseV ("NEAREST", []) ]) -> wrap_f64_unop (F64.nearest) v
+          | CaseV ("_F", [ CaseV ("SQRT", []) ]) -> wrap_f64_unop (F64.sqrt) v
           | _ -> failwith ("Invalid unop: " ^ (Print.string_of_value op)))
         | _ -> failwith "Invalid type for unop")
       | _ -> failwith "Invalid unop")
@@ -243,7 +271,7 @@ let testop : numerics =
     name = "testop";
     f =
       (function
-      | [ TextV "Eqz"; CaseV (t, []); i ] -> (
+      | [ CaseV ("_I", [ CaseV ("EQZ", []) ]); CaseV (t, []); i ] -> (
           match t with
           | "I32" -> wrap_i32_testop I32.eqz i
           | "I64" -> wrap_i64_testop I64.eqz i
@@ -286,6 +314,16 @@ let relop : numerics =
           | TextV "GtU" -> wrap_i32_relop I32.gt_u v1 v2
           | TextV "GeS" -> wrap_i32_relop I32.ge_s v1 v2
           | TextV "GeU" -> wrap_i32_relop I32.ge_u v1 v2
+          | CaseV ("_I", [ CaseV ("EQ", []) ]) -> wrap_i32_relop I32.eq v1 v2
+          | CaseV ("_I", [ CaseV ("NE", []) ]) -> wrap_i32_relop I32.ne v1 v2
+          | CaseV ("_I", [ CaseV ("LT", [ CaseV ("S", []) ]) ]) -> wrap_i32_relop I32.lt_s v1 v2
+          | CaseV ("_I", [ CaseV ("LT", [ CaseV ("U", []) ]) ]) -> wrap_i32_relop I32.lt_u v1 v2
+          | CaseV ("_I", [ CaseV ("LE", [ CaseV ("S", []) ]) ]) -> wrap_i32_relop I32.le_s v1 v2
+          | CaseV ("_I", [ CaseV ("LE", [ CaseV ("U", []) ]) ]) -> wrap_i32_relop I32.le_u v1 v2
+          | CaseV ("_I", [ CaseV ("GT", [ CaseV ("S", []) ]) ]) -> wrap_i32_relop I32.gt_s v1 v2
+          | CaseV ("_I", [ CaseV ("GT", [ CaseV ("U", []) ]) ]) -> wrap_i32_relop I32.gt_u v1 v2
+          | CaseV ("_I", [ CaseV ("GE", [ CaseV ("S", []) ]) ]) -> wrap_i32_relop I32.ge_s v1 v2
+          | CaseV ("_I", [ CaseV ("GE", [ CaseV ("U", []) ]) ]) -> wrap_i32_relop I32.ge_u v1 v2
           | _ -> failwith ("Invalid relop: " ^ (Print.string_of_value op)))
         | "I64" -> (
           match op with
@@ -299,6 +337,16 @@ let relop : numerics =
           | TextV "GtU" -> wrap_i64_relop I64.gt_u v1 v2
           | TextV "GeS" -> wrap_i64_relop I64.ge_s v1 v2
           | TextV "GeU" -> wrap_i64_relop I64.ge_u v1 v2
+          | CaseV ("_I", [ CaseV ("EQ", []) ]) -> wrap_i64_relop I64.eq v1 v2
+          | CaseV ("_I", [ CaseV ("NE", []) ]) -> wrap_i64_relop I64.ne v1 v2
+          | CaseV ("_I", [ CaseV ("LT", [ CaseV ("S", []) ]) ]) -> wrap_i64_relop I64.lt_s v1 v2
+          | CaseV ("_I", [ CaseV ("LT", [ CaseV ("U", []) ]) ]) -> wrap_i64_relop I64.lt_u v1 v2
+          | CaseV ("_I", [ CaseV ("LE", [ CaseV ("S", []) ]) ]) -> wrap_i64_relop I64.le_s v1 v2
+          | CaseV ("_I", [ CaseV ("LE", [ CaseV ("U", []) ]) ]) -> wrap_i64_relop I64.le_u v1 v2
+          | CaseV ("_I", [ CaseV ("GT", [ CaseV ("S", []) ]) ]) -> wrap_i64_relop I64.gt_s v1 v2
+          | CaseV ("_I", [ CaseV ("GT", [ CaseV ("U", []) ]) ]) -> wrap_i64_relop I64.gt_u v1 v2
+          | CaseV ("_I", [ CaseV ("GE", [ CaseV ("S", []) ]) ]) -> wrap_i64_relop I64.ge_s v1 v2
+          | CaseV ("_I", [ CaseV ("GE", [ CaseV ("U", []) ]) ]) -> wrap_i64_relop I64.ge_u v1 v2
           | _ -> failwith ("Invalid relop: " ^ (Print.string_of_value op)))
         | "F32" -> (
           match op with
@@ -308,6 +356,12 @@ let relop : numerics =
           | TextV "Gt" -> wrap_f32_relop F32.gt v1 v2
           | TextV "Le" -> wrap_f32_relop F32.le v1 v2
           | TextV "Ge" -> wrap_f32_relop F32.ge v1 v2
+          | CaseV ("_F", [ CaseV ("EQ", []) ]) -> wrap_f32_relop F32.eq v1 v2
+          | CaseV ("_F", [ CaseV ("NE", []) ]) -> wrap_f32_relop F32.ne v1 v2
+          | CaseV ("_F", [ CaseV ("LT", []) ]) -> wrap_f32_relop F32.lt v1 v2
+          | CaseV ("_F", [ CaseV ("GT", []) ]) -> wrap_f32_relop F32.gt v1 v2
+          | CaseV ("_F", [ CaseV ("LE", []) ]) -> wrap_f32_relop F32.le v1 v2
+          | CaseV ("_F", [ CaseV ("GE", []) ]) -> wrap_f32_relop F32.ge v1 v2
           | _ -> failwith ("Invalid relop: " ^ (Print.string_of_value op)))
         | "F64" -> (
           match op with
@@ -317,6 +371,12 @@ let relop : numerics =
           | TextV "Gt" -> wrap_f64_relop F64.gt v1 v2
           | TextV "Le" -> wrap_f64_relop F64.le v1 v2
           | TextV "Ge" -> wrap_f64_relop F64.ge v1 v2
+          | CaseV ("_F", [ CaseV ("EQ", []) ]) -> wrap_f64_relop F64.eq v1 v2
+          | CaseV ("_F", [ CaseV ("NE", []) ]) -> wrap_f64_relop F64.ne v1 v2
+          | CaseV ("_F", [ CaseV ("LT", []) ]) -> wrap_f64_relop F64.lt v1 v2
+          | CaseV ("_F", [ CaseV ("GT", []) ]) -> wrap_f64_relop F64.gt v1 v2
+          | CaseV ("_F", [ CaseV ("LE", []) ]) -> wrap_f64_relop F64.le v1 v2
+          | CaseV ("_F", [ CaseV ("GE", []) ]) -> wrap_f64_relop F64.ge v1 v2
           | _ -> failwith ("Invalid relop: " ^ (Print.string_of_value op)))
         | _ -> failwith "Invalid type for relop" )
       | _ -> failwith "Invalid relop");

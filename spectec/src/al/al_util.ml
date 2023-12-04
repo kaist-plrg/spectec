@@ -56,6 +56,10 @@ let is_case case = function
 | CaseV (case', _) -> case = case'
 | _ -> false
 
+let case_of_case = function
+| CaseV (case, _) -> case
+| _ -> failwith "invalid case_of_case"
+
 let get_name = function
   | RuleA ((name, _), _, _) -> name
   | FuncA (name, _, _) -> name
@@ -80,3 +84,7 @@ let al_to_string = function
 let al_to_int = function
 | NumV i64 -> Int64.to_int i64
 | _ -> failwith "invalid al_to_int"
+
+let listv_map f = function
+| ListV a -> ListV (Array.map f !a |> ref)
+| _ -> failwith "invalid listv_map"
