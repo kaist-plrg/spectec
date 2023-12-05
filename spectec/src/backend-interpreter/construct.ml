@@ -649,11 +649,17 @@ and al_to_heap_type: value -> heap_type = function
     | "NOFUNC" -> NoFuncHT
     | "EXTERN" -> ExternHT
     | "NOEXTERN" -> NoExternHT
+    (* Wasm 2 *)
+    | "FUNCREF" -> FuncHT
+    | "EXTERNREF" -> ExternHT
     | _ -> fail "abstract heap type" v)
   | v -> fail "heap type" v
 
 and al_to_ref_type: value -> ref_type = function
   | CaseV ("REF", [ n; ht ]) -> al_to_null n, al_to_heap_type ht
+  (* Wasm 2 *)
+  | CaseV ("FUNCREF", []) -> Null, FuncHT
+  | CaseV ("EXTERNREF", []) -> Null, ExternHT
   | v -> fail "ref type" v
 
 and al_to_num_type: value -> num_type = function
@@ -669,6 +675,9 @@ and al_to_val_type: value -> val_type = function
   | CaseV ("V128", []) -> VecT V128T
   | CaseV ("REF", _) as v -> RefT (al_to_ref_type v)
   | CaseV ("BOT", []) -> BotT
+  (* Wasm 2 *)
+  | CaseV ("FUNCREF", []) as v -> RefT (al_to_ref_type v)
+  | CaseV ("EXTERNREF", []) as v-> RefT (al_to_ref_type v)
   | v -> fail "val type" v
 
 let al_to_block_type: value -> block_type = function
@@ -873,7 +882,8 @@ let al_to_extension: value -> Pack.extension = function
   | v -> fail "extension" v
 
 let al_to_memop (f: value -> 'p) : value list -> (num_type, 'p) memop = function
-  | [ nt; p; NumV 0L; StrV str ] ->
+  | [ nt; p; NumV 0L; StrV str ]
+  | [ nt; p;          StrV str ] ->
     {
       ty = al_to_num_type nt;
       align = Record.find "ALIGN" str |> al_to_int;
@@ -947,11 +957,11 @@ and al_to_instr': value -> Ast.instr' = function
     ReturnCallIndirect (al_to_idx idx1, al_to_idx idx2)
   | CaseV ("LOAD", loadop) -> Load (al_to_loadop loadop)
   | CaseV ("STORE", storeop) -> Store (al_to_storeop storeop)
-  | CaseV ("MEMORY.SIZE", [ NumV 0L ]) -> MemorySize
-  | CaseV ("MEMORY.GROW", [ NumV 0L ]) -> MemoryGrow
-  | CaseV ("MEMORY.FILL", [ NumV 0L ]) -> MemoryFill
-  | CaseV ("MEMORY.COPY", [ NumV 0L; NumV 0L ]) -> MemoryCopy
-  | CaseV ("MEMORY.INIT", [ NumV 0L; idx ]) -> MemoryInit (al_to_idx idx)
+  | CaseV ("MEMORY.SIZE", ([ NumV 0L ] | [])) -> MemorySize
+  | CaseV ("MEMORY.GROW", ([ NumV 0L ] | [])) -> MemoryGrow
+  | CaseV ("MEMORY.FILL", ([ NumV 0L ] | [])) -> MemoryFill
+  | CaseV ("MEMORY.COPY", ([ NumV 0L; NumV 0L ] | [])) -> MemoryCopy
+  | CaseV ("MEMORY.INIT", ([ NumV 0L; idx ] | [ idx ])) -> MemoryInit (al_to_idx idx)
   | CaseV ("DATA.DROP", [ idx ]) -> DataDrop (al_to_idx idx)
   | CaseV ("REF.AS_NON_NULL", []) -> RefAsNonNull
   | CaseV ("REF.TEST", [ rt ]) -> RefTest (al_to_ref_type rt)
@@ -992,7 +1002,12 @@ let al_to_const: value -> const = al_to_list al_to_instr |> al_to_phrase
 (* Deconstruct module *)
 
 let al_to_type: value -> type_ = function
-  | CaseV ("TYPE", [ rt ]) -> al_to_phrase al_to_rec_type rt
+  | CaseV ("TYPE", [ rt ]) when !version = 3 -> al_to_phrase al_to_rec_type rt
+  | CaseV ("TYPE", [ ft ]) when !version < 3 ->
+    let final = CaseV ("FINAL", [ OptV (Some (TupV [])) ]) in
+    let st = CaseV ("SUBD", [ final; listV []; CaseV ("FUNC", [ ft ]) ]) in
+    let rt = CaseV ("REC", [ listV [ st ] ]) in
+    al_to_phrase al_to_rec_type rt
   | v -> fail "type" v
 
 let al_to_local': value -> local' = function
@@ -1017,8 +1032,14 @@ let al_to_global': value -> global' = function
 let al_to_global: value -> global = al_to_phrase al_to_global'
 
 let al_to_table': value -> table' = function
+  (* Wasm 3 *)
   | CaseV ("TABLE", [ tt; const ]) ->
     { ttype = al_to_table_type tt; tinit = al_to_const const }
+  (* Wasm 2 *)
+  | CaseV ("TABLE", [ TupV [ _; (CaseV _) as rt ] as tt ]) ->
+    { ttype = al_to_table_type tt; tinit = al_to_const (listV [case_v "REF.NULL" rt]) }
+  (* Wasm 1 *)
+  | CaseV ("TABLE", [ _ ]) -> failwith "TODO: al_to_table for Wasm1"
   | v -> fail "table" v
 let al_to_table: value -> table = al_to_phrase al_to_table'
 

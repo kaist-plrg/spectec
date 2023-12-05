@@ -483,6 +483,8 @@ let to_wast i (m, result) =
   let ref_module = Construct.al_to_module m in
 
   Reference_interpreter.Print.module_ oc 80 ref_module;
+
+  close_out oc;
   ignore result
 
 (* Generate tests *)
