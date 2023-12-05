@@ -100,11 +100,11 @@ and al_of_heap_type = function
 
 and al_of_ref_type (null, ht) =
   if !version = 3 then
-    CaseV ("REF", [ al_of_null null; al_of_heap_type ht ])
+    CaseV ("REF", [al_of_null null; al_of_heap_type ht ])
   else
     match al_of_heap_type ht with
-    | CaseV ("FUNC", []) -> singleton "FUNC" (* TODO: "FUNCREF" *)
-    | CaseV ("EXTERN", []) -> singleton "EXTERN" (* TODO: "EXTERNREF" *)
+    | CaseV ("FUNC", []) -> singleton "FUNCREF"
+    | CaseV ("EXTERN", []) -> singleton "EXTERNREF"
     | _ -> failwith "Not supported reftype for wasm <= 2.0"
 
 and al_of_num_type nt = string_of_num_type nt |> singleton
@@ -152,7 +152,8 @@ let al_of_num = function
   | F64 f64 -> CaseV ("CONST", [ singleton "F64"; al_of_float64 f64 ])
 
 let rec al_of_ref = function
-  | NullRef ht -> CaseV ("REF.NULL", [ al_of_heap_type ht ])
+  | NullRef ht when !version = 3 -> CaseV ("REF.NULL", [ al_of_heap_type ht ])
+  | NullRef rt -> CaseV ("REF.NULL", [ al_of_ref_type (Null, rt) ])
   (*
   | I31.I31Ref i ->
     CaseV ("REF.I31_NUM", [ NumV (Int64.of_int i) ])
@@ -316,7 +317,9 @@ let rec al_of_instr instr =
   match instr.it with
   (* wasm values *)
   | Const num -> al_of_num num.it
-  | RefNull ht -> CaseV ("REF.NULL", [ al_of_heap_type ht ])
+  | RefNull ht -> ( match !version with
+    | 3 -> CaseV ("REF.NULL", [ al_of_heap_type ht ])
+    | _ -> CaseV ("REF.NULL", [ al_of_ref_type (Null, ht) ]) )
   (* wasm instructions *)
   | Unreachable -> singleton "UNREACHABLE"
   | Nop -> singleton "NOP"
