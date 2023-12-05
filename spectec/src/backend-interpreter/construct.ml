@@ -1072,25 +1072,21 @@ let al_to_data': value -> data_segment' = function
   | v -> fail "data segment" v
 let al_to_data: value -> data_segment = al_to_phrase al_to_data'
 
-  (*
+let al_to_import_desc _module_ = function
+  | CaseV ("FUNC", [ x ]) -> FuncImport (al_to_phrase (fun _ -> 0l) x) (* TODO *)
+  | CaseV ("TABLE", [ tt ]) -> TableImport (al_to_table_type tt)
+  | CaseV ("MEM", [ mt ]) -> MemoryImport (al_to_memory_type mt)
+  | CaseV ("GLOBAL", [ gt ]) -> GlobalImport (al_to_global_type gt)
+  | v -> fail "import desc" v
 
-let al_to_import_desc module_ idesc =
-  match idesc.it with
-  | FuncImport x ->
-      let dts = def_types_of module_ in
-      let dt = Lib.List32.nth dts x.it |> al_to_def_type in
-      CaseV ("FUNC", [ dt ])
-  | TableImport tt -> CaseV ("TABLE", [ al_to_table_type tt ])
-  | MemoryImport mt -> CaseV ("MEM", [ al_to_memory_type mt ])
-  | GlobalImport gt -> CaseV ("GLOBAL", [ al_to_global_type gt ])
-
-let al_to_import module_ import =
-  CaseV ("IMPORT", [
-    al_to_name import.it.module_name;
-    al_to_name import.it.item_name;
-    al_to_import_desc module_ import.it.idesc;
-  ])
-  *)
+let al_to_import' module_ = function
+ | CaseV ("IMPORT", [ module_name; item_name; import_desc ]) -> {
+    module_name = al_to_name module_name;
+    item_name = al_to_name item_name;
+    idesc = al_to_phrase (al_to_import_desc module_) import_desc;
+  }
+| v -> fail "import" v
+let al_to_import module_: value -> import = al_to_phrase (al_to_import' module_)
 
 let al_to_export_desc': value -> export_desc' = function
   | CaseV ("FUNC", [ idx ]) -> FuncExport (al_to_idx idx)
@@ -1113,12 +1109,11 @@ let al_to_export: value -> export = al_to_phrase al_to_export'
 
 let al_to_module': value -> module_' = function
   | CaseV ("MODULE", [
-    types; _imports; funcs; globals; tables; memories; elems; datas; start; exports
-  ]) ->
+    types; imports; funcs; globals; tables; memories; elems; datas; start; exports
+  ]) as module_ ->
     {
       types = al_to_list al_to_type types;
-      (* TODO: imports = al_to_list (al_to_import module_) imports;*)
-      imports = [];
+      imports = al_to_list (al_to_import module_) imports;
       funcs = al_to_list al_to_func funcs;
       globals = al_to_list al_to_global globals;
       tables = al_to_list al_to_table tables;

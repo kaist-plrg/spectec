@@ -36,6 +36,8 @@ let singleton x = CaseV (String.uppercase_ascii x, [])
 let listV l = ListV (ref (Array.of_list l))
 let zero = NumV 0L
 let case_v case v = CaseV (case, [ v ])
+let case_vv case v1 v2 = CaseV (case, [ v1; v2 ])
+let case_vvv case v1 v2 v3 = CaseV (case, [ v1; v2; v3 ])
 
 (* Smart getters *)
 let arg_of_case case i = function
@@ -88,3 +90,8 @@ let al_to_int = function
 let listv_map f = function
 | ListV a -> ListV (Array.map f !a |> ref)
 | _ -> failwith "invalid listv_map"
+
+(* Smart operators *)
+let add_num v1 v2 = match v1, v2 with
+| NumV i64, NumV i64' -> NumV (Int64.add i64 i64')
+| _ -> failwith "invalid add_num"

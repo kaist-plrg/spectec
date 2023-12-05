@@ -82,10 +82,11 @@ let builtin () =
     let ptype = List.map singleton type_tags in
     let arrow = ArrowV (listV ptype, listV []) in
     let ftype = CaseV ("FUNC", [ arrow ]) in
+    let final = CaseV ("FINAL", [ OptV (Some (TupV [])) ]) in
     let dt =
       CaseV ("DEF", [
         CaseV ("REC", [
-          [ CaseV ("SUBD", [OptV (Some (singleton "FINAL")); [] |> listV; ftype]) ] |> listV
+          [ CaseV ("SUBD", [final; [] |> listV; ftype]) ] |> listV
         ]); NumV 0L
       ]) in
     name, StrV [

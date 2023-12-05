@@ -48,6 +48,8 @@ let find_syn name =
 let numV i = Al.Ast.NumV (i |> Int64.of_int)
 let optV_none = Al.Ast.OptV None
 let optV_some v = Al.Ast.OptV (Some v)
+let empty x = case_v x optV_none
+let non_empty x = case_v x (optV_some (TupV []))
 
 let string_of_atom = Il.Print.string_of_atom
 let string_of_module m = match m with
@@ -231,20 +233,25 @@ let print_consts () = List.iter (fun i -> print_endline i) !consts
 let case_stack = ref []
 
 let types_cache = ref []
-let typeidx_cache = ref (numV 0)
+let type_cache = ref (numV 0)
 let cache_if cond ref v = if cond then ref := v; v
 
-let estimate_out_dim tid types = try (
-  al_to_int tid
-  |> List.nth types
-  |> arg_of_case "TYPE" 0
-  |> arg_of_tup 1 (* Wasm 2.0 *)
-  |> al_to_list
-  |> List.map (function
-    (* | Al.Ast.CaseV (t, []) -> T t *)
-    | _ -> TopT )
-  |> Option.some
-) with _ -> None
+let estimate_out_dim t types = try Al.Ast.(
+  match t with
+  | NumV i64 ->
+    Int64.to_int i64
+    |> List.nth types
+    |> arg_of_case "TYPE" 0
+    |> arg_of_tup 1 (* Wasm 2.0 *)
+    |> al_to_list
+    |> List.map (function
+      (* | Al.Ast.CaseV (t, []) -> T t *)
+      | _ -> TopT )
+  | TupV [ CaseV ("MUT", _); vt ] -> ( match vt with
+      | Al.Ast.CaseV (t, []) -> [ T t ]
+      | _ -> [ TopT ] )
+  | _ -> failwith "invalid type"
+) |> Option.some with _ -> None
 
 (* Generate specific syntax from input IL *)
 let rec gen name =
@@ -252,7 +259,7 @@ let rec gen name =
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then gen_wasm_expr [] ( match top case_stack with
-    | "FUNC" -> estimate_out_dim !typeidx_cache !types_cache
+    | "FUNC" | "GLOBAL" -> estimate_out_dim !type_cache !types_cache
     | "ACTIVE" -> Some [T "I32"]
     | _ -> Some [TopT] ) else
   (* HARDCODE: name *)
@@ -267,12 +274,16 @@ let rec gen name =
   match syn.it with
   | AliasT typ -> gen_typ typ
   (* TupV *)
-  | NotationT ([[]; []; []], typs)
+  | NotationT ([[]; []; []], typs) ->
+    let pair = gen_typs typs in
+    Al.Ast.TupV pair
   | NotationT ([[LBrack]; [Dot2]; [RBrack]], typs) ->
+    (* limits *)
     let pair = gen_typs typs in
     let fst = List.hd pair in
     let snd = List.hd (List.tl pair) in
-    Al.Ast.TupV [ fst; snd ]
+    let new_snd = add_num fst snd in
+    Al.Ast.TupV [ fst; new_snd ]
   (* ArrowV *)
   | NotationT ([[]; [Arrow]; []], typs)
   | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
@@ -362,14 +373,42 @@ and gen_wasm_expr rt rt_opt =
   try_expr 1000
 
 and gen_typ typ = match typ.it with
-  | VarT id -> gen id.it |> cache_if (id.it = "typeidx") typeidx_cache
+  | VarT id -> gen id.it |> cache_if (id.it = "typeidx" || id.it = "globaltype") type_cache
   | NumT NatT ->
     let i = Random.int 2 (* 0, 1 *) in
     numV i
+  (* HARDCODE: imported builtins *)
+  | IterT ({it = VarT id; _}, List) when id.it = "import" ->
+    let import name kind t = Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; case_v kind t ]) in
+    let const = empty "MUT" in
+    listV [
+      import "print" "FUNC" zero;
+      import "global_i32" "GLOBAL" (TupV [const; singleton "I32"]);
+      import "global_i64" "GLOBAL" (TupV [const; singleton "I64"]);
+      import "global_f32" "GLOBAL" (TupV [const; singleton "F32"]);
+      import "global_f64" "GLOBAL" (TupV [const; singleton "F64"]);
+      import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; singleton "FUNCREF" ]);
+      import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ]));
+    ]
+  (* HARDCODE: types *)
+  | IterT ({it = VarT id; _}, List) when id.it = "type" ->
+    let arrow = Al.Ast.ArrowV (listV [], listV []) in
+    let dt =
+      case_vv "REC" ([
+        case_vvv "SUBD"
+          (non_empty "FINAL")
+          (listV [])
+          arrow
+      ] |> listV) zero
+      |> case_v "DEF" in
+    let t = case_v "TYPE" (if (!Construct.version = 3) then dt else arrow) in
+    let n = Random.int 3 + 1 (* 1, 2, 3 *) in
+    let l = t :: List.init n (fun _ -> gen "type") in
+    types_cache := l;
+    listV l
   | IterT (typ', List) ->
-    let is_types = match typ'.it with VarT id -> id.it = "type" | _ -> false in
-    let n = Random.int 3 + 1 (* 1, 2, 3 *) + if is_types then 1 else 0 in
-    let l = List.init n (fun _ -> gen_typ typ') |> cache_if is_types types_cache in
+    let n = Random.int 3 + 1 (* 1, 2, 3 *) in
+    let l = List.init n (fun _ -> gen_typ typ') in
     listV l
   | TupT typs -> TupV (List.map gen_typ typs)
   | IterT (typ', Opt) ->
@@ -477,7 +516,7 @@ let print_test (m, result) =
   print_endline "================"
 
 let to_wast i (m, result) =
-  "Writing " ^ (string_of_int i) ^ "th module..." |> print_endline;
+  "Writing " ^ (string_of_int i) ^ "th module..." |> prerr_endline;
   let file = Filename.concat !Flag.out (string_of_int i ^ ".wast") in
   let oc = open_out file in
   let ref_module = Construct.al_to_module m in
