@@ -96,10 +96,10 @@ let valid case args const (rt1, rt2) = Al.Ast.(
     | [ CaseV (t2, []); _; CaseV (t1, []); _ ],  [ T t1' ], [ T t2' ] -> t1 = t1' && t2 = t2'
     | _ -> false )
   | "CONST" -> ( match args, rt2 with
-    | [ CaseV ("I32", []); _ ], [ T "I32" ]
-    | [ CaseV ("I64", []); _ ], [ T "I64" ]
-    | [ CaseV ("F32", []); _ ], [ T "F32" ]
-    | [ CaseV ("F64", []); _ ], [ T "F64" ] -> true
+    | [ CaseV (nt, []); _ ], [ T nt' ] -> nt = nt'
+    | _ -> false )
+  | "REF.NULL" when !Construct.version < 3 -> ( match args, rt2 with
+    | [ CaseV (rt, []) ], [ T rt' ] -> rt = rt'
     | _ -> false )
   | "GLOBAL.GET" -> ( match args with
     (* builtin globals *)
@@ -247,10 +247,12 @@ let estimate_out_dim t types = try Al.Ast.(
     |> List.map (function
       (* | Al.Ast.CaseV (t, []) -> T t *)
       | _ -> TopT )
-  | TupV [ CaseV ("MUT", _); vt ] -> ( match vt with
-      | Al.Ast.CaseV (t, []) -> [ T t ]
-      | _ -> [ TopT ] )
-  | _ -> failwith "invalid type"
+  | TupV [ CaseV ("MUT", _); vt ] | vt ->
+    let rec v2t v = match v with
+    | Al.Ast.CaseV (t, []) -> T t
+    | Al.Ast.CaseV ("REF", [_; t]) -> RefT (v2t t)
+    | _ -> TopT in
+    [ v2t vt ]
 ) |> Option.some with _ -> None
 
 (* Generate specific syntax from input IL *)
@@ -259,7 +261,7 @@ let rec gen name =
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then gen_wasm_expr [] ( match top case_stack with
-    | "FUNC" | "GLOBAL" -> estimate_out_dim !type_cache !types_cache
+    | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out_dim !type_cache !types_cache
     | "ACTIVE" -> Some [T "I32"]
     | _ -> Some [TopT] ) else
   (* HARDCODE: name *)
@@ -356,6 +358,7 @@ let rec gen name =
   | _ -> failwith ("TODO: gen of " ^ Il.Print.string_of_deftyp syn ^ Il.Print.structured_string_of_deftyp syn)
 
 and gen_wasm_expr rt rt_opt =
+  let max_life = 1000 in
   let rec try_expr life =
     if (life = 0) then
       prerr_endline "life is 0..";
@@ -370,15 +373,11 @@ and gen_wasm_expr rt rt_opt =
     | _ when life > 0 -> try_expr (life - 1) (* TODO: This is THE source of inefficiency *)
     | _ -> ret
   in
-  try_expr 1000
+  try_expr max_life
 
 and gen_typ typ = match typ.it with
-  | VarT id -> gen id.it |> cache_if (id.it = "typeidx" || id.it = "globaltype") type_cache
-  | NumT NatT ->
-    let i = Random.int 2 (* 0, 1 *) in
-    numV i
   (* HARDCODE: imported builtins *)
-  | IterT ({it = VarT id; _}, List) when id.it = "import" ->
+  | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
     let import name kind t = Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; case_v kind t ]) in
     let const = empty "MUT" in
     listV [
@@ -388,10 +387,10 @@ and gen_typ typ = match typ.it with
       import "global_f32" "GLOBAL" (TupV [const; singleton "F32"]);
       import "global_f64" "GLOBAL" (TupV [const; singleton "F64"]);
       import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; singleton "FUNCREF" ]);
-      import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ]));
+      (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
     ]
   (* HARDCODE: types *)
-  | IterT ({it = VarT id; _}, List) when id.it = "type" ->
+  | IterT ({ it = VarT id; _ }, List) when id.it = "type" ->
     let arrow = Al.Ast.ArrowV (listV [], listV []) in
     let dt =
       case_vv "REC" ([
@@ -406,6 +405,17 @@ and gen_typ typ = match typ.it with
     let l = t :: List.init n (fun _ -> gen "type") in
     types_cache := l;
     listV l
+  (* HARDCODE: single memory *)
+  | IterT ({ it = VarT id; _ }, List) when id.it = "mem" ->
+    listV [ gen "mem" ]
+  (* General types *)
+  | VarT id -> gen id.it |> cache_if (
+    id.it = "typeidx"
+    || id.it = "globaltype"
+    || id.it = "reftype" && top case_stack = "ELEM" ) type_cache
+  | NumT NatT ->
+    let i = Random.int 2 (* 0, 1 *) in
+    numV i
   | IterT (typ', List) ->
     let n = Random.int 3 + 1 (* 1, 2, 3 *) in
     let l = List.init n (fun _ -> gen_typ typ') in
