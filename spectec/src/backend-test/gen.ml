@@ -3,6 +3,7 @@ open Util.Source
 open Util.Record
 open Backend_interpreter
 open Al.Al_util
+open Utils
 
 (* Specs *)
 let el: El.Ast.script ref = ref []
@@ -19,13 +20,6 @@ type valtype =
 type restype = valtype list
 
 (* Helpers *)
-let choose l =
-  let n = List.length l in
-  assert (n > 0);
-  let i = Random.int n in
-  List.nth l i
-
-let contains x = List.exists (fun x' -> x = x')
 
 let hds xs = xs |> List.rev |> List.tl |> List.rev
 
@@ -44,12 +38,6 @@ let find_syn name =
   match syn_opt with
   | Some syn -> syn
   | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
-
-let numV i = Al.Ast.NumV (i |> Int64.of_int)
-let optV_none = Al.Ast.OptV None
-let optV_some v = Al.Ast.OptV (Some v)
-let empty x = case_v x optV_none
-let non_empty x = case_v x (optV_some (TupV []))
 
 let string_of_atom = Il.Print.string_of_atom
 let string_of_module m = match m with
@@ -111,6 +99,9 @@ let valid case args const (rt1, rt2) = Al.Ast.(
   | "CALL_REF" | "RETURN_CALL_REF" -> ( match args with
     | [ OptV (Some _) ] -> true
     | _ -> false )
+  | "LOAD" | "STORE" -> (match args with
+    | nt :: OptV (Some _) :: _ -> String.sub (case_of_case nt) 0 1 = "I"
+    | _  -> true )
   | _ -> true
 )
 
@@ -270,7 +261,7 @@ let rec gen name =
   if name = "memidx" then numV 0 else
   (* HARDCODE: pack_size to be 8/16/32/64 *)
   if !case_stack > [] && contains (top case_stack)  [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
-    numV (choose [8; 16; 32; 64])
+    numV (choose [8; 16; 32])
   else
 
   match syn.it with
@@ -389,36 +380,21 @@ and gen_typ typ = match typ.it with
       import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; singleton "FUNCREF" ]);
       (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
     ]
-  (* HARDCODE: types *)
-  | IterT ({ it = VarT id; _ }, List) when id.it = "type" ->
-    let arrow = Al.Ast.ArrowV (listV [], listV []) in
-    let dt =
-      case_vv "REC" ([
-        case_vvv "SUBD"
-          (non_empty "FINAL")
-          (listV [])
-          arrow
-      ] |> listV) zero
-      |> case_v "DEF" in
-    let t = case_v "TYPE" (if (!Construct.version = 3) then dt else arrow) in
-    let n = Random.int 3 + 1 (* 1, 2, 3 *) in
-    let l = t :: List.init n (fun _ -> gen "type") in
-    types_cache := l;
-    listV l
-  (* HARDCODE: single memory *)
-  | IterT ({ it = VarT id; _ }, List) when id.it = "mem" ->
-    listV [ gen "mem" ]
   (* General types *)
   | VarT id -> gen id.it |> cache_if (
-    id.it = "typeidx"
+    id.it = "typeidx" && top case_stack = "FUNC"
     || id.it = "globaltype"
     || id.it = "reftype" && top case_stack = "ELEM" ) type_cache
   | NumT NatT ->
-    let i = Random.int 2 (* 0, 1 *) in
+    let i = Random.int 3 (* 0, 1, 2 *) in
     numV i
   | IterT (typ', List) ->
-    let n = Random.int 3 + 1 (* 1, 2, 3 *) in
+    let name = match typ'.it with | VarT id -> id.it | _ -> "" in
+    let n = match name with
+    | "table" | "data" | "elem" | "type" | "func" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
+    | _ -> Random.int 3 (* 0, 1, 2 *) in
     let l = List.init n (fun _ -> gen_typ typ') in
+    if name = "type" then types_cache := l;
     listV l
   | TupT typs -> TupV (List.map gen_typ typs)
   | IterT (typ', Opt) ->
@@ -444,7 +420,13 @@ and fix_rts rt1 rt2 : (restype * restype) =
   (fix_rt rt1, fix_rt rt2)
 
 (** Mutation **)
-let mutate modules = modules (* TODO *)
+let mutate modules =
+  let aux i m = try
+    prerr_endline ("Patching " ^ string_of_int i ^ "th module..");
+    Patch.patch_module m
+  with e -> prerr_endline (Printexc.to_string e); m in
+  List.mapi aux modules
+  (* TODO *)
 
 (** Injection **)
 type invoke = string * Al.Ast.value list
@@ -494,7 +476,7 @@ let get_instant_result m : instant_result = try
     List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
     @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
     @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i]))
-    @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i]))
+    (* @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i])) *)
   ) in (*TODO *)
   let mm = Interpreter.call_instantiate [ m; externvals ] in
   let exported_funcs =
@@ -526,15 +508,20 @@ let print_test (m, result) =
   print_endline "================"
 
 let to_wast i (m, result) =
+  ignore result;
   "Writing " ^ (string_of_int i) ^ "th module..." |> prerr_endline;
   let file = Filename.concat !Flag.out (string_of_int i ^ ".wast") in
-  let oc = open_out file in
   let ref_module = Construct.al_to_module m in
 
+  let oc = open_out file in
   Reference_interpreter.Print.module_ oc 80 ref_module;
-
   close_out oc;
-  ignore result
+
+  try
+    Reference_interpreter.Valid.check_module ref_module;
+    prerr_endline "Valid"
+  with
+    | e -> prerr_endline ("Invalid: " ^ Printexc.to_string e)
 
 (* Generate tests *)
 

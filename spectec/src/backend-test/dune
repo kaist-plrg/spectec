@@ -4,5 +4,7 @@
   (modules
     flag
     gen
+    patch
+    utils
     )
 )

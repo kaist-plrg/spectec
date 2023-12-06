@@ -35,9 +35,16 @@ let id str = VarE str
 let singleton x = CaseV (String.uppercase_ascii x, [])
 let listV l = ListV (ref (Array.of_list l))
 let zero = NumV 0L
+let one = NumV 1L
 let case_v case v = CaseV (case, [ v ])
 let case_vv case v1 v2 = CaseV (case, [ v1; v2 ])
 let case_vvv case v1 v2 v3 = CaseV (case, [ v1; v2; v3 ])
+let numV i = NumV (i |> Int64.of_int)
+let optV_none = OptV None
+let optV_some v = OptV (Some v)
+let empty x = case_v x optV_none
+let non_empty x = case_v x (optV_some (TupV []))
+
 
 (* Smart getters *)
 let arg_of_case case i = function
@@ -49,6 +56,10 @@ let arg_of_tup i = function
 | ArrowV (v0, _) when i = 0 -> v0
 | ArrowV (_, v1) when i = 1 -> v1
 | v -> failwith ("invalid arg_of_tup " ^ Print.string_of_value v ^ "." ^ string_of_int i)
+
+let arg_of_list i = function
+| ListV args -> Array.get !args i
+| v -> failwith ("invalid arg_of_list " ^ Print.string_of_value v ^ "." ^ string_of_int i)
 
 let field_of_str k = function
 | StrV record -> Util.Record.Record.find k record
@@ -90,6 +101,10 @@ let al_to_int = function
 let listv_map f = function
 | ListV a -> ListV (Array.map f !a |> ref)
 | _ -> failwith "invalid listv_map"
+
+let replace_case case i v = function
+| CaseV (case', args) when case = case' -> CaseV (case', List.mapi (fun i' v' -> if i' = i then v else v') args)
+| _ -> failwith "invalid arg_of_case"
 
 (* Smart operators *)
 let add_num v1 v2 = match v1, v2 with
