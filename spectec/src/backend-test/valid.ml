@@ -16,10 +16,10 @@ let f64T = singleton "F64"
 
 (* Helper *)
 let nt_matches_op nt op = match nt, op with
-| CaseV ("I32", []), CaseV ("_I", [])
-| CaseV ("I64", []), CaseV ("_I", [])
-| CaseV ("F32", []), CaseV ("_F", [])
-| CaseV ("F64", []), CaseV ("_F", []) -> true
+| CaseV ("I32", []), CaseV ("_I", _)
+| CaseV ("I64", []), CaseV ("_I", _)
+| CaseV ("F32", []), CaseV ("_F", _)
+| CaseV ("F64", []), CaseV ("_F", _) -> true
 | _ -> false
 
 let is_inn nt = nt = i32T || nt = i64T
