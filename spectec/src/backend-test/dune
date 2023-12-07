@@ -6,5 +6,6 @@
     gen
     patch
     utils
+    valid
     )
 )

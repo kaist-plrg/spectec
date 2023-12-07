@@ -1,29 +1,24 @@
 open Flag
+open Utils
+open Valid
+
 open Util.Source
 open Util.Record
 open Backend_interpreter
 open Al.Al_util
-open Utils
 
 (* Specs *)
 let el: El.Ast.script ref = ref []
 let il: Il.Ast.script ref = ref []
 let al: Al.Ast.script ref = ref []
 
-type valtype =
-| T of string
-| RefT of valtype
-| SubT of string * string
-| TopT
-| BotT
-| SeqT
-type restype = valtype list
-
 (* Helpers *)
 
 let hds xs = xs |> List.rev |> List.tl |> List.rev
 
 let option_flatmap f opt = Option.bind opt f
+
+let (-->) p q = (not p) || q
 
 let flatten_rec = List.concat_map (fun def ->
   match def.it with
@@ -49,73 +44,16 @@ let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
 
-let correct_cvtop = Al.Ast.(function
-| [ CaseV (t2, []); CaseV (cvtop, []); CaseV (t1, []); OptV (sx_opt) ] ->
-  let x2 = String.sub t2 0 1 in
-  let n2 = String.sub t2 1 2 in
-  let x1 = String.sub t1 0 1 in
-  let n1 = String.sub t1 1 2 in
-  ( match (x2, n2, cvtop, x1, n1, sx_opt) with
-  | "I", "32", "WRAP", "I", "64", None
-  | "I", "64", "EXTEND", "I", "32", Some _
-  | "I", _, "TRUNC", "F", _, Some _
-  | "I", _, "TRUNC_SAT", "F", _, Some _
-  | "F", "32", "DEMOTE", "F", "64", None
-  | "F", "64", "PROMOTE", "F", "32", None
-  | "F", _, "CONVERT", "I", _, Some _ -> true
-  | _, _, "REINTERPRET", _, _, None -> x2 <> x1 && n2 = n1
-  | _ -> false )
-| _ -> false )
-
-let valid case args const (rt1, rt2) = Al.Ast.(
-  (* Bunch of hardcoded heuristics to check if the given Wasm instruction is valid *)
-  match case with
-  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt1 with
-    | [ CaseV ("I32", []); CaseV ("_I", _) ], T "I32" :: _
-    | [ CaseV ("I64", []); CaseV ("_I", _) ], T "I64" :: _
-    | [ CaseV ("F32", []); CaseV ("_F", _) ], T "F32" :: _
-    | [ CaseV ("F64", []); CaseV ("_F", _) ], T "F64" :: _ -> not const || rt2 = [ T "I32" ] || rt2 = [ T "I64" ]
-    | _ -> false )
-  | "EXTEND" -> ( match args, rt1 with
-    | [ CaseV ("I32", []); _ ], [ T "I32" ]
-    | [ CaseV ("I64", []); _ ], [ T "I64" ] -> true
-    | _ -> false )
-  | "CVTOP" -> correct_cvtop args && ( match args, rt1, rt2 with
-    | [ CaseV (t2, []); _; CaseV (t1, []); _ ],  [ T t1' ], [ T t2' ] -> t1 = t1' && t2 = t2'
-    | _ -> false )
-  | "CONST" -> ( match args, rt2 with
-    | [ CaseV (nt, []); _ ], [ T nt' ] -> nt = nt'
-    | _ -> false )
-  | "REF.NULL" when !Construct.version < 3 -> ( match args, rt2 with
-    | [ CaseV (rt, []) ], [ T rt' ] -> rt = rt'
-    | _ -> false )
-  | "GLOBAL.GET" -> ( match args with
-    (* builtin globals *)
-    | [ NumV 0L ] -> rt2 = [ T "I32" ]
-    | [ NumV 1L ] -> rt2 = [ T "I64" ]
-    | [ NumV 2L ] -> rt2 = [ T "F32" ]
-    | [ NumV 3L ] -> rt2 = [ T "F64" ]
-    | _ -> true (* Over-approximate *) )
-  | "CALL_REF" | "RETURN_CALL_REF" -> ( match args with
-    | [ OptV (Some _) ] -> true
-    | _ -> false )
-  | "LOAD" | "STORE" -> (match args with
-    | nt :: OptV (Some _) :: _ -> String.sub (case_of_case nt) 0 1 = "I"
-    | _  -> true )
-  | _ -> true
-)
 
 (** Initialize **)
 
 let rts = ref Record.empty
 
 let rec string_of_vt = function
-| T x -> x
-| RefT t -> "REF " ^ string_of_vt t
+| T v -> Al.Print.string_of_value v
 | SubT (x, sub) -> x ^ "<:" ^ sub
 | TopT -> "_"
-| BotT -> "_"
-| SeqT -> "_*"
+| SeqT t -> (string_of_vt t) ^ "*"
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 let print_rts () =
   Record.iter (fun (k, v) ->
@@ -125,13 +63,12 @@ let print_rts () =
 
 let estimate_rt () = Il.Ast.(
   let rec get_rt e = match e.it with
-  | CaseE (atom, { it = TupE []; _}) -> [ T (string_of_atom atom) ]
+  | CaseE (atom, { it = TupE []; _}) -> [ T (singleton (string_of_atom atom)) ]
   | ListE es -> List.concat_map get_rt es
   | VarE id -> [ SubT (id.it, Il.Print.string_of_typ e.note) ]
   | SubE ({ it = VarE id; _ }, { it = VarT id'; _ }, _)  -> [ SubT (id.it, id'.it) ]
-  | IterE (_, (Il.Ast.List, _)) -> [ SeqT ]
+  | IterE (e', (Il.Ast.List, _)) -> [ SeqT (get_rt e' |> List.hd) ]
   | CatE (e1, e2) -> get_rt e1 @ get_rt e2
-  | CaseE (Atom "REF", { it = TupE [_; e']; _ }) -> get_rt e' |> List.map (fun t -> RefT t)
   | _ -> [ TopT ] in
 
   let expected e kind =
@@ -158,19 +95,18 @@ let estimate_rt () = Il.Ast.(
 )
 
 let rt_stack = ref []
+let updated_stack rt1 rt2 (st, target, n) =
+  let st1 = List.fold_right (fun _ st -> List.tl st) rt1 st in
+  let st2 = List.fold_left  (fun st t -> t :: st) st1 rt2 in
+  (st2, target, n - 1)
 let update_rt rt1 rt2 =
   match !rt_stack with
   | [] -> failwith "rt_stack is empty"
-  | (st, target) :: tl ->
-    let st1 = List.fold_right (fun _ st -> List.tl st) rt1 st in
-    let st2 = List.fold_left  (fun st t -> t :: st) st1 rt2 in
-    rt_stack := (st2, target) :: tl
+  | hd :: tl -> rt_stack := (updated_stack rt1 rt2 hd) :: tl
 
-let rec matches vt1 vt2 = match vt1, vt2 with
+let matches vt1 vt2 = match vt1, vt2 with
 | TopT, _ | _, TopT -> true
-| _, BotT -> true
 | T x1, T x2 -> x1 = x2
-| RefT t1, RefT t2 -> matches t1 t2
 | _ -> false
 
 let rec matches_all vts1 vts2 = match vts1, vts2 with
@@ -184,12 +120,18 @@ let poppable rt =
   | hd1 :: tl1, hd2 :: tl2 -> matches hd1 hd2 && aux tl1 tl2
   | _ -> false in
 
-  aux (List.rev rt) (top rt_stack |> fst)
+  aux (List.rev rt) (top rt_stack |> (fun (x, _, _) -> x))
 
-let rec al_to_rt v = match v with
-| Al.Ast.CaseV (x, []) -> T x
-| Al.Ast.CaseV ("REF", [_; v']) -> al_to_rt v'
-| _ -> BotT
+let edit_dist ts1 ts2_opt = match ts2_opt with
+  | None -> 0
+  | Some ts2 -> 
+    let rec common_len xs ys = match xs, ys with
+    | x :: xs', y :: ys' when matches x y -> 1 + common_len xs' ys'
+    | _ -> 0 in
+    let l1 = List.length ts1 in
+    let l2 = List.length ts2 in
+    let l3 = common_len (List.rev ts1) (List.rev ts2) in
+    (l1-l3) + (l2-l3)
 
 let consts = ref []
 let const_ctxs = ref []
@@ -227,7 +169,7 @@ let types_cache = ref []
 let type_cache = ref (numV 0)
 let cache_if cond ref v = if cond then ref := v; v
 
-let estimate_out_dim t types = try Al.Ast.(
+let estimate_out_stack t types = try Al.Ast.(
   match t with
   | NumV i64 ->
     Int64.to_int i64
@@ -235,16 +177,13 @@ let estimate_out_dim t types = try Al.Ast.(
     |> arg_of_case "TYPE" 0
     |> arg_of_tup 1 (* Wasm 2.0 *)
     |> al_to_list
-    |> List.map (function
-      (* | Al.Ast.CaseV (t, []) -> T t *)
-      | _ -> TopT )
-  | TupV [ CaseV ("MUT", _); vt ] | vt ->
-    let rec v2t v = match v with
-    | Al.Ast.CaseV (t, []) -> T t
-    | Al.Ast.CaseV ("REF", [_; t]) -> RefT (v2t t)
-    | _ -> TopT in
-    [ v2t vt ]
+    |> List.map (fun v -> T v)
+    |> List.rev
+  | TupV [ CaseV ("MUT", _); v ] | v ->
+    [ T v ]
 ) |> Option.some with _ -> None
+
+exception OutOfLife
 
 (* Generate specific syntax from input IL *)
 let rec gen name =
@@ -252,8 +191,8 @@ let rec gen name =
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then gen_wasm_expr [] ( match top case_stack with
-    | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out_dim !type_cache !types_cache
-    | "ACTIVE" -> Some [T "I32"]
+    | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out_stack !type_cache !types_cache
+    | "ACTIVE" -> Some [T (singleton "I32")]
     | _ -> Some [TopT] ) else
   (* HARDCODE: name *)
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
@@ -306,21 +245,33 @@ let rec gen name =
   | VariantT typcases when name = "instr" ->
     (* HARDCODE: checks if currently in a context that requires const instrution *)
     let const_required = (contains (top case_stack) !const_ctxs) in
-    let typcases' = if not const_required then typcases else
-      let is_const (atom, _, _) = contains (string_of_atom atom) !consts in
-      List.filter is_const typcases
+    let const_filter (atom, _, _) =
+      const_required --> contains (string_of_atom atom) !consts in
+    let block_filter (atom, _, _) =
+      (List.length !case_stack > 4) --> not (contains (string_of_atom atom) [ "BLOCK"; "LOOP"; "IF" ]) in
+    let typcases' = typcases
+      |> List.filter const_filter
+      |> List.filter block_filter
     in
     let rec try_instr life =
+      if life = 0 then raise OutOfLife;
       let typcase = choose typcases' in
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
       let (t1, t2) = !rts |> Record.find case in
       let rt1, rt2 = fix_rts t1 t2 in
-      if not (poppable rt1) && life > 0 then
+      let valid_rts = (
+        poppable rt1 && (
+          let (cur_stack, target_stack_opt, n) = updated_stack rt1 rt2 (List.hd !rt_stack) in
+          let d = edit_dist cur_stack target_stack_opt in
+          (* Check if Random.float <= n / (n+d), but in smarter way *)
+          d = 0 || (Random.int (n + d) < n) )
+      ) in
+      if not valid_rts then
         try_instr (life - 1)
       else
         let rec try_args life' =
-          if life' = 0 && life > 0 then try_instr (life - 1) else (
+          if life' = 0 then try_instr (life - 1) else (
           push case case_stack;
           let args = match case with
           | "BLOCK"
@@ -328,12 +279,12 @@ let rec gen name =
           | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
           | _ -> gen_typs typs in
           pop case_stack;
-          if not (valid case args const_required (rt1, rt2)) && life' > 0 then
+          if not (valid_instr case args const_required (rt1, rt2)) && life' > 0 then
             try_args (life' - 1)
           else (
             update_rt rt1 rt2;
             Al.Ast.CaseV (case, args) ) )
-        in try_args 10
+        in try_args 100
     in try_instr 100
   | VariantT typcases ->
     (* HARDCODE: Remove V128 *)
@@ -349,20 +300,22 @@ let rec gen name =
   | _ -> failwith ("TODO: gen of " ^ Il.Print.string_of_deftyp syn ^ Il.Print.structured_string_of_deftyp syn)
 
 and gen_wasm_expr rt rt_opt =
-  let max_life = 1000 in
+  let max_life = 100 in
   let rec try_expr life =
     if (life = 0) then
-      prerr_endline "life is 0..";
-    push (rt, rt_opt) rt_stack;
-    let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
-    let ret = List.init n (fun _ -> gen "instr") |> listV in
-    let (actual, expected) = List.hd !rt_stack in
-    pop rt_stack;
-    match actual, expected with
-    | _, None -> ret
-    | r, Some r' when matches_all r r' -> ret
-    | _ when life > 0 -> try_expr (life - 1) (* TODO: This is THE source of inefficiency *)
-    | _ -> ret
+      match rt, rt_opt with
+      | [], Some [] -> listV [] (* TODO *)
+      | _ -> listV [] (* TODO *)
+      (* | _ -> raise OutOfLife *)
+    else
+      let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
+      push (rt, rt_opt, n) rt_stack;
+      try
+        let rt = List.init n (fun _ -> gen "instr") |> listV in
+        pop rt_stack;
+        rt
+      with
+        OutOfLife -> pop rt_stack; try_expr (life - 1)
   in
   try_expr max_life
 
@@ -411,10 +364,9 @@ and gen_typs typs = match typs.it with
 and fix_rts rt1 rt2 : (restype * restype) =
   let cache = ref Record.empty in
   let rec fix_rt rt = List.concat_map (fun vt -> match vt with
-    | RefT t -> fix_rt [t] |> List.map (fun t' -> RefT t')
     | SubT (x, _) when Record.keys !cache |> contains x -> [ Record.find x !cache ]
-    | SubT (x, sub) -> let vt = gen sub |> al_to_rt in cache := Record.add x vt !cache; [ vt ]
-    | SeqT -> List.init (Random.int 3) (fun _ -> BotT)
+    | SubT (x, sub) -> let vt = T (gen sub) in cache := Record.add x vt !cache; [ vt ]
+    | SeqT t -> List.init (Random.int 3) (fun _ -> (List.hd (fix_rt [ t ])))
     | t -> [ t ]
   ) rt in
   (fix_rt rt1, fix_rt rt2)
