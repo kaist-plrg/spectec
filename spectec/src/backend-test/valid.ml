@@ -47,38 +47,29 @@ let correct_cvtop = function
 
 (* Estimate if given instruction is valid with expected type, rt1* -> rt2* *)
 (* TODO: Perhaps some of these can be automated? *)
-let validate_instr case args const (rt1, rt2) =
+let validate_instr case args const (_rt1, rt2) =
   match case with
-  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt1, rt2 with
-    | [ _nt; op ], T nt1 :: _, [ T t2 ] when nt_matches_op nt1 op && (not const || is_inn t2) -> Some [ nt1; op ]
+  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
+    | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )
-  | "EXTEND" -> ( match args, rt1 with
-    | _nt :: tl, [ T nt ] when is_inn nt -> Some (nt :: tl)
+  | "EXTEND" -> ( match args with
+    | nt :: _ when is_inn nt -> Some args
     | _ -> None )
-  | "CVTOP" -> ( match args, rt1, rt2 with
-    | [ _nt2; a1; _nt1; a2 ],  [ T nt1 ], [ T nt2 ] when correct_cvtop [ nt2; a1; nt1; a2 ] -> Some [ nt2; a1; nt1; a2 ]
-    | _ -> None )
-  | "CONST" -> ( match args, rt2 with
-    | [ _nt; a ], [ T nt ] -> Some [ nt; a ]
-    | _ -> None )
-  | "REF.NULL" when !Backend_interpreter.Construct.version < 3 -> ( match args, rt2 with
-    | [ _rt ], [ T rt ] -> Some [ rt ]
-    | _ -> None )
+  | "CVTOP" -> if correct_cvtop args then Some args else None
   | "GLOBAL.GET" -> ( match rt2 with
     | [ T (CaseV ("I32", [])) ] -> Some [ NumV 0L ]
     | [ T (CaseV ("I64", [])) ] -> Some [ NumV 1L ]
     | [ T (CaseV ("F32", [])) ] -> Some [ NumV 2L ]
     | [ T (CaseV ("F64", [])) ] -> Some [ NumV 3L ]
     | _ -> None )
+  | "GLOBAL.SET" -> ( match args with
+    | [ gid ] -> Some [ add_num gid (NumV 4L) ]
+    | _ -> None )
   | "CALL_REF" | "RETURN_CALL_REF" -> ( match args with
     | [ OptV (Some _) ] -> Some args
     | _ -> None )
-  | "LOAD" -> (match args, rt2 with
-    | _nt :: opt :: tl, [ T nt ] ->
+  | "LOAD" | "STORE" -> (match args with
+    | nt :: opt :: tl ->
       Some (if is_inn nt then nt :: opt :: tl else nt :: OptV None :: tl)
     | _ -> None)
-  | "STORE" -> (match args, rt1 with
-    | _nt :: opt :: tl, [ _; T nt ] ->
-      Some (if is_inn nt then nt :: opt :: tl else nt :: OptV None :: tl)
-    | _  -> None )
   | _ -> Some args

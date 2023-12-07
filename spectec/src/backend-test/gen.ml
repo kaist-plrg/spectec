@@ -40,6 +40,12 @@ let string_of_module m = match m with
   "(MODULE\n  " ^ (List.map Al.Print.string_of_value args |> String.concat "\n  ") ^ "\n)"
 | _ -> failwith "Unreachable"
 
+let flatten_args e = match e.it with
+| Il.Ast.TupE es -> es
+| _ -> [ e ]
+
+let replace ixs = List.mapi (fun i x -> match List.assoc_opt i ixs with Some x' -> x' | None -> x)
+
 let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
@@ -57,7 +63,7 @@ let rec string_of_vt = function
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 let print_rts () =
   Record.iter (fun (k, v) ->
-    let (rt1, rt2) = v in
+    let (rt1, rt2, _) = v in
     Printf.sprintf "%s : %s -> %s" k (string_of_rt rt1) (string_of_rt rt2) |> print_endline
   ) !rts
 
@@ -71,6 +77,15 @@ let estimate_rt () = Il.Ast.(
   | CatE (e1, e2) -> get_rt e1 @ get_rt e2
   | _ -> [ TopT ] in
 
+  let get_entangles case ts = match case.it with
+  | CaseE (_, args) -> List.mapi (fun i arg ->
+    let arg_t = get_rt arg in
+    match arg_t with
+    | [ SubT (x, _) as t ] -> if contains t ts then Some (i, x) else None
+    | _ -> None
+  ) (flatten_args args) |> List.filter_map (fun x -> x)
+  | _ -> [] in
+
   let expected e kind =
     Printf.sprintf "Expected %s to be %s" (Il.Print.string_of_exp e) kind |> failwith
   in
@@ -79,13 +94,14 @@ let estimate_rt () = Il.Ast.(
     | RelD (id, _, _, rules) when id.it = "Instr_ok" || id.it = "Instrf_ok" ->
       List.iter (fun rule -> match rule.it with
         | RuleD (id, _, _, exp, _) -> ( match exp.it with
-          | TupE [_c; _lhs; rhs] -> ( match rhs.it with
+          | TupE [_c; lhs; rhs] -> ( match rhs.it with
             | MixE (_, args) -> ( match args.it with
               | TupE [t1; t2] | TupE [t1; _; t2] ->
                 let name = String.split_on_char '-' id.it |> List.hd |> String.uppercase_ascii in
                 let rt1 = get_rt t1 in
                 let rt2 = get_rt t2 in
-                rts := Record.add name (rt1, rt2) !rts;
+                let entangles = get_entangles lhs (rt1 @ rt2) in
+                rts := Record.add name (rt1, rt2, entangles) !rts;
               | _ -> expected args "t1, t2 or t1, x*, t2" )
             | _ -> expected rhs "e1 -> e2" )
           | _ -> expected exp "C |- lhs : rhs" )
@@ -169,16 +185,20 @@ let types_cache = ref []
 let type_cache = ref (numV 0)
 let cache_if cond ref v = if cond then ref := v; v
 
-let estimate_out_stack t types = try Al.Ast.(
+let get_type types tid =
+  let arrow = List.nth types tid |> arg_of_case "TYPE" 0 in
+  let f i =
+    arrow
+    |> arg_of_tup i (* Wasm 2.0 *)
+    |> al_to_list
+    |> List.map (fun v -> T v) in
+  (f 0, f 1)
+let estimate_out t types = try Al.Ast.(
   match t with
   | NumV i64 ->
     Int64.to_int i64
-    |> List.nth types
-    |> arg_of_case "TYPE" 0
-    |> arg_of_tup 1 (* Wasm 2.0 *)
-    |> al_to_list
-    |> List.map (fun v -> T v)
-    |> List.rev
+    |> get_type types
+    |> snd
   | TupV [ CaseV ("MUT", _); v ] | v ->
     [ T v ]
 ) |> Option.some with _ -> None
@@ -191,7 +211,7 @@ let rec gen name =
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then gen_wasm_expr [] ( match top case_stack with
-    | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out_stack !type_cache !types_cache
+    | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out !type_cache !types_cache
     | "ACTIVE" -> Some [T (singleton "I32")]
     | _ -> Some [TopT] ) else
   (* HARDCODE: name *)
@@ -258,8 +278,20 @@ let rec gen name =
       let typcase = choose typcases' in
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
-      let (t1, t2) = !rts |> Record.find case in
-      let rt1, rt2 = fix_rts t1 t2 in
+      let (t1, t2, entangles) = !rts |> Record.find case in
+      let (rt1, rt2, induced_args) = if contains case [ "BLOCK"; "LOOP"; "IF" ] then
+        let i32_opt = if case = "IF" then [ T (singleton "I32") ] else [] in
+        let bt = gen "blocktype" in
+        let pair = [ 0, bt ] in
+        match bt with
+        | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
+        | CaseV ("_RESULT", [ OptV (Some t) ]) -> i32_opt, [ T t ], pair
+        | CaseV ("_IDX", [ tid ]) ->
+          let arrow = get_type !types_cache (al_to_int tid) in
+          fst arrow @ i32_opt, snd arrow, pair
+        | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
+      else
+        fix_rts t1 t2 entangles in
       let valid_rts = (
         poppable rt1 && (
           let (cur_stack, target_stack_opt, n) = updated_stack rt1 rt2 (List.hd !rt_stack) in
@@ -273,11 +305,11 @@ let rec gen name =
         let rec try_args life' =
           if life' = 0 then try_instr (life - 1) else (
           push case case_stack;
-          let args = match case with
+          let args = ( match case with
           | "BLOCK"
           | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 (Some rt2) ]
           | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
-          | _ -> gen_typs typs in
+          | _ -> gen_typs typs ) |> replace induced_args in
           pop case_stack;
           match validate_instr case args const_required (rt1, rt2) with
           | None -> try_args (life' - 1)
@@ -309,7 +341,7 @@ and gen_wasm_expr rt rt_opt =
       (* | _ -> raise OutOfLife *)
     else
       let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
-      push (rt, rt_opt, n) rt_stack;
+      push (List.rev rt, Option.map List.rev rt_opt, n) rt_stack;
       try
         let rt = List.init n (fun _ -> gen "instr") |> listV in
         pop rt_stack;
@@ -361,15 +393,18 @@ and gen_typs typs = match typs.it with
   | TupT typs' -> List.map gen_typ typs'
   | _ -> [ gen_typ typs ]
 
-and fix_rts rt1 rt2 : (restype * restype) =
+and fix_rts rt1 rt2 entangles =
   let cache = ref Record.empty in
   let rec fix_rt rt = List.concat_map (fun vt -> match vt with
-    | SubT (x, _) when Record.keys !cache |> contains x -> [ Record.find x !cache ]
-    | SubT (x, sub) -> let vt = T (gen sub) in cache := Record.add x vt !cache; [ vt ]
+    | SubT (x, _) when Record.keys !cache |> contains x -> [ T (Record.find x !cache) ]
+    | SubT (x, sub) -> let vt = gen sub in cache := Record.add x vt !cache; [ T vt ]
     | SeqT t -> List.init (Random.int 3) (fun _ -> (List.hd (fix_rt [ t ])))
     | t -> [ t ]
   ) rt in
-  (fix_rt rt1, fix_rt rt2)
+  let rt1' = fix_rt rt1 in
+  let rt2' = fix_rt rt2 in
+  let induced_args = List.map (fun (i, x) -> (i, Record.find x !cache)) entangles in
+  (rt1', rt2', induced_args)
 
 (** Mutation **)
 let mutate modules =

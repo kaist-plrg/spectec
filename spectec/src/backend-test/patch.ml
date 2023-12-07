@@ -67,7 +67,11 @@ let fix_local_idx = function
     CaseV ("FUNC", [ tid; locals; fix_local_id' expr ])
   | v -> v
 let inc_type_idx = function (* Due to manually added 0th type, [] -> [] *)
-  | CaseV ("FUNC", tid :: args) -> CaseV ("FUNC", (add_num tid one) :: args)
+  | CaseV ("FUNC", tid :: args) ->
+    let inc_type_idx' = walk_value (function
+    | CaseV ("_IDX", [ tid ]) -> CaseV ("_IDX", [ add_num tid one ])
+    | v -> v) in
+    CaseV ("FUNC", (add_num tid one) :: List.map inc_type_idx' args)
   | v -> v
 let patch_func func = func
   |> fix_local_idx
