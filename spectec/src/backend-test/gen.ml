@@ -124,7 +124,7 @@ let poppable rt =
 
 let edit_dist ts1 ts2_opt = match ts2_opt with
   | None -> 0
-  | Some ts2 -> 
+  | Some ts2 ->
     let rec common_len xs ys = match xs, ys with
     | x :: xs', y :: ys' when matches x y -> 1 + common_len xs' ys'
     | _ -> 0 in
@@ -279,11 +279,11 @@ let rec gen name =
           | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
           | _ -> gen_typs typs in
           pop case_stack;
-          if not (valid_instr case args const_required (rt1, rt2)) && life' > 0 then
-            try_args (life' - 1)
-          else (
+          match validate_instr case args const_required (rt1, rt2) with
+          | None -> try_args (life' - 1)
+          | Some args' ->
             update_rt rt1 rt2;
-            Al.Ast.CaseV (case, args) ) )
+            Al.Ast.CaseV (case, args') )
         in try_args 100
     in try_instr 100
   | VariantT typcases ->
