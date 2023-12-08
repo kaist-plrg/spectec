@@ -334,10 +334,7 @@ and gen_wasm_expr rt1 rt2 label =
   let max_life = 100 in
   let rec try_expr life =
     if (life = 0) then
-      match rt1, rt2 with
-      | [], [] -> listV [] (* TODO *)
-      | _ -> listV [] (* TODO *)
-      (* | _ -> raise OutOfLife *)
+      List.map (fun _ -> singleton "DROP") rt1 @ List.map default rt2 |> listV
     else
       let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
       push (List.rev rt1, Some (List.rev rt2), label, n) expr_info_stack; (* TODO: make input optional? *)

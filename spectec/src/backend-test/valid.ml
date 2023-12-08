@@ -25,6 +25,14 @@ let nt_matches_op nt op = match nt, op with
 
 let is_inn nt = nt = i32T || nt = i64T
 
+let default = function
+| T (CaseV ("I32", [])) -> case_vv "CONST" (singleton "I32") zero
+| T (CaseV ("I64", [])) -> case_vv "CONST" (singleton "I64") zero
+| T (CaseV ("F32", [])) -> case_vv "CONST" (singleton "F32") zero
+| T (CaseV ("F64", [])) -> case_vv "CONST" (singleton "F64") zero
+| T (CaseV (("FUNCREF" | "EXTERNREF"), []) as rt) -> case_v "REF.NULL" rt
+| _ -> singleton "UNREACHABLE"
+
 (** Estimate if the given module is valid **)
 
 (* Check if cvtop is syntactically correct *)
