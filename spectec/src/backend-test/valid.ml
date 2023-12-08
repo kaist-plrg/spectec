@@ -1,6 +1,8 @@
 open Al
 open Ast
 open Al_util
+open Utils
+open Util.Record
 
 type valtype =
 | T of value
@@ -62,6 +64,7 @@ let validate_instr case args const (_rt1, rt2) =
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )
   | "EXTEND" -> ( match args with
+    | [ CaseV ("I32", []) as nt; NumV 32L ] -> Some [ nt; choose [ numV 8; numV 16 ] ]
     | nt :: _ when is_inn nt -> Some args
     | _ -> None )
   | "CVTOP" -> if correct_cvtop args then Some args else None
@@ -78,7 +81,45 @@ let validate_instr case args const (_rt1, rt2) =
     | [ OptV (Some _) ] -> Some args
     | _ -> None )
   | "LOAD" | "STORE" -> (match args with
-    | nt :: opt :: tl ->
-      Some (if is_inn nt then nt :: opt :: tl else nt :: OptV None :: tl)
+    | [ nt; opt; memop ] ->
+      let decompose_nt = function
+      | CaseV ("I32", []) -> "I", 32
+      | CaseV ("I64", []) -> "I", 64
+      | CaseV ("F32", []) -> "F", 32
+      | CaseV ("F64", []) -> "F", 64
+      | _ -> failwith "Unreachable" in
+      let (x, n) = decompose_nt nt in
+
+      let decompose_opt = function
+      | OptV None -> false, n, ""
+      | OptV (Some (TupV [ m; s ])) -> true, al_to_int m, case_of_case s
+      | OptV (Some m) -> true, al_to_int m, ""
+      | _ -> failwith "Unreachable" in
+      let compose_opt is_some m s = match is_some, s with
+      | true, "" -> OptV (Some ( numV m ))
+      | true, _  -> OptV (Some ( TupV [ numV m; singleton s ]))
+      | false, _ -> OptV None in
+      let (is_some, m, s) = decompose_opt opt in
+
+      let decompose_memop s = field_of_str "ALIGN" s |> al_to_int, field_of_str "OFFSET" s |> al_to_int in
+      let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV a) |> Record.add "OFFSET" (numV o)) in
+      let (a, o) = decompose_memop memop in
+
+      let is_some' = if x = "F" then false else is_some in
+
+      let rec dec_m m =
+        if not is_some' then m else
+        if m < n then m else
+        dec_m (m / 2)
+      in
+      let m' = dec_m m in
+
+      let rec dec_align a =
+        if 1 lsl a <= m'/8 then a else
+        dec_align (a-1)
+      in
+      let a' = dec_align a in
+
+      Some [ nt; compose_opt is_some' m' s; compose_memop a' o ]
     | _ -> None)
   | _ -> Some args
