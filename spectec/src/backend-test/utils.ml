@@ -6,6 +6,10 @@ let choose l =
 
 let contains x = List.exists (fun x' -> x = x')
 
+let find_index_all f l =
+  let fi i x = if f x then Some i else None in
+  l |> List.mapi fi |> List.filter_map (fun o -> o)
+
 (* TODO: move this to al/walk.ml *)
 open Al.Ast
 
