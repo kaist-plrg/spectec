@@ -183,6 +183,7 @@ let case_stack = ref []
 
 let types_cache = ref []
 let type_cache = ref (numV 0)
+let locals_cache = ref []
 let cache_if cond ref v = if cond then ref := v; v
 
 let get_type types tid =
@@ -290,6 +291,15 @@ let rec gen name =
           let arrow = get_type !types_cache (al_to_int tid) in
           fst arrow @ i32_opt, snd arrow, pair
         | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
+      else if contains case [ "LOCAL.GET"; "LOCAL.SET"; "LOCAL.TEE" ] then (*TODO: Perhaps automate this? *)
+        let params = get_type !types_cache (!type_cache |> al_to_int) |> fst in
+        let locals = !locals_cache |> List.map (fun l -> T (arg_of_case "LOCAL" 0 l)) in
+        let ls = params @ locals in
+        if ls = [] then [ T (singleton "__BOT__") ], [], [] else
+        let lid = Random.int (List.length ls) in
+        let lt = List.nth ls lid in
+        let subst = function SubT _ -> lt | t -> t in
+        (List.map subst t1, List.map subst t2, [ 0, numV lid ])
       else
         fix_rts t1 t2 entangles in
       let valid_rts = (
@@ -376,10 +386,11 @@ and gen_typ typ = match typ.it with
   | IterT (typ', List) ->
     let name = match typ'.it with | VarT id -> id.it | _ -> "" in
     let n = match name with
-    | "table" | "data" | "elem" | "type" | "func" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
+    | "table" | "data" | "elem" | "type" | "func" | "global" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
     | _ -> Random.int 3 (* 0, 1, 2 *) in
     let l = List.init n (fun _ -> gen_typ typ') in
     if name = "type" then types_cache := l;
+    if name = "local" then locals_cache := l;
     listV l
   | TupT typs -> TupV (List.map gen_typ typs)
   | IterT (typ', Opt) ->

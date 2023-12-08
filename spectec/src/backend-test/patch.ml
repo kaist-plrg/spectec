@@ -46,26 +46,6 @@ let patch_imports _imports =
   ]
 
 (* func *)
-let fix_local_idx = function
-  | CaseV ("FUNC", [ tid; locals; expr ]) ->
-    let n =
-      (  arg_of_list (al_to_int tid) !types
-      |> arg_of_case "TYPE" 0
-      |> arg_of_tup 0
-      |> al_to_list
-      |> List.length )
-    + (  locals
-      |> al_to_list
-      |> List.length )
-    in
-    let fix_local_id' = walk_value (function
-    | CaseV (("LOCAL.GET" | "LOCAL.SET" | "LOCAL.TEE") as case, [ lid ]) ->
-      let i = al_to_int lid in
-      let i' = if i < n then i else if n > 0 then Random.int n else 0 in
-      CaseV (case, [ numV i' ])
-    | v -> v) in
-    CaseV ("FUNC", [ tid; locals; fix_local_id' expr ])
-  | v -> v
 let inc_type_idx = function (* Due to manually added 0th type, [] -> [] *)
   | CaseV ("FUNC", tid :: args) ->
     let inc_type_idx' = walk_value (function
@@ -74,7 +54,6 @@ let inc_type_idx = function (* Due to manually added 0th type, [] -> [] *)
     CaseV ("FUNC", (add_num tid one) :: List.map inc_type_idx' args)
   | v -> v
 let patch_func func = func
-  |> fix_local_idx
   |> inc_type_idx
 let patch_funcs funcs = listv_map patch_func funcs
 
