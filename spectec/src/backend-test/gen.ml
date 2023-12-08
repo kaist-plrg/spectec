@@ -49,6 +49,7 @@ let replace ixs = List.mapi (fun i x -> match List.assoc_opt i ixs with Some x' 
 let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
+let string_of_stack s = String.concat "," !s
 
 
 (** Initialize **)
@@ -219,6 +220,8 @@ let rec gen name =
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
   (* HARDCODE: memidx to be always 0 *)
   if name = "memidx" then numV 0 else
+  (* HARDCODE: labelidx to be smaller than current block stack size *)
+  if name = "labelidx" then numV (List.length !case_stack - 2 |> Random.int) else
   (* HARDCODE: pack_size to be 8/16/32/64 *)
   if !case_stack > [] && contains (top case_stack)  [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
     numV (choose [8; 16; 32])
