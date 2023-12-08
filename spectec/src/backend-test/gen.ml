@@ -59,7 +59,7 @@ let rts = ref Record.empty
 let rec string_of_vt = function
 | T v -> Al.Print.string_of_value v
 | SubT (x, sub) -> x ^ "<:" ^ sub
-| TopT -> "_"
+| TopT | BotT -> "_"
 | SeqT t -> (string_of_vt t) ^ "*"
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 let print_rts () =
@@ -111,17 +111,22 @@ let estimate_rt () = Il.Ast.(
   ) !il
 )
 
-let rt_stack = ref []
-let updated_stack rt1 rt2 (st, target, n) =
+let expr_info_stack = ref []
+let updated_stack rt1 rt2 (st, target, label, n) =
   let st1 = List.fold_right (fun _ st -> List.tl st) rt1 st in
   let st2 = List.fold_left  (fun st t -> t :: st) st1 rt2 in
-  (st2, target, n - 1)
+  (st2, target, label, n - 1)
 let update_rt rt1 rt2 =
-  match !rt_stack with
-  | [] -> failwith "rt_stack is empty"
-  | hd :: tl -> rt_stack := (updated_stack rt1 rt2 hd) :: tl
+  match !expr_info_stack with
+  | [] -> failwith "expr_info_stack is empty"
+  | hd :: tl -> expr_info_stack := (updated_stack rt1 rt2 hd) :: tl
+let nullify_target () =
+  match !expr_info_stack with
+  | [] -> failwith "expr_info_stack is empty"
+  | (st, _, label, n) :: tl -> expr_info_stack := (st, None, label, n) :: tl
 
 let matches vt1 vt2 = match vt1, vt2 with
+| BotT, _ | _, BotT -> false
 | TopT, _ | _, TopT -> true
 | T x1, T x2 -> x1 = x2
 | _ -> false
@@ -137,7 +142,7 @@ let poppable rt =
   | hd1 :: tl1, hd2 :: tl2 -> matches hd1 hd2 && aux tl1 tl2
   | _ -> false in
 
-  aux (List.rev rt) (top rt_stack |> (fun (x, _, _) -> x))
+  aux (List.rev rt) (top expr_info_stack |> (fun (x, _, _, _) -> x))
 
 let edit_dist ts1 ts2_opt = match ts2_opt with
   | None -> 0
@@ -195,7 +200,7 @@ let get_type types tid =
     |> al_to_list
     |> List.map (fun v -> T v) in
   (f 0, f 1)
-let estimate_out t types = try Al.Ast.(
+let estimate_out t types = Al.Ast.(
   match t with
   | NumV i64 ->
     Int64.to_int i64
@@ -203,7 +208,7 @@ let estimate_out t types = try Al.Ast.(
     |> snd
   | TupV [ CaseV ("MUT", _); v ] | v ->
     [ T v ]
-) |> Option.some with _ -> None
+)
 
 exception OutOfLife
 
@@ -212,17 +217,17 @@ let rec gen name =
   let syn = find_syn name in
 
   (* HARDCODE: Wasm expression *)
-  if name = "expr" then gen_wasm_expr [] ( match top case_stack with
+  if name = "expr" then
+    let out = ( match top case_stack with
     | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out !type_cache !types_cache
-    | "ACTIVE" -> Some [T (singleton "I32")]
-    | _ -> Some [TopT] ) else
+    | "ACTIVE" -> [ T (singleton "I32") ]
+    | _ -> [ TopT ] ) in
+    gen_wasm_expr [] out out else
   (* HARDCODE: name *)
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
   (* HARDCODE: memidx to be always 0 *)
   if name = "memidx" then numV 0 else
-  (* HARDCODE: labelidx to be smaller than current block stack size *)
-  if name = "labelidx" then numV (List.length !case_stack - 2 |> Random.int) else
-  (* HARDCODE: pack_size to be 8/16/32/64 *)
+  (* HARDCODE: pack_size to be 8/16/32 *)
   if !case_stack > [] && contains (top case_stack)  [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
     numV (choose [8; 16; 32])
   else
@@ -283,31 +288,10 @@ let rec gen name =
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
       let (t1, t2, entangles) = !rts |> Record.find case in
-      let (rt1, rt2, induced_args) = if contains case [ "BLOCK"; "LOOP"; "IF" ] then
-        let i32_opt = if case = "IF" then [ T (singleton "I32") ] else [] in
-        let bt = gen "blocktype" in
-        let pair = [ 0, bt ] in
-        match bt with
-        | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
-        | CaseV ("_RESULT", [ OptV (Some t) ]) -> i32_opt, [ T t ], pair
-        | CaseV ("_IDX", [ tid ]) ->
-          let arrow = get_type !types_cache (al_to_int tid) in
-          fst arrow @ i32_opt, snd arrow, pair
-        | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
-      else if contains case [ "LOCAL.GET"; "LOCAL.SET"; "LOCAL.TEE" ] then (*TODO: Perhaps automate this? *)
-        let params = get_type !types_cache (!type_cache |> al_to_int) |> fst in
-        let locals = !locals_cache |> List.map (fun l -> T (arg_of_case "LOCAL" 0 l)) in
-        let ls = params @ locals in
-        if ls = [] then [ T (singleton "__BOT__") ], [], [] else
-        let lid = Random.int (List.length ls) in
-        let lt = List.nth ls lid in
-        let subst = function SubT _ -> lt | t -> t in
-        (List.map subst t1, List.map subst t2, [ 0, numV lid ])
-      else
-        fix_rts t1 t2 entangles in
+      let (rt1, rt2, induced_args) = fix_rts case t1 t2 entangles in
       let valid_rts = (
         poppable rt1 && (
-          let (cur_stack, target_stack_opt, n) = updated_stack rt1 rt2 (List.hd !rt_stack) in
+          let (cur_stack, target_stack_opt, _, n) = updated_stack rt1 rt2 (List.hd !expr_info_stack) in
           let d = edit_dist cur_stack target_stack_opt in
           (* Check if Random.float <= n / (n+d), but in smarter way *)
           d = 0 || (Random.int (n + d) < n) )
@@ -319,15 +303,17 @@ let rec gen name =
           if life' = 0 then try_instr (life - 1) else (
           push case case_stack;
           let args = ( match case with
-          | "BLOCK"
-          | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 (Some rt2) ]
-          | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) (Some rt2); gen_wasm_expr (hds rt1) (Some rt2) ]
+          | "BLOCK" -> [ gen "blocktype"; gen_wasm_expr rt1 rt2 rt2 ]
+          | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 rt2 rt1 ]
+          | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) rt2 rt2; gen_wasm_expr (hds rt1) rt2 rt2 ]
           | _ -> gen_typs typs ) |> replace induced_args in
           pop case_stack;
           match validate_instr case args const_required (rt1, rt2) with
           | None -> try_args (life' - 1)
           | Some args' ->
             update_rt rt1 rt2;
+            if contains name ["RETURN"; "BR"; "BR_TABLE"; "UNREACHABLE"] then (*TODO: Perhaps automate this? *)
+              nullify_target ();
             Al.Ast.CaseV (case, args') )
         in try_args 100
     in try_instr 100
@@ -344,23 +330,23 @@ let rec gen name =
     Al.Ast.CaseV (case, args)
   | _ -> failwith ("TODO: gen of " ^ Il.Print.string_of_deftyp syn ^ Il.Print.structured_string_of_deftyp syn)
 
-and gen_wasm_expr rt rt_opt =
+and gen_wasm_expr rt1 rt2 label =
   let max_life = 100 in
   let rec try_expr life =
     if (life = 0) then
-      match rt, rt_opt with
-      | [], Some [] -> listV [] (* TODO *)
+      match rt1, rt2 with
+      | [], [] -> listV [] (* TODO *)
       | _ -> listV [] (* TODO *)
       (* | _ -> raise OutOfLife *)
     else
       let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
-      push (List.rev rt, Option.map List.rev rt_opt, n) rt_stack;
+      push (List.rev rt1, Some (List.rev rt2), label, n) expr_info_stack; (* TODO: make input optional? *)
       try
-        let rt = List.init n (fun _ -> gen "instr") |> listV in
-        pop rt_stack;
-        rt
+        let ret = List.init n (fun _ -> gen "instr") |> listV in
+        pop expr_info_stack;
+        ret
       with
-        OutOfLife -> pop rt_stack; try_expr (life - 1)
+        OutOfLife -> pop expr_info_stack; try_expr (life - 1)
   in
   try_expr max_life
 
@@ -407,18 +393,73 @@ and gen_typs typs = match typs.it with
   | TupT typs' -> List.map gen_typ typs'
   | _ -> [ gen_typ typs ]
 
-and fix_rts rt1 rt2 entangles =
-  let cache = ref Record.empty in
-  let rec fix_rt rt = List.concat_map (fun vt -> match vt with
-    | SubT (x, _) when Record.keys !cache |> contains x -> [ T (Record.find x !cache) ]
-    | SubT (x, sub) -> let vt = gen sub in cache := Record.add x vt !cache; [ T vt ]
-    | SeqT t -> List.init (Random.int 3) (fun _ -> (List.hd (fix_rt [ t ])))
-    | t -> [ t ]
-  ) rt in
-  let rt1' = fix_rt rt1 in
-  let rt2' = fix_rt rt2 in
-  let induced_args = List.map (fun (i, x) -> (i, Record.find x !cache)) entangles in
-  (rt1', rt2', induced_args)
+and fix_rts case rt1 rt2 entangles =
+  if contains case [ "BLOCK"; "LOOP"; "IF" ] then
+    let i32_opt = if case = "IF" then [ T (singleton "I32") ] else [] in
+    let bt = gen "blocktype" in
+    let pair = [ 0, bt ] in
+    match bt with
+    | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
+    | CaseV ("_RESULT", [ OptV (Some t) ]) -> i32_opt, [ T t ], pair
+    | CaseV ("_IDX", [ tid ]) ->
+      let arrow = get_type !types_cache (al_to_int tid) in
+      fst arrow @ i32_opt, snd arrow, pair
+    | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
+
+  else if contains case [ "LOCAL.GET"; "LOCAL.SET"; "LOCAL.TEE" ] then (*TODO: Perhaps automate this? *)
+    let params = get_type !types_cache (!type_cache |> al_to_int) |> fst in
+    let locals = !locals_cache |> List.map (fun l -> T (arg_of_case "LOCAL" 0 l)) in
+    let ls = params @ locals in
+    if ls = [] then [ BotT ], [], [] else
+    let lid = Random.int (List.length ls) in
+    let lt = List.nth ls lid in
+    let subst = function SubT _ -> lt | t -> t in
+    (List.map subst rt1, List.map subst rt2, [ 0, numV lid ])
+
+  else if case = "RETURN" then
+    (* TODO: Signal arbitrary size better *)
+    (List.init (Random.int 3) (fun _ -> TopT) @ estimate_out !type_cache !types_cache),
+    List.init 3 (fun _ -> TopT),
+    []
+
+  else if case = "BR" then
+    let lid = Random.int (List.length !expr_info_stack) in
+    let (_, _, t, _) = List.nth !expr_info_stack lid in
+    (List.init (Random.int 3) (fun _ -> TopT) @ t),
+    List.init 3 (fun _ -> TopT),
+    [ 0, numV lid ]
+  else if case = "BR_IF" then
+    let lid = Random.int (List.length !expr_info_stack) in
+    let (_, _, t, _) = List.nth !expr_info_stack lid in
+    t @ [ T (singleton "I32") ],
+    t,
+    [ 0, numV lid ]
+  else if case = "BR_TABLE" then
+    let lid_groups = groupi_by (fun (_, _, t, _) -> t) !expr_info_stack in
+    let (t, is) = choose lid_groups in
+    let lids = List.init (Random.int 3) (fun _ -> choose is) in
+    let lid = choose is in
+    (List.init (Random.int 3) (fun _ -> TopT) @ t @ [ T (singleton "I32") ]),
+    List.init 3 (fun _ -> TopT),
+    [ 0, List.map numV lids |> listV; 1, numV lid ]
+
+  else
+    let cache = ref Record.empty in
+    let len_cache = ref Record.empty in
+    let update r x v = r := Record.add x v !r; v in
+    let get x sub = try Record.find x !cache with | _ -> gen sub |> update cache x in
+    let get_len x = try Record.find x !len_cache with | _ -> Random.int 3 |> update len_cache x in
+
+    let rec fix_rt rt = List.concat_map (fun vt -> match vt with
+      | SubT (x, sub) -> [ T (get x sub) ]
+      | SeqT (SubT (x, sub)) -> List.init (get_len x) (fun i -> (List.hd (fix_rt [ SubT (x ^ string_of_int i, sub) ])))
+      | SeqT t -> List.init (Random.int 3) (fun _ -> (List.hd (fix_rt [ t ])))
+      | t -> [ t ]
+    ) rt in
+    let rt1' = fix_rt rt1 in
+    let rt2' = fix_rt rt2 in
+    let induced_args = List.map (fun (i, x) -> (i, Record.find x !cache)) entangles in
+    (rt1', rt2', induced_args)
 
 (** Mutation **)
 let mutate modules =

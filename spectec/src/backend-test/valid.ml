@@ -6,6 +6,7 @@ type valtype =
 | T of value
 | SubT of string * string
 | TopT
+| BotT
 | SeqT of valtype
 type restype = valtype list
 

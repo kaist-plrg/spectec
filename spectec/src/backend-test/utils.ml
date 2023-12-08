@@ -10,6 +10,18 @@ let find_index_all f l =
   let fi i x = if f x then Some i else None in
   l |> List.mapi fi |> List.filter_map (fun o -> o)
 
+let groupi_by f xs =
+  let ixs = List.mapi (fun i x -> (i, x)) xs in
+  List.fold_left (fun groups (i, x) ->
+    let tag = f x in
+    let rec new_ groups = match groups with
+    | [] -> [ tag, [ i ] ]
+    | (tag', is) :: gs when tag = tag' -> (tag, i :: is) :: gs
+    | g :: gs -> g :: new_ gs in
+    new_ groups
+  ) [] ixs
+
+
 (* TODO: move this to al/walk.ml *)
 open Al.Ast
 
