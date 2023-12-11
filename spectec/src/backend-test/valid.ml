@@ -26,6 +26,7 @@ let nt_matches_op nt op = match nt, op with
 | _ -> false
 
 let is_inn nt = nt = i32T || nt = i64T
+let is_fnn nt = nt = f32T || nt = f64T
 
 let default = function
 | T (CaseV ("I32", [])) -> case_vv "CONST" (singleton "I32") zero
@@ -113,4 +114,8 @@ let validate_instr case args const (_rt1, rt2) =
 
       Some [ nt; compose_opt is_some' m' s; compose_memop a' o ]
     | _ -> None)
+  | "SELECT" -> ( match args, rt2 with
+    | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t then Some args else None
+    | [ OptV _ ], [ T t ] -> Some [ OptV (Some (listV [t])) ]
+    | _ -> None )
   | _ -> Some args
