@@ -201,6 +201,19 @@ let default_context = {
 let types_cache = ref []
 let type_cache = ref (numV 0)
 let locals_cache = ref []
+let tids_cache = ref []
+let globals_cache = ref []
+let tables_cache = ref []
+
+let init_cache () =
+  types_cache := [];
+  type_cache := (numV 0);
+  locals_cache := [];
+  tids_cache := [];
+  globals_cache := [];
+  tables_cache := []
+
+let do_cache ref v = ref := v; v
 let cache_if cond ref v = if cond then ref := v; v
 
 let get_type types tid =
@@ -221,11 +234,14 @@ let estimate_out t types = Al.Ast.(
     [ T v ]
 )
 
+let is_func_table = function
+| Al.Ast.CaseV ("TABLE", [ TupV [ _; CaseV ("FUNCREF", []) ]]) -> true
+| _ -> false
+
 exception OutOfLife
 
 (* Generate specific syntax from input IL *)
 let rec gen c name =
-  let syn = find_syn name in
   let c' = { c with parent_name = name } in
 
   (* HARDCODE: Wasm expression *)
@@ -239,16 +255,18 @@ let rec gen c name =
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
   (* HARDCODE: memidx to be always 0 *)
   if name = "memidx" then numV 0 else
+  (* HARCODE: typeidx of function is already cached *)
+  if name = "typeidx" && c.parent_case = "FUNC" then List.nth !tids_cache c.i |> numV |> do_cache type_cache else
   (* HARDCODE: pack_size to be 8/16/32 *)
   if contains c.parent_case [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
     numV (choose [8; 16; 32])
   else
 
   let post_process = cache_if (
-    name = "typeidx" && c.parent_case = "FUNC"
-    || name = "globaltype"
+    name = "globaltype"
     || name = "reftype" && c.parent_case = "ELEM" ) type_cache in
 
+  let syn = find_syn name in
   ( match syn.it with
   | AliasT typ -> gen_typ c' typ
   (* TupV *)
@@ -273,8 +291,10 @@ let rec gen c name =
   | NotationT ((atom :: _) :: _, typs)
   | NotationT ([[]; [atom]], typs) (* Hack for I8 *) ->
     let case = string_of_atom atom in
-    let args = gen_typs { c' with parent_case = case } typs in
-    Al.Ast.CaseV (case, args)
+    let c'' = { c' with parent_case = case } in
+    let args = gen_typs c'' typs in
+    let args' = List.map (gen_wasm_funcs c'') args in (* Regenerated deferred wasm funcs *)
+    Al.Ast.CaseV (case, args')
   (* StrV *)
   | StructT typfields ->
     let rec_ = List.fold_right (fun typefield ->
@@ -303,7 +323,7 @@ let rec gen c name =
       let (atom, (_, typs, _), _) = typcase in
       let case = string_of_atom atom in
       let (t1, t2, entangles) = !rts |> Record.find case in
-      let (rt1, rt2, induced_args) = fix_rts case t1 t2 entangles in
+      let (rt1, rt2, induced_args) = fix_rts case const_required t1 t2 entangles in
       let valid_rts = (
         poppable rt1 && (
           let (cur_stack, target_stack_opt, _, n) = updated_stack rt1 rt2 (List.hd !expr_info_stack) in
@@ -360,6 +380,11 @@ and gen_wasm_expr c rt1 rt2 label =
   in
   try_expr max_life
 
+and gen_wasm_funcs c = function
+  | CaseV ("DEFERRED_FUNCS", []) ->
+    List.init (List.length !tids_cache) (fun i -> gen { c with i = i } "func") |> listV
+  | v -> v
+
 and gen_typ c typ = match typ.it with
   (* HARDCODE: imported builtins *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
@@ -384,9 +409,15 @@ and gen_typ c typ = match typ.it with
     let n = match name with
     | "table" | "data" | "elem" | "type" | "func" | "global" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
     | _ -> Random.int 3 (* 0, 1, 2 *) in
+    if name = "func" then (* Hardcode: Defer generating functions *)
+      let tids = List.init n (fun _ -> Random.int (List.length !types_cache)) in
+      tids_cache := tids;
+      singleton "DEFERRED_FUNCS" else
     let l = List.init n (fun i -> gen_typ { c with i = i } typ') in
     if name = "type" then types_cache := l;
     if name = "local" then locals_cache := l;
+    if name = "table" then tables_cache := l;
+    if name = "global" then globals_cache := l;
     listV l
   | TupT typs -> TupV (List.map (gen_typ c) typs)
   | IterT (typ', Opt) ->
@@ -400,7 +431,9 @@ and gen_typs c typs = match typs.it with
   | TupT typs' -> List.map (gen_typ c) typs'
   | _ -> [ gen_typ c typs ]
 
-and fix_rts case rt1 rt2 entangles =
+and fix_rts case const_required rt1 rt2 entangles =
+  let bot = [ BotT ], [], [] in
+
   if contains case [ "BLOCK"; "LOOP"; "IF" ] then
     let i32_opt = if case = "IF" then [ T (singleton "I32") ] else [] in
     let bt = gen default_context "blocktype" in
@@ -417,11 +450,34 @@ and fix_rts case rt1 rt2 entangles =
     let params = get_type !types_cache (!type_cache |> al_to_int) |> fst in
     let locals = !locals_cache |> List.map (fun l -> T (arg_of_case "LOCAL" 0 l)) in
     let ls = params @ locals in
-    if ls = [] then [ BotT ], [], [] else
+    if ls = [] then bot else
     let lid = Random.int (List.length ls) in
     let lt = List.nth ls lid in
     let subst = function SubT _ -> lt | t -> t in
     (List.map subst rt1, List.map subst rt2, [ 0, numV lid ])
+
+  else if contains case [ "GLOBAL.GET"; "GLOBAL.SET" ] then (*TODO: Perhaps automate this? *)
+    let no_mut = case_v "MUT" (OptV None) in
+    let gs = List.map (function
+    | Al.Ast.CaseV ("GLOBAL", [ TupV [ m; t ]; _ ]) -> (m <> no_mut, t)
+    | _ -> failwith "Unreachable: Global") !globals_cache in
+    let g x = (false, singleton x) in
+    let gs_builtins = [ g "I32"; g "I64"; g "F32"; g "F64" ] in
+    let gs' = if const_required then gs_builtins else gs_builtins @ gs in
+    let gids = find_index_all (fun (is_mut, _) -> (case = "GLOBAL.SET") --> is_mut) gs' in
+    if gids = [] then bot else
+    let gid = choose gids in
+    let t = List.nth gs' gid |> snd in
+    let subst = function SubT _ -> T t | t' -> t' in
+    (List.map subst rt1, List.map subst rt2, [ 0, numV gid ])
+
+  else if contains case [ "TABLE.GET"; "TABLE.SET"; "TABLE.GROW"; "TABLE.FILL" ] then (*TODO: Perhaps automate this? *)
+    let (tid, table) = choosei !tables_cache in
+    let rt = match table with
+    | CaseV ("TABLE", [ TupV [ _; rt ] ] ) -> rt
+    | _ -> failwith "Unreachable: Table" in
+    let subst = function SubT _ -> T rt | t' -> t' in
+    (List.map subst rt1, List.map subst rt2, [ 0, numV tid ])
 
   else if case = "RETURN" then
     (* TODO: Signal arbitrary size better *)
@@ -449,6 +505,19 @@ and fix_rts case rt1 rt2 entangles =
     (List.init (Random.int 3) (fun _ -> TopT) @ t @ [ T (singleton "I32") ]),
     List.init 3 (fun _ -> TopT),
     [ 0, List.map numV lids |> listV; 1, numV lid ]
+
+  else if case = "CALL" then
+    let fid, tid = choosei !tids_cache in
+    let arrow = get_type !types_cache tid in
+    fst arrow, snd arrow, [ 0, numV (fid + 1) (* due to imported function (move to patch?) *) ]
+
+  else if case = "CALL_INDIRECT" then
+    let tables = find_index_all is_func_table !tables_cache in
+    if tables = [] then bot else
+    let table = choose tables in
+    let tid = Random.int (List.length !types_cache) in
+    let arrow = get_type !types_cache tid in
+    fst arrow @ [ T (singleton "I32") ], snd arrow, [ 0, numV table; 1, numV (tid + 1) (* move to patch? *) ]
 
   else
     let cache = ref Record.empty in
@@ -588,8 +657,9 @@ let gen_test el' il' al' =
   Tester.init_tester ();
 
   (* Generate tests *)
-  let seeds = List.init !test_num (fun _i ->
-    prerr_endline ("Generatring " ^ string_of_int _i ^ "th module...");
+  let seeds = List.init !test_num (fun i ->
+    prerr_endline ("Generatring " ^ string_of_int i ^ "th module...");
+    init_cache ();
     gen default_context "module"
   ) in
 

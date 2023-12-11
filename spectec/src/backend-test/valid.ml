@@ -68,15 +68,6 @@ let validate_instr case args const (_rt1, rt2) =
     | nt :: _ when is_inn nt -> Some args
     | _ -> None )
   | "CVTOP" -> if correct_cvtop args then Some args else None
-  | "GLOBAL.GET" -> ( match rt2 with
-    | [ T (CaseV ("I32", [])) ] -> Some [ NumV 0L ]
-    | [ T (CaseV ("I64", [])) ] -> Some [ NumV 1L ]
-    | [ T (CaseV ("F32", [])) ] -> Some [ NumV 2L ]
-    | [ T (CaseV ("F64", [])) ] -> Some [ NumV 3L ]
-    | _ -> None )
-  | "GLOBAL.SET" -> ( match args with
-    | [ gid ] -> Some [ add_num gid (NumV 4L) ]
-    | _ -> None )
   | "CALL_REF" | "RETURN_CALL_REF" -> ( match args with
     | [ OptV (Some _) ] -> Some args
     | _ -> None )

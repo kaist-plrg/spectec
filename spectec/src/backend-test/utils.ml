@@ -1,8 +1,9 @@
-let choose l =
+let choosei l =
   let n = List.length l in
   assert (n > 0);
   let i = Random.int n in
-  List.nth l i
+  i, List.nth l i
+let choose l = choosei l |> snd
 
 let contains x = List.exists (fun x' -> x = x')
 
