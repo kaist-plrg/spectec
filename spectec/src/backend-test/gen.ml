@@ -19,6 +19,7 @@ let hds xs = xs |> List.rev |> List.tl |> List.rev
 let option_flatmap f opt = Option.bind opt f
 
 let (-->) p q = (not p) || q
+let (%>) f g v = f v |> g
 
 let flatten_rec = List.concat_map (fun def ->
   match def.it with
@@ -189,13 +190,15 @@ type context = {
   i: int;               (* Denote generating i-th value for IterT *)
   parent_case: string;  (* Denote case of most recent parent CaseV *)
   parent_name: string;  (* Denote name of most recent production *)
-  depth_limit: int      (* HARDCODE: Limit on block / loop / if depth *)
+  depth_limit: int;     (* HARDCODE: Limit on block / loop / if depth *)
+  is_func: bool;        (* HARDCODE: currently making function *)
 }
 let default_context = {
   i = 0;
   parent_case = "";
   parent_name = "";
   depth_limit = 3;
+  is_func = false;
 }
 
 let types_cache = ref []
@@ -204,6 +207,7 @@ let locals_cache = ref []
 let tids_cache = ref []
 let globals_cache = ref []
 let tables_cache = ref []
+let refs_cache = ref []
 
 let init_cache () =
   types_cache := [];
@@ -211,10 +215,14 @@ let init_cache () =
   locals_cache := [];
   tids_cache := [];
   globals_cache := [];
-  tables_cache := []
+  tables_cache := [];
+  refs_cache := [];
+  ()
 
 let do_cache ref v = ref := v; v
+let append_cache ref v = ref := v :: !ref; v
 let cache_if cond ref v = if cond then ref := v; v
+let append_cache_if cond ref v = if cond then ref := v :: !ref; v
 
 let get_type types tid =
   let arrow = List.nth types tid |> arg_of_case "TYPE" 0 in
@@ -243,6 +251,7 @@ exception OutOfLife
 (* Generate specific syntax from input IL *)
 let rec gen c name =
   let c' = { c with parent_name = name } in
+  let c' = if name = "func" || name = "start" then { c' with is_func = true } else c' in
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then
@@ -262,9 +271,13 @@ let rec gen c name =
     numV (choose [8; 16; 32])
   else
 
-  let post_process = cache_if (
+  let post_process =
+  cache_if (
     name = "globaltype"
-    || name = "reftype" && c.parent_case = "ELEM" ) type_cache in
+    || name = "reftype" && c.parent_case = "ELEM" ) type_cache
+  %> append_cache_if (
+    name = "funcidx" && not c.is_func) refs_cache in
+
 
   let syn = find_syn name in
   ( match syn.it with
@@ -445,6 +458,10 @@ and fix_rts case const_required rt1 rt2 entangles =
       let arrow = get_type !types_cache (al_to_int tid) in
       fst arrow @ i32_opt, snd arrow, pair
     | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
+
+  else if case = "REF.FUNC" then
+    if List.length !refs_cache = 0 then bot
+    else rt1, rt2, [ 0, choose !refs_cache ]
 
   else if contains case [ "LOCAL.GET"; "LOCAL.SET"; "LOCAL.TEE" ] then (*TODO: Perhaps automate this? *)
     let params = get_type !types_cache (!type_cache |> al_to_int) |> fst in
