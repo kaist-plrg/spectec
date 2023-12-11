@@ -185,7 +185,18 @@ let print_consts () = List.iter (fun i -> print_endline i) !consts
 
 (** Seed generation **)
 
-let case_stack = ref []
+type context = {
+  i: int;               (* Denote generating i-th value for IterT *)
+  parent_case: string;  (* Denote case of most recent parent CaseV *)
+  parent_name: string;  (* Denote name of most recent production *)
+  depth_limit: int      (* HARDCODE: Limit on block / loop / if depth *)
+}
+let default_context = {
+  i = 0;
+  parent_case = "";
+  parent_name = "";
+  depth_limit = 3;
+}
 
 let types_cache = ref []
 let type_cache = ref (numV 0)
@@ -213,34 +224,40 @@ let estimate_out t types = Al.Ast.(
 exception OutOfLife
 
 (* Generate specific syntax from input IL *)
-let rec gen name =
+let rec gen c name =
   let syn = find_syn name in
+  let c' = { c with parent_name = name } in
 
   (* HARDCODE: Wasm expression *)
   if name = "expr" then
-    let out = ( match top case_stack with
+    let out = ( match c.parent_case with
     | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out !type_cache !types_cache
     | "ACTIVE" -> [ T (singleton "I32") ]
     | _ -> [ TopT ] ) in
-    gen_wasm_expr [] out out else
+    gen_wasm_expr c' [] out out else
   (* HARDCODE: name *)
   if name = "name" then (Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])) else
   (* HARDCODE: memidx to be always 0 *)
   if name = "memidx" then numV 0 else
   (* HARDCODE: pack_size to be 8/16/32 *)
-  if !case_stack > [] && contains (top case_stack)  [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
+  if contains c.parent_case [ "LOAD"; "STORE"; "EXTEND" ] && name = "n" then
     numV (choose [8; 16; 32])
   else
 
-  match syn.it with
-  | AliasT typ -> gen_typ typ
+  let post_process = cache_if (
+    name = "typeidx" && c.parent_case = "FUNC"
+    || name = "globaltype"
+    || name = "reftype" && c.parent_case = "ELEM" ) type_cache in
+
+  ( match syn.it with
+  | AliasT typ -> gen_typ c' typ
   (* TupV *)
   | NotationT ([[]; []; []], typs) ->
-    let pair = gen_typs typs in
+    let pair = gen_typs c' typs in
     Al.Ast.TupV pair
   | NotationT ([[LBrack]; [Dot2]; [RBrack]], typs) ->
     (* limits *)
-    let pair = gen_typs typs in
+    let pair = gen_typs c' typs in
     let fst = List.hd pair in
     let snd = List.hd (List.tl pair) in
     let new_snd = add_num fst snd in
@@ -248,7 +265,7 @@ let rec gen name =
   (* ArrowV *)
   | NotationT ([[]; [Arrow]; []], typs)
   | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
-    let pair = gen_typs typs in
+    let pair = gen_typs c' typs in
     let fst = List.hd pair in
     let snd = List.hd (List.tl pair) in
     Al.Ast.ArrowV (fst, snd)
@@ -256,16 +273,14 @@ let rec gen name =
   | NotationT ((atom :: _) :: _, typs)
   | NotationT ([[]; [atom]], typs) (* Hack for I8 *) ->
     let case = string_of_atom atom in
-    push case case_stack;
-    let args = gen_typs typs in
-    pop case_stack;
+    let args = gen_typs { c' with parent_case = case } typs in
     Al.Ast.CaseV (case, args)
   (* StrV *)
   | StructT typfields ->
     let rec_ = List.fold_right (fun typefield ->
       let (atom, (_, typ, _), _) = typefield in
       let key = string_of_atom atom in
-      let value = gen_typ typ in
+      let value = gen_typ c' typ in
       Record.add key value
     ) typfields Record.empty in
     Al.Ast.StrV rec_
@@ -273,11 +288,11 @@ let rec gen name =
   (* HARDCODE: Wasm instruction *)
   | VariantT typcases when name = "instr" ->
     (* HARDCODE: checks if currently in a context that requires const instrution *)
-    let const_required = (contains (top case_stack) !const_ctxs) in
+    let const_required = (contains c.parent_case !const_ctxs) in
     let const_filter (atom, _, _) =
       const_required --> contains (string_of_atom atom) !consts in
     let block_filter (atom, _, _) =
-      (List.length !case_stack > 4) --> not (contains (string_of_atom atom) [ "BLOCK"; "LOOP"; "IF" ]) in
+      (c.depth_limit <= 0) --> not (contains (string_of_atom atom) [ "BLOCK"; "LOOP"; "IF" ]) in
     let typcases' = typcases
       |> List.filter const_filter
       |> List.filter block_filter
@@ -301,13 +316,12 @@ let rec gen name =
       else
         let rec try_args life' =
           if life' = 0 then try_instr (life - 1) else (
-          push case case_stack;
+          let c'' = { c' with parent_case = case; depth_limit = c'.depth_limit - 1 } in
           let args = ( match case with
-          | "BLOCK" -> [ gen "blocktype"; gen_wasm_expr rt1 rt2 rt2 ]
-          | "LOOP" -> [ gen "blocktype"; gen_wasm_expr rt1 rt2 rt1 ]
-          | "IF" -> [ gen "blocktype"; gen_wasm_expr (hds rt1) rt2 rt2; gen_wasm_expr (hds rt1) rt2 rt2 ]
-          | _ -> gen_typs typs ) |> replace induced_args in
-          pop case_stack;
+          | "BLOCK" -> [ gen c'' "blocktype"; gen_wasm_expr c'' rt1 rt2 rt2 ]
+          | "LOOP" -> [ gen c'' "blocktype"; gen_wasm_expr c'' rt1 rt2 rt1 ]
+          | "IF" -> [ gen c'' "blocktype"; gen_wasm_expr c'' (hds rt1) rt2 rt2; gen_wasm_expr c'' (hds rt1) rt2 rt2 ]
+          | _ -> gen_typs c'' typs ) |> replace induced_args in
           match validate_instr case args const_required (rt1, rt2) with
           | None -> try_args (life' - 1)
           | Some args' ->
@@ -324,13 +338,12 @@ let rec gen name =
     let typcase = choose typcases in
     let (atom, (_, typs, _), _) = typcase in
     let case = string_of_atom atom in
-    push case case_stack;
-    let args = gen_typs typs in
-    pop case_stack;
+    let args = gen_typs { c' with parent_case = case } typs in
     Al.Ast.CaseV (case, args)
   | _ -> failwith ("TODO: gen of " ^ Il.Print.string_of_deftyp syn ^ Il.Print.structured_string_of_deftyp syn)
+  ) |> post_process
 
-and gen_wasm_expr rt1 rt2 label =
+and gen_wasm_expr c rt1 rt2 label =
   let max_life = 100 in
   let rec try_expr life =
     if (life = 0) then
@@ -339,7 +352,7 @@ and gen_wasm_expr rt1 rt2 label =
       let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
       push (List.rev rt1, Some (List.rev rt2), label, n) expr_info_stack; (* TODO: make input optional? *)
       try
-        let ret = List.init n (fun _ -> gen "instr") |> listV in
+        let ret = List.init n (fun i -> gen { c with i = i } "instr") |> listV in
         pop expr_info_stack;
         ret
       with
@@ -347,7 +360,7 @@ and gen_wasm_expr rt1 rt2 label =
   in
   try_expr max_life
 
-and gen_typ typ = match typ.it with
+and gen_typ c typ = match typ.it with
   (* HARDCODE: imported builtins *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
     let import name kind t = Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; case_v kind t ]) in
@@ -362,10 +375,7 @@ and gen_typ typ = match typ.it with
       (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
     ]
   (* General types *)
-  | VarT id -> gen id.it |> cache_if (
-    id.it = "typeidx" && top case_stack = "FUNC"
-    || id.it = "globaltype"
-    || id.it = "reftype" && top case_stack = "ELEM" ) type_cache
+  | VarT id -> gen c id.it
   | NumT NatT ->
     let i = Random.int 3 (* 0, 1, 2 *) in
     numV i
@@ -374,26 +384,26 @@ and gen_typ typ = match typ.it with
     let n = match name with
     | "table" | "data" | "elem" | "type" | "func" | "global" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
     | _ -> Random.int 3 (* 0, 1, 2 *) in
-    let l = List.init n (fun _ -> gen_typ typ') in
+    let l = List.init n (fun i -> gen_typ { c with i = i } typ') in
     if name = "type" then types_cache := l;
     if name = "local" then locals_cache := l;
     listV l
-  | TupT typs -> TupV (List.map gen_typ typs)
+  | TupT typs -> TupV (List.map (gen_typ c) typs)
   | IterT (typ', Opt) ->
     if Random.bool() then
       optV_none
     else
-      optV_some (gen_typ typ')
+      optV_some ((gen_typ c) typ')
   | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.structured_string_of_typ typ)
 
-and gen_typs typs = match typs.it with
-  | TupT typs' -> List.map gen_typ typs'
-  | _ -> [ gen_typ typs ]
+and gen_typs c typs = match typs.it with
+  | TupT typs' -> List.map (gen_typ c) typs'
+  | _ -> [ gen_typ c typs ]
 
 and fix_rts case rt1 rt2 entangles =
   if contains case [ "BLOCK"; "LOOP"; "IF" ] then
     let i32_opt = if case = "IF" then [ T (singleton "I32") ] else [] in
-    let bt = gen "blocktype" in
+    let bt = gen default_context "blocktype" in
     let pair = [ 0, bt ] in
     match bt with
     | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
@@ -444,7 +454,7 @@ and fix_rts case rt1 rt2 entangles =
     let cache = ref Record.empty in
     let len_cache = ref Record.empty in
     let update r x v = r := Record.add x v !r; v in
-    let get x sub = try Record.find x !cache with | _ -> gen sub |> update cache x in
+    let get x sub = try Record.find x !cache with | _ -> gen default_context sub |> update cache x in
     let get_len x = try Record.find x !len_cache with | _ -> Random.int 3 |> update len_cache x in
 
     let rec fix_rt rt = List.concat_map (fun vt -> match vt with
@@ -580,7 +590,7 @@ let gen_test el' il' al' =
   (* Generate tests *)
   let seeds = List.init !test_num (fun _i ->
     prerr_endline ("Generatring " ^ string_of_int _i ^ "th module...");
-    gen "module"
+    gen default_context "module"
   ) in
 
   (* Mutatiion *)
