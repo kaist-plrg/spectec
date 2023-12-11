@@ -207,6 +207,7 @@ let locals_cache = ref []
 let tids_cache = ref []
 let globals_cache = ref []
 let tables_cache = ref []
+let elems_cache = ref []
 let refs_cache = ref []
 
 let init_cache () =
@@ -216,6 +217,7 @@ let init_cache () =
   tids_cache := [];
   globals_cache := [];
   tables_cache := [];
+  elems_cache := [];
   refs_cache := [];
   ()
 
@@ -431,6 +433,7 @@ and gen_typ c typ = match typ.it with
     if name = "local" then locals_cache := l;
     if name = "table" then tables_cache := l;
     if name = "global" then globals_cache := l;
+    if name = "elem" then elems_cache := l;
     listV l
   | TupT typs -> TupV (List.map (gen_typ c) typs)
   | IterT (typ', Opt) ->
@@ -444,7 +447,7 @@ and gen_typs c typs = match typs.it with
   | TupT typs' -> List.map (gen_typ c) typs'
   | _ -> [ gen_typ c typs ]
 
-and fix_rts case const_required rt1 rt2 entangles =
+and fix_rts case const_required rt1 rt2 entangles = Al.Ast.(
   let bot = [ BotT ], [], [] in
 
   if contains case [ "BLOCK"; "LOOP"; "IF" ] then
@@ -476,7 +479,7 @@ and fix_rts case const_required rt1 rt2 entangles =
   else if contains case [ "GLOBAL.GET"; "GLOBAL.SET" ] then (*TODO: Perhaps automate this? *)
     let no_mut = case_v "MUT" (OptV None) in
     let gs = List.map (function
-    | Al.Ast.CaseV ("GLOBAL", [ TupV [ m; t ]; _ ]) -> (m <> no_mut, t)
+    | CaseV ("GLOBAL", [ TupV [ m; t ]; _ ]) -> (m <> no_mut, t)
     | _ -> failwith "Unreachable: Global") !globals_cache in
     let g x = (false, singleton x) in
     let gs_builtins = [ g "I32"; g "I64"; g "F32"; g "F64" ] in
@@ -488,13 +491,38 @@ and fix_rts case const_required rt1 rt2 entangles =
     let subst = function SubT _ -> T t | t' -> t' in
     (List.map subst rt1, List.map subst rt2, [ 0, numV gid ])
 
-  else if contains case [ "TABLE.GET"; "TABLE.SET"; "TABLE.GROW"; "TABLE.FILL" ] then (*TODO: Perhaps automate this? *)
+  else if contains case [ "TABLE.GET"; "TABLE.SET"; "TABLE.GROW"; "TABLE.FILL" ] then
     let (tid, table) = choosei !tables_cache in
     let rt = match table with
     | CaseV ("TABLE", [ TupV [ _; rt ] ] ) -> rt
     | _ -> failwith "Unreachable: Table" in
     let subst = function SubT _ -> T rt | t' -> t' in
     (List.map subst rt1, List.map subst rt2, [ 0, numV tid ])
+
+  else if case = "TABLE.COPY" then
+    let get_rt = function
+    | CaseV ("TABLE", [ TupV [ _; rt ] ] ) -> rt
+    | _ -> failwith "Unreachable: Table" in
+    let groups = groupi_by get_rt !tables_cache in
+    let (_, tids) = choose groups in
+    (rt1, rt2, [ 0, numV (choose tids); 1, numV (choose tids) ])
+
+  else if case = "TABLE.INIT" then
+    let get_rt = function
+    | CaseV ("TABLE", [ TupV [ _; rt ] ] )
+    | CaseV ("ELEM", rt :: _) -> rt
+    | _ -> failwith "Unreachable: Table / Elem" in
+    let tgroups = groupi_by get_rt !tables_cache in
+    let egroups = groupi_by get_rt !elems_cache in
+    let tegroups = List.fold_left (fun acc (et, eids) ->
+      let f (tt, tids) = if (et = tt) then Some tids else None in
+      match List.find_map f tgroups with
+      | Some tids -> (tids, eids) :: acc
+      | None -> acc
+    ) [] egroups in
+    if tegroups = [] then bot else
+    let (tids, eids) = choose tegroups in
+    (rt1, rt2, [ 0, numV (choose tids); 1, numV (choose eids) ])
 
   else if case = "RETURN" then
     (* TODO: Signal arbitrary size better *)
@@ -553,6 +581,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     let rt2' = fix_rt rt2 in
     let induced_args = List.map (fun (i, x) -> (i, Record.find x !cache)) entangles in
     (rt1', rt2', induced_args)
+)
 
 (** Mutation **)
 let mutate modules =
