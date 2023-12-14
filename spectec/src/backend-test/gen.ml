@@ -594,7 +594,7 @@ let mutate modules =
 
 (** Injection **)
 type invoke = string * Al.Ast.value list
-type exn' = exn * string list
+type exn' = exn * string list * Al.Ast.cond list
 type invoke_result = (Al.Ast.value list, exn') result
 type assertion = invoke * invoke_result
 type instant_result = (assertion list, exn') result
@@ -602,7 +602,7 @@ type instant_result = (assertion list, exn') result
 let mk_assertion funcinst =
   let name = field_of_str "NAME" funcinst |> al_to_string in
   let addr = field_of_str "VALUE" funcinst |> arg_of_case "FUNC" 0 in
-  let n = try
+  let arg_types = try
     !Ds.store
     |> Record.find "FUNC"
     |> al_to_list
@@ -610,16 +610,21 @@ let mk_assertion funcinst =
     |> field_of_str "TYPE"
     |> arg_of_tup 0 (* Wasm 2.0 *)
     |> al_to_list
-    |> List.length
-  with _ -> 3 in
-  let args = List.init n (fun i -> Al.Ast.CaseV ("CONST", [ singleton "I32"; numV (i+1) ])) in (*TODO *)
+  with _ -> [] in
+  let args = List.map (fun t ->
+    match t with
+    | Al.Ast.CaseV ("I32", [])
+    | Al.Ast.CaseV ("I64", [])
+    | Al.Ast.CaseV ("F32", [])
+    | Al.Ast.CaseV ("F64", []) -> case_vv "CONST" t (numV (Random.full_int 0x7fffffff))
+    | _ -> (* Assumpnion: is ref *) case_v "REF.NULL" t ) arg_types in
   let invoke = (name, args) in
 
   try
     let returns = Interpreter.call_invoke [ addr; args |> listV ] in
     invoke, Ok (al_to_list returns)
   with
-    | e -> invoke, Error (e, !Interpreter.algo_name_stack)
+    | e -> invoke, Error (e, !Interpreter.algo_name_stack, !Interpreter.cond_stack)
 
 let print_assertion ((f, args), result) =
   print_endline (match result with
@@ -627,19 +632,19 @@ let print_assertion ((f, args), result) =
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
     (returns |> List.map Al.Print.string_of_value |> String.concat " ")
-  | Error (Exception.Trap, _) -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
+  | Error (Exception.Trap _, _, _) -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
-  | Error (e, stack) -> Printf.sprintf "Invocation of %s failed due to %s during %s"
+  | Error (e, stack, _) -> Printf.sprintf "Invocation of %s failed due to %s during %s"
     f
     (Printexc.to_string e)
-    (String.concat "," stack) )
+    (String.concat "," (stack |> List.filteri (fun i _ -> i < 10))) )
 
 let get_instant_result m : instant_result = try
   let externvals = listV (
     List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
     @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
-    @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i]))
+    (* @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i])) *)
     (* @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i])) *)
   ) in (*TODO *)
   let mm = Interpreter.call_instantiate [ m; externvals ] in
@@ -651,8 +656,10 @@ let get_instant_result m : instant_result = try
   in
   Ok (List.map mk_assertion exported_funcs)
 with
-  | e -> Error (e, !Interpreter.algo_name_stack)
-let inject m = (m, get_instant_result m)
+  | e -> Error (e, !Interpreter.algo_name_stack, !Interpreter.cond_stack)
+let inject i m =
+  prerr_endline ("Injecting " ^ string_of_int i ^ "th module..");
+  (m, get_instant_result m)
 
 type module_ = Al.Ast.value
 type test = module_ * instant_result
@@ -665,27 +672,83 @@ let print_test (m, result) =
   | Ok assertions ->
     print_endline "Instantiation success";
     List.iter print_assertion assertions
-  | Error (Exception.Trap, stack) ->
+  | Error (Exception.Trap _, stack, _) ->
     print_endline ("Instantiation trapped during " ^ (String.concat "," stack))
-  | Error (e, stack) ->
+  | Error (e, stack, _) ->
     print_endline ("Instantiation failed: " ^ Printexc.to_string e ^ " during " ^ (String.concat "," stack)) );
   print_endline "================"
 
-let to_wast i (m, result) =
+let to_phrase x = Reference_interpreter.Source.(x @@ no_region)
+let infer_msg (e, algo_stack, cond_stack) = match e, List.hd algo_stack with
+| _, "UNREACHABLE" -> "unreachable executed"
+| _, "BINOP" -> "integer divide by zero"
+| _, "TABLE.GET"
+| _, "TABLE.SET"
+| _, "TABLE.FILL"
+| _, "TABLE.GROW"
+| _, "TABLE.COPY"
+| _, "TABLE.INIT" -> "out of bounds table access"
+| _, "LOAD"
+| _, "STORE"
+| _, "MEMORY.GROW"
+| _, "MEMORY.FILL"
+| _, "MEMORY.COPY"
+| _, "MEMORY.INIT" -> "out of bounds memory access"
+| Exception.Trap env, "CALL_INDIRECT" ->
+  ( match List.hd cond_stack with
+  | Al.Ast.CmpC _ -> "undefined element "
+  | _ -> "uninitialized element " )
+  ^ (Ds.Env.find "i" env |> al_to_int |> string_of_int)
+| _, case -> case
+
+let value_to_wast v = Reference_interpreter.( Value.( Script.(
+  match v with
+  | Al.Ast.CaseV ("REF.FUNC_ADDR", _) -> RefResult (RefTypePat FuncHT) |> to_phrase
+  | _ -> match Construct.al_to_value v with
+    | Num n -> NumResult (NumPat (n |> to_phrase)) |> to_phrase
+    | Ref r -> RefResult (RefPat (r |> to_phrase)) |> to_phrase
+    | _ -> failwith "vector value not supported" ) ) )
+
+let invoke_to_wast ((f, args), result) = Reference_interpreter.Script.(
+  let f' = Reference_interpreter.Utf8.decode f in
+  let args' = List.map (Construct.al_to_value %> to_phrase) args in
+  let action = Invoke (None, f', args') |> to_phrase in
+  let a_opt = match result with
+  | Ok returns ->
+    let returns' = List.map value_to_wast returns in
+    Some (AssertReturn (action, returns') |> to_phrase)
+  | Error (Exception.Exhaustion, _, _) -> None
+  | Error e -> Some (AssertTrap (action, infer_msg e) |> to_phrase) in
+  Option.map (fun a -> Assertion a |> to_phrase) a_opt;
+)
+
+let to_wast i (m, result) = Reference_interpreter.(
   ignore result;
-  "Writing " ^ (string_of_int i) ^ "th module..." |> prerr_endline;
+  let m_r = Construct.al_to_module m in
+
+  let def = Script.Textual m_r |> to_phrase in
+  let script = Script.( match result with
+  | Ok assertions ->
+    (Module (None, def) |> to_phrase)
+    :: List.filter_map invoke_to_wast assertions
+  | Error e ->
+    [ Assertion (AssertUninstantiable (def, infer_msg e) |> to_phrase) |> to_phrase ]
+  ) in
+
   let file = Filename.concat !Flag.out (string_of_int i ^ ".wast") in
-  let ref_module = Construct.al_to_module m in
-
   let oc = open_out file in
-  Reference_interpreter.Print.module_ oc 80 ref_module;
-  close_out oc;
-
+  "Writing " ^ (string_of_int i) ^ "th module..." |> prerr_endline;
+  (* Print.module_ oc 80 m_r; *)
+  Print.script oc 80 `Textual script;
+  close_out oc
+  (*
   try
-    Reference_interpreter.Valid.check_module ref_module;
+    Reference_interpreter.Valid.check_module m_r;
     prerr_endline "Valid"
   with
     | e -> prerr_endline ("Invalid: " ^ Printexc.to_string e)
+  *)
+)
 
 (* Generate tests *)
 
@@ -713,7 +776,7 @@ let gen_test el' il' al' =
   let modules = mutate seeds in
 
   (* Injection *)
-  let tests = List.map inject modules in
+  let tests = List.mapi inject modules in
 
   (* Print result *)
   List.iter print_test tests;

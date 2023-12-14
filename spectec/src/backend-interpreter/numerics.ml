@@ -150,7 +150,7 @@ let wrap_f64_binop op f1 f2 =
 let catch_ixx_exception f = try f() with
   | Ixx.DivideByZero
   | Ixx.Overflow
-  | Ixx.InvalidConversion -> raise Exception.Trap
+  | Ixx.InvalidConversion -> raise (Exception.Trap Ds.Env.empty)
 let wrap_i32_binop_with_trap op i1 i2 = catch_ixx_exception (fun _ -> wrap_i32_binop op i1 i2)
 let wrap_i64_binop_with_trap op i1 i2 = catch_ixx_exception (fun _ -> wrap_i64_binop op i1 i2)
 let binop : numerics =

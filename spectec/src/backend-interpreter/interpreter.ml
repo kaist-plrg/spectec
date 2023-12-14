@@ -677,6 +677,8 @@ and execute (wasm_instr: value): unit =
     |> Printf.sprintf "Executing invalid value: %s"
     |> failwith
 
+and cond_stack = ref []
+
 and interp_instr (env: env) (instr: instr): env =
   (*
   AL_Context.get_name () |> print_endline;
@@ -691,11 +693,14 @@ and interp_instr (env: env) (instr: instr): env =
   let res =
   match instr.it with
   (* Block instruction *)
-  | IfI (c, il1, il2) ->
-    if eval_cond env c then
+  | IfI (c, il1, il2) -> (
+    cond_stack := c :: !cond_stack;
+    let ret = if eval_cond env c then
       interp_instrs env il1
     else
-      interp_instrs env il2
+      interp_instrs env il2 in
+    cond_stack := List.tl !cond_stack;
+    ret )
   | EitherI (il1, il2) ->
     begin try interp_instrs env il1 with
     | Exception.MissingReturnValue
@@ -749,7 +754,7 @@ and interp_instr (env: env) (instr: instr): env =
     let args = List.map (eval_expr env) el in
     dsl_function_call f args |> ignore;
     env
-  | TrapI -> raise Exception.Trap
+  | TrapI -> raise (Exception.Trap env)
   | NopI -> env
   | ReturnI None ->
     () |> AL_Context.set_return;
@@ -875,7 +880,7 @@ and call_algo (name: string) (args: value list): AL_Context.return_value =
 
   let depth = !AL_Context.context_stack_length in
   if depth > 70_000 then
-    failwith "Stack overflow";
+    raise Exception.Exhaustion;
 
   (* Push AL context *)
   let al_context = AL_Context.create_context name in
@@ -907,7 +912,8 @@ and call_algo (name: string) (args: value list): AL_Context.return_value =
 let init_context () =
   AL_Context.init_context ();
   WasmContext.init_context ();
-  algo_name_stack := []
+  algo_name_stack := [];
+  cond_stack := []
 
 let call_instantiate (args: value list): value =
   init_context();
