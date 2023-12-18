@@ -406,7 +406,7 @@ and gen_typ c typ = match typ.it with
     let import name kind t = Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; case_v kind t ]) in
     let const = empty "MUT" in
     listV [
-      import "print" "FUNC" zero;
+      (* import "print" "FUNC" zero; *)
       import "global_i32" "GLOBAL" (TupV [const; singleton "I32"]);
       import "global_i64" "GLOBAL" (TupV [const; singleton "I64"]);
       import "global_f32" "GLOBAL" (TupV [const; singleton "F32"]);
@@ -414,6 +414,11 @@ and gen_typ c typ = match typ.it with
       import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; singleton "FUNCREF" ]);
       (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
     ]
+  (* HARDCODE: export functios *)
+  | IterT ({ it = VarT id; _ }, List) when id.it = "export" ->
+    List.init (List.length !tids_cache) (fun i ->
+      case_vv "EXPORT" (TextV ("f" ^ string_of_int i)) (case_v "FUNC" (numV i))
+    ) |> listV
   (* General types *)
   | VarT id -> gen c id.it
   | NumT NatT ->
@@ -554,7 +559,7 @@ and fix_rts case const_required rt1 rt2 entangles = Al.Ast.(
   else if case = "CALL" then
     let fid, tid = choosei !tids_cache in
     let arrow = get_type !types_cache tid in
-    fst arrow, snd arrow, [ 0, numV (fid + 1) (* due to imported function (move to patch?) *) ]
+    fst arrow, snd arrow, [ 0, numV fid ]
 
   else if case = "CALL_INDIRECT" then
     let tables = find_index_all is_func_table !tables_cache in
@@ -642,8 +647,8 @@ let print_assertion ((f, args), result) =
 
 let get_instant_result m : instant_result = try
   let externvals = listV (
-    List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i]))
-    @ List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
+    (* List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i])) *)
+    List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
     (* @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i])) *)
     (* @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i])) *)
   ) in (*TODO *)

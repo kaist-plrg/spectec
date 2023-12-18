@@ -36,7 +36,7 @@ let patch_types types =
 let patch_imports _imports =
   let mk_import name kind t = Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; case_v kind t ]) in
   listV [
-    mk_import "print" "FUNC" zero;
+    (* mk_import "print" "FUNC" zero; *)
     mk_import "global_i32" "GLOBAL" (TupV [empty "MUT"; singleton "I32"]);
     mk_import "global_i64" "GLOBAL" (TupV [empty "MUT"; singleton "I64"]);
     mk_import "global_f32" "GLOBAL" (TupV [empty "MUT"; singleton "F32"]);
@@ -93,17 +93,16 @@ let patch_datas datas = listv_map patch_data datas
 (* start *)
 let patch_start start =
   let fid = arg_of_case "START" 0 start |> al_to_int in
-  if fid = 0 then Some start else (* builtin print function *)
   let fs = !funcs |> al_to_list in
   let is_ok f =
     let tid = arg_of_case "FUNC" 0 f |> al_to_int in
-    let t = List.nth (!types |> al_to_list) tid in
+    let t = List.nth (!types |> al_to_list) tid |> arg_of_case "TYPE" 0 in
     t = ArrowV (listV [], listV []) in
-  let f = List.nth fs (fid - 1) in
+  let f = List.nth fs fid in
   if is_ok f then Some start else
   let candidates = find_index_all is_ok fs in
   if candidates = [] then None else
-  Some (case_v "START" (numV (choose candidates + 1)))
+  Some (case_v "START" (numV (choose candidates)))
 let patch_starts starts = match starts with
 | OptV None -> starts
 | OptV Some start -> OptV (patch_start start)
