@@ -175,7 +175,7 @@ rule Step_pure/relop:
 
 
 rule Step_pure/extend:
-  (CONST nt c) (EXTEND nt n)  ~>  (CONST nt $ext(n, $size(nt), S, c))
+  (CONST nt c) (EXTEND nt n)  ~>  (CONST nt $ext(n, $size(nt), S, $wrap($size(nt), n, c)))
 
 
 rule Step_pure/cvtop-val:
