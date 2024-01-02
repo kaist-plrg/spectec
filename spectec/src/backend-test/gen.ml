@@ -703,7 +703,7 @@ let infer_msg (e, algo_stack, cond_stack) = match e, List.hd algo_stack with
   ( match List.hd cond_stack with
   | Al.Ast.CmpC _ -> "undefined element "
   | _ -> "uninitialized element " )
-  ^ (Ds.Env.find "i" env |> al_to_int |> string_of_int)
+  ^ (Ds.Env.find "i" env |> al_to_int |> Int32.of_int |> Int32.to_string)
 | _, case -> case
 
 let value_to_wast v = Reference_interpreter.( Value.( Script.(

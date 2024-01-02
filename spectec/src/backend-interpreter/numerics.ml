@@ -460,7 +460,8 @@ let ext : numerics =
       | [ NumV n1; NumV n2; CaseV ("S", []); NumV n3 ] ->
         let i1 = Int64.to_int n1 in
         let i2 = Int64.to_int n2 in
-        if Int64.shift_right n3 (i1 - 1) = 0L then NumV n3 else
+        let sign_bit = Int64.shift_right n3 (i1 - 1) |> Int64.logand 1L in
+        if sign_bit = 0L then NumV n3 else
           let mask = Int64.sub (if i2 = 64 then 0L else Int64.shift_left 1L i2) (Int64.shift_left 1L i1) in
           NumV (Int64.logor n3 mask)
       | _ -> failwith "Invalid argument fot ext"

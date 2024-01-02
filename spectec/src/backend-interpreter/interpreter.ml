@@ -879,7 +879,7 @@ and call_algo (name: string) (args: value list): AL_Context.return_value =
   algo_name_stack := name :: !algo_name_stack;
 
   let depth = !AL_Context.context_stack_length in
-  if depth > 70_000 then
+  if depth > 100 then
     raise Exception.Exhaustion;
 
   (* Push AL context *)
