@@ -718,24 +718,23 @@ let invoke_to_wast ((f, args), result) = Reference_interpreter.Script.(
   let f' = Reference_interpreter.Utf8.decode f in
   let args' = List.map (Construct.al_to_value %> to_phrase) args in
   let action = Invoke (None, f', args') |> to_phrase in
-  let a_opt = match result with
+  ( match result with
   | Ok returns ->
     let returns' = List.map value_to_wast returns in
-    Some (AssertReturn (action, returns') |> to_phrase)
-  | Error (Exception.Exhaustion, _, _) -> None
-  | Error e -> Some (AssertTrap (action, infer_msg e) |> to_phrase) in
-  Option.map (fun a -> Assertion a |> to_phrase) a_opt;
+    AssertReturn (action, returns')
+  | Error (Exception.Exhaustion, _, _) -> AssertExhaustion (action, "")
+  | Error e -> AssertTrap (action, infer_msg e)
+  ) |> (fun a -> Assertion (to_phrase a) |> to_phrase)
 )
 
 let to_wast i (m, result) = Reference_interpreter.(
-  ignore result;
-  let m_r = Construct.al_to_module m in
+  ret m_r = Construct.al_to_module m in
 
   let def = Script.Textual m_r |> to_phrase in
   let script = Script.( match result with
   | Ok assertions ->
     (Module (None, def) |> to_phrase)
-    :: List.filter_map invoke_to_wast assertions
+    :: List.map invoke_to_wast assertions
   | Error e ->
     [ Assertion (AssertUninstantiable (def, infer_msg e) |> to_phrase) |> to_phrase ]
   ) in
