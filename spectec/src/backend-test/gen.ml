@@ -728,7 +728,7 @@ let invoke_to_wast ((f, args), result) = Reference_interpreter.Script.(
 )
 
 let to_wast i (m, result) = Reference_interpreter.(
-  ret m_r = Construct.al_to_module m in
+  let m_r = Construct.al_to_module m in
 
   let def = Script.Textual m_r |> to_phrase in
   let script = Script.( match result with
