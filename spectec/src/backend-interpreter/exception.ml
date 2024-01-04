@@ -1,4 +1,4 @@
-exception Trap of Ds.env
+exception Trap
 exception OutOfMemory
 exception Timeout
 exception MissingReturnValue

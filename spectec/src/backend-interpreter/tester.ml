@@ -362,7 +362,7 @@ let test_assertion assertion =
       let result = do_action invoke in
       fail expected (Al.Print.string_of_value result)
     with
-      | Exception.Trap _ -> Success
+      | Exception.Trap -> Success
       | e -> fail expected (Printexc.to_string e)
     end
   | AssertUninstantiable (def, msg) ->
@@ -375,7 +375,7 @@ let test_assertion assertion =
 
       fail expected"Module instantiation success"
     with
-      | Exception.Trap _ -> Success
+      | Exception.Trap -> Success
       | e -> fail expected (Printexc.to_string e)
     end
   | _ -> Ignore (* ignore other kinds of assertions *)

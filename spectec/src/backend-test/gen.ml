@@ -370,6 +370,7 @@ let rec gen c name =
     (* HARDCODE: Remove V128 *)
     let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "V128") typcases in
     let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "BOT") typcases in
+    (* let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "EXTERNREF") typcases in *)
     let typcase = choose typcases in
     let (atom, (_, typs, _), _) = typcase in
     let case = string_of_atom atom in
@@ -637,7 +638,7 @@ let print_assertion ((f, args), result) =
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
     (returns |> List.map Al.Print.string_of_value |> String.concat " ")
-  | Error (Exception.Trap _, _, _) -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
+  | Error (Exception.Trap, _, _) -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
   | Error (e, stack, _) -> Printf.sprintf "Invocation of %s failed due to %s during %s"
@@ -677,15 +678,16 @@ let print_test (m, result) =
   | Ok assertions ->
     print_endline "Instantiation success";
     List.iter print_assertion assertions
-  | Error (Exception.Trap _, stack, _) ->
+  | Error (Exception.Trap, stack, _) ->
     print_endline ("Instantiation trapped during " ^ (String.concat "," stack))
   | Error (e, stack, _) ->
     print_endline ("Instantiation failed: " ^ Printexc.to_string e ^ " during " ^ (String.concat "," stack)) );
   print_endline "================"
 
-let to_phrase x = Reference_interpreter.Source.(x @@ no_region)
+let to_phrase x = Reference_interpreter2.Source.(x @@ no_region)
 let infer_msg (e, algo_stack, cond_stack) = match e, List.hd algo_stack with
-| _, "UNREACHABLE" -> "unreachable executed"
+| Exception.Exhaustion, _ -> "exhaust"
+| _, "UNREACHABLE" -> "unreachable"
 | _, "BINOP" -> "integer divide by zero"
 | _, "TABLE.GET"
 | _, "TABLE.SET"
@@ -699,24 +701,22 @@ let infer_msg (e, algo_stack, cond_stack) = match e, List.hd algo_stack with
 | _, "MEMORY.FILL"
 | _, "MEMORY.COPY"
 | _, "MEMORY.INIT" -> "out of bounds memory access"
-| Exception.Trap env, "CALL_INDIRECT" ->
-  ( match List.hd cond_stack with
-  | Al.Ast.CmpC _ -> "undefined element "
-  | _ -> "uninitialized element " )
-  ^ (Ds.Env.find "i" env |> al_to_int |> Int32.of_int |> Int32.to_string)
+| Exception.Trap, "CALL_INDIRECT" -> ( match List.hd cond_stack with
+  | Al.Ast.CmpC _ -> "undefined element"
+  | _ -> "uninitialized element" )
 | _, case -> case
 
-let value_to_wast v = Reference_interpreter.( Value.( Script.(
+let value_to_wast v = Reference_interpreter2.( Values.( Script.(
   match v with
-  | Al.Ast.CaseV ("REF.FUNC_ADDR", _) -> RefResult (RefTypePat FuncHT) |> to_phrase
-  | _ -> match Construct.al_to_value v with
+  | Al.Ast.CaseV ("REF.FUNC_ADDR", _) -> RefResult (RefTypePat FuncRefType) |> to_phrase
+  | _ -> match Construct2.al_to_value v with
     | Num n -> NumResult (NumPat (n |> to_phrase)) |> to_phrase
     | Ref r -> RefResult (RefPat (r |> to_phrase)) |> to_phrase
     | _ -> failwith "vector value not supported" ) ) )
 
-let invoke_to_wast ((f, args), result) = Reference_interpreter.Script.(
+let invoke_to_wast ((f, args), result) = Reference_interpreter2.Script.(
   let f' = Reference_interpreter.Utf8.decode f in
-  let args' = List.map (Construct.al_to_value %> to_phrase) args in
+  let args' = List.map (Construct2.al_to_value %> to_phrase) args in
   let action = Invoke (None, f', args') |> to_phrase in
   ( match result with
   | Ok returns ->
@@ -727,8 +727,8 @@ let invoke_to_wast ((f, args), result) = Reference_interpreter.Script.(
   ) |> (fun a -> Assertion (to_phrase a) |> to_phrase)
 )
 
-let to_wast i (m, result) = Reference_interpreter.(
-  let m_r = Construct.al_to_module m in
+let to_wast i (m, result) = Reference_interpreter2.(
+  let m_r = Construct2.al_to_module m in
 
   let def = Script.Textual m_r |> to_phrase in
   let script = Script.( match result with
@@ -786,4 +786,10 @@ let gen_test el' il' al' =
   List.iter print_test tests;
 
   (* Convert to Wast *)
-  List.iteri to_wast tests
+  List.iteri to_wast tests;
+
+  (* Print Coverage *)
+  Ds.(
+    InfoMap.uncovered !info_map
+    |> InfoMap.print
+  )

@@ -754,7 +754,7 @@ and interp_instr (env: env) (instr: instr): env =
     let args = List.map (eval_expr env) el in
     dsl_function_call f args |> ignore;
     env
-  | TrapI -> raise (Exception.Trap env)
+  | TrapI -> raise Exception.Trap
   | NopI -> env
   | ReturnI None ->
     () |> AL_Context.set_return;
