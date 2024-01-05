@@ -60,7 +60,8 @@ let rts = ref Record.empty
 let rec string_of_vt = function
 | T v -> Al.Print.string_of_value v
 | SubT (x, sub) -> x ^ "<:" ^ sub
-| TopT | BotT -> "_"
+| TopT -> "_"
+| BotT -> "⊥"
 | SeqT t -> (string_of_vt t) ^ "*"
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 let print_rts () =
@@ -418,7 +419,9 @@ and gen_typ c typ = match typ.it with
   (* HARDCODE: export functios *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "export" ->
     List.init (List.length !tids_cache) (fun i ->
-      case_vv "EXPORT" (TextV ("f" ^ string_of_int i)) (case_v "FUNC" (numV i))
+      let funcidx = numV i in
+      refs_cache := funcidx :: !refs_cache;
+      case_vv "EXPORT" (TextV ("f" ^ string_of_int i)) (case_v "FUNC" funcidx)
     ) |> listV
   (* General types *)
   | VarT id -> gen c id.it
