@@ -114,7 +114,7 @@ let dedup_names exports =
   | [] -> []
   | e :: es' ->
     let name = arg_of_case "EXPORT" 0 e |> al_to_string in
-    if contains name names then
+    if List.mem name names then
       let name' = TextV (name ^ "'") in
       let e' = replace_case "EXPORT" 0 name' e in
       dedup_names' names (e' :: es')
