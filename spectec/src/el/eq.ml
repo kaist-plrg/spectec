@@ -37,7 +37,8 @@ and eq_typ t1 t2 =
     (t1.it = t2.it);
   *)
   match t1.it, t2.it with
-  | VarT id1, VarT id2 -> id1.it = id2.it
+  | VarT (id1, args1), VarT (id2, args2) ->
+    id1.it = id2.it && eq_list eq_arg args1 args2
   | ParenT t11, ParenT t21 -> eq_typ t11 t21
   | TupT ts1, TupT ts2 -> eq_list eq_typ ts1 ts2
   | IterT (t11, iter1), IterT (t21, iter2) ->
@@ -50,15 +51,15 @@ and eq_typ t1 t2 =
   | SeqT ts1, SeqT ts2 -> eq_list eq_typ ts1 ts2
   | InfixT (t11, atom1, t12), InfixT (t21, atom2, t22) ->
     eq_typ t11 t21 && atom1 = atom2 && eq_typ t12 t22
-  | BrackT (brack1, t11), BrackT (brack2, t21) ->
-    brack1 = brack2 && eq_typ t11 t21
+  | BrackT (l1, t11, r1), BrackT (l2, t21, r2) ->
+    l1 = l2 && eq_typ t11 t21 && r1 = r2
   | _, _ -> t1.it = t2.it
 
 and eq_typfield (atom1, (t1, prems1), _) (atom2, (t2, prems2), _) =
   atom1 = atom2 && eq_typ t1 t2 && eq_nl_list eq_prem prems1 prems2
 
-and eq_typcase (atom1, (ts1, prems1), _) (atom2, (ts2, prems2), _) =
-  atom1 = atom2 && eq_list eq_typ ts1 ts2 && eq_nl_list eq_prem prems1 prems2
+and eq_typcase (atom1, (t1, prems1), _) (atom2, (t2, prems2), _) =
+  atom1 = atom2 && eq_typ t1 t2 && eq_nl_list eq_prem prems1 prems2
 
 and eq_typenum (e1, eo1) (e2, eo2) =
   eq_exp e1 e2 && eq_opt eq_exp eo1 eo2
@@ -68,7 +69,8 @@ and eq_typenum (e1, eo1) (e2, eo2) =
 
 and eq_exp e1 e2 =
   match e1.it, e2.it with
-  | VarE id1, VarE id2 -> id1.it = id2.it
+  | VarE (id1, args1), VarE (id2, args2) ->
+    id1.it = id2.it && eq_list eq_arg args1 args2
   | UnE (op1, e11), UnE (op2, e21) -> op1 = op2 && eq_exp e11 e21
   | BinE (e11, op1, e12), BinE (e21, op2, e22) ->
     eq_exp e11 e21 && op1 = op2 && eq_exp e12 e22
@@ -91,10 +93,14 @@ and eq_exp e1 e2 =
   | DotE (e11, atom1), DotE (e21, atom2) -> eq_exp e11 e21 && atom1 = atom2
   | InfixE (e11, atom1, e12), InfixE (e21, atom2, e22) ->
     eq_exp e11 e21 && atom1 = atom2 && eq_exp e12 e22
-  | BrackE (brack1, e1), BrackE (brack2, e2) -> brack1 = brack2 && eq_exp e1 e2
-  | CallE (id1, e1), CallE (id2, e2) -> id1.it = id2.it && eq_exp e1 e2
+  | BrackE (l1, e1, r1), BrackE (l2, e2, r2) ->
+    l1 = l2 && eq_exp e1 e2 && r1 = r2
+  | CallE (id1, args1), CallE (id2, args2) ->
+    id1.it = id2.it && eq_list eq_arg args1 args2
   | IterE (e11, iter1), IterE (e21, iter2) ->
     eq_exp e11 e21 && eq_iter iter1 iter2
+  | TypE (e11, t1), TypE (e21, t2) ->
+    eq_exp e11 e21 && eq_typ t1 t2
   | _, _ -> e1.it = e2.it
 
 and eq_expfield (atom1, e1) (atom2, e2) =
@@ -123,9 +129,34 @@ and eq_prem prem1 prem2 =
 
 (* Grammars *)
 
-let eq_param p1 p2 =
+and eq_sym g1 g2 =
+  match g1.it, g2.it with
+  | VarG (id1, args1), VarG (id2, args2) ->
+    id1.it = id2.it && eq_list eq_arg args1 args2
+  | SeqG gs1, SeqG gs2
+  | AltG gs1, AltG gs2 -> eq_nl_list eq_sym gs1 gs2
+  | TupG gs1, TupG gs2 -> eq_list eq_sym gs1 gs2
+  | RangeG (g11, g12), RangeG (g21, g22) -> eq_sym g11 g21 && eq_sym g12 g22
+  | ParenG g11, ParenG g21 -> eq_sym g11 g21
+  | IterG (g11, iter1), IterG (g21, iter2) ->
+    eq_sym g11 g21 && eq_iter iter1 iter2
+  | ArithG e1, ArithG e2 -> eq_exp e1 e2
+  | AttrG (e1, g11), AttrG (e2, g21) -> eq_exp e1 e2 && eq_sym g11 g21
+  | _, _ -> g1.it = g2.it
+
+
+(* Definitions *)
+
+and eq_arg a1 a2 =
+  match !(a1.it), !(a2.it) with
+  | ExpA e1, ExpA e2 -> eq_exp e1 e2
+  | SynA t1, SynA t2 -> eq_typ t1 t2
+  | GramA g1, GramA g2 -> eq_sym g1 g2
+  | _, _ -> false
+
+and eq_param p1 p2 =
   match p1.it, p2.it with
-  | VarP id1, VarP id2 -> id1.it = id2.it
-  | GramP (id11, id12, iters1), GramP (id21, id22, iters2) ->
-    id11.it = id21.it && id12.it = id22.it && eq_list eq_iter iters1 iters2
+  | ExpP (id1, t1), ExpP (id2, t2) -> id1.it = id2.it && eq_typ t1 t2
+  | SynP id1, SynP id2 -> id1.it = id2.it
+  | GramP (id1, t1), GramP (id2, t2) -> id1.it = id2.it && eq_typ t1 t2
   | _, _ -> false

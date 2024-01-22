@@ -2,16 +2,13 @@
   (name backend_interpreter)
   (libraries reference_interpreter reference_interpreter2 util il el str middlend al)
   (modules
-    translate
-    transpile
     interpreter
     numerics
     construct
     construct2
-    tester
+    runner
     exception
-    il2il
     manual
     ds
-    )
+    builtin)
 )

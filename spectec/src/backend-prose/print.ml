@@ -3,6 +3,10 @@ open Prose
 open Printf
 
 (* Helpers *)
+let string_of_opt prefix stringifier suffix = function
+  | None -> ""
+  | Some x -> prefix ^ stringifier x ^ suffix
+
 let string_of_list stringifier left sep right = function
   | [] -> left ^ right
   | h :: t ->
@@ -50,7 +54,7 @@ let rec string_of_instr = function
         (string_of_opt " with type " string_of_expr "" e_opt)
   | IfI (c, is) ->
       sprintf "%s If %s, \n%s" (indent ())
-        (string_of_cond c)
+        (string_of_expr c)
         (string_of_list indented_string_of_instr "" "\n" "" is)
   | ForallI (e1, e2, is) ->
       sprintf "%s For all %s in %s,\n%s" (indent ())
@@ -59,8 +63,8 @@ let rec string_of_instr = function
         (string_of_list indented_string_of_instr "" "\n" "" is)
   | EquivI (e1, e2) ->
       sprintf "%s (%s) and (%s) are equivalent." (indent ())
-        (string_of_cond e2)
-        (string_of_cond e1)
+        (string_of_expr e2)
+        (string_of_expr e1)
   | YetI s -> indent () ^ " Yet: " ^ s
 
 and indented_string_of_instr i =

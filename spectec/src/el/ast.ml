@@ -20,16 +20,20 @@ type atom =
   | Atom of string               (* atomid *)
   | Infinity                     (* infinity *)
   | Bot                          (* `_|_` *)
+  | Top                          (* `^|^` *)
   | Dot                          (* `.` *)
   | Dot2                         (* `..` *)
   | Dot3                         (* `...` *)
   | Semicolon                    (* `;` *)
   | Backslash                    (* `\` *)
-  | In                           (* `in` *)
+  | In                           (* `<-` *)
   | Arrow                        (* `->` *)
+  | Arrow2                       (* ``=>` *)
   | Colon                        (* `:` *)
   | Sub                          (* `<:` *)
+  | Sup                          (* `:>` *)
   | Assign                       (* `:=` *)
+  | Equiv                        (* `==` *)
   | Approx                       (* `~~` *)
   | SqArrow                      (* `~>` *)
   | SqArrowStar                  (* `~>*` *)
@@ -37,15 +41,14 @@ type atom =
   | Succ                         (* `>>` *)
   | Turnstile                    (* `|-` *)
   | Tilesturn                    (* `-|` *)
-  | Quest                        (* `?` *)
-  | Star                         (* `*` *)
-
-type brack =
-  | Paren                        (* ``(` ... `)` *)
-  | Brack                        (* ``[` ... `]` *)
-  | Brace                        (* ``{` ... `}` *)
-
-type dots = Dots | NoDots
+  | Quest                        (* ``?` *)
+  | Plus                         (* ``+` *)
+  | Star                         (* ``*` *)
+  | Comma                        (* ``,` *)
+  | Bar                          (* ``|` *)
+  | LParen | RParen              (* ``(` `)` *)
+  | LBrack | RBrack              (* ``[` `]` *)
+  | LBrace | RBrace              (* ``{` `}` *)
 
 
 (* Iteration *)
@@ -59,6 +62,8 @@ type iter =
 
 (* Types *)
 
+and dots = Dots | NoDots
+
 and numtyp =
   | NatT                         (* `nat` *)
   | IntT                         (* `int` *)
@@ -67,7 +72,7 @@ and numtyp =
 
 and typ = typ' phrase
 and typ' =
-  | VarT of id                   (* varid *)
+  | VarT of id * arg list        (* varid (`(` arg,* `)`)? *)
   | BoolT                        (* `bool` *)
   | NumT of numtyp               (* numtyp *)
   | TextT                        (* `text` *)
@@ -79,12 +84,12 @@ and typ' =
   | CaseT of dots * id nl_list * typcase nl_list * dots (* `|` list(`...`|varid|typcase, `|`) *)
   | RangeT of typenum nl_list    (* exp `|` `...` `|` exp *)
   | AtomT of atom                (* atom *)
-  | SeqT of typ list             (* `epsilon` / typ typ *)
+  | SeqT of typ list             (* `eps` / typ typ *)
   | InfixT of typ * atom * typ   (* typ atom typ *)
-  | BrackT of brack * typ        (* ``` ([{ typ }]) *)
+  | BrackT of atom * typ * atom  (* ``` ([{ typ }]) *)
 
-and typfield = atom * (typ * premise nl_list) * hint list     (* atom typ prem* hint* *)
-and typcase = atom * (typ list * premise nl_list) * hint list (* atom typ* prem* hint* *)
+and typfield = atom * (typ * premise nl_list) * hint list (* atom typ prem* hint* *)
+and typcase = atom * (typ * premise nl_list) * hint list  (* atom typ* prem* hint* *)
 and typenum = exp * exp option                  (* exp (`|` exp (`|` `...` `|` exp)?)* *)
 
 
@@ -116,7 +121,7 @@ and cmpop =
 
 and exp = exp' phrase
 and exp' =
-  | VarE of id                   (* varid *)
+  | VarE of id * arg list        (* varid *)
   | AtomE of atom                (* atom *)
   | BoolE of bool                (* bool *)
   | NatE of nat                  (* nat *)
@@ -126,7 +131,7 @@ and exp' =
   | UnE of unop * exp            (* unop exp *)
   | BinE of exp * binop * exp    (* exp binop exp *)
   | CmpE of exp * cmpop * exp    (* exp cmpop exp *)
-  | EpsE                         (* `epsilon` *)
+  | EpsE                         (* `eps` *)
   | SeqE of exp list             (* exp exp *)
   | IdxE of exp * exp            (* exp `[` exp `]` *)
   | SliceE of exp * exp * exp    (* exp `[` exp `:` exp `]` *)
@@ -141,10 +146,11 @@ and exp' =
   | ParenE of exp * bool         (* `(` exp `)` *)
   | TupE of exp list             (* `(` list2(exp, `,`) `)` *)
   | InfixE of exp * atom * exp   (* exp atom exp *)
-  | BrackE of brack * exp        (* ``` ([{ exp }]) *)
-  | CallE of id * exp            (* `$` defid exp? *)
+  | BrackE of atom * exp * atom  (* ``` ([{ exp }]) *)
+  | CallE of id * arg list       (* `$` defid (`(` arg,* `)`)? *)
   | IterE of exp * iter          (* exp iter *)
-  | HoleE of bool                (* `%` or `%%` *)
+  | TypE of exp * typ            (* exp `:` typ *)
+  | HoleE of [`Use | `Skip] * [`One | `All]  (* `%` or `%%` or `!%` or `!%%` *)
   | FuseE of exp * exp           (* exp `#` exp *)
 
 and expfield = atom * exp        (* atom exp *)
@@ -161,12 +167,12 @@ and path' =
 
 and sym = sym' phrase
 and sym' =
-  | VarG of id * sym list                    (* gramid (`(` sym,* `)`)? *)
+  | VarG of id * arg list                    (* gramid (`(` arg,* `)`)? *)
   | NatG of int                              (* nat *)
   | HexG of int                              (* 0xhex *)
   | CharG of int                             (* U+hex *)
   | TextG of string                          (* `"`text`"` *)
-  | EpsG                                     (* `epsilon` *)
+  | EpsG                                     (* `eps` *)
   | SeqG of sym nl_list                      (* sym sym *)
   | AltG of sym nl_list                      (* sym `|` sym *)
   | RangeG of sym * sym                      (* sym `|` `...` `|` sym *)
@@ -174,7 +180,7 @@ and sym' =
   | TupG of sym list                         (* `(` sym ',' ... ',' sym `)` *)
   | IterG of sym * iter                      (* sym iter *)
   | ArithG of exp                            (* `$(` exp `)` *)
-  | AttrG of sym * exp                       (* exp `:` sym *)
+  | AttrG of exp * sym                       (* exp `:` sym *)
 
 and prod = prod' phrase
 and prod' = sym * exp * premise nl_list      (* `|` sym `=>` exp (`--` premise)* *)
@@ -187,19 +193,26 @@ and gram' = dots * prod nl_list * dots       (* `|` list(`...`|prod, `|`) *)
 
 and param = param' phrase
 and param' =
-  | VarP of id                                (* varid *)
-  | GramP of id * id * iter list              (* `grammar` gramid `:` varid iter* *)
+  | ExpP of id * typ                         (* varid `:` typ *)
+  | SynP of id                               (* `syntax` varid *)
+  | GramP of id * typ                        (* `grammar` gramid `:` typ *)
+
+and arg = arg' ref phrase
+and arg' =
+  | ExpA of exp                              (* exp *)
+  | SynA of typ                              (* `syntax` typ *)
+  | GramA of sym                             (* `grammar` sym *)
 
 and def = def' phrase
 and def' =
-  | SynD of id * id * typ * hint list         (* `syntax` synid hint* `=` typ *)
-  | GramD of id * id * param list * typ * gram * hint list (* `grammar` gramid hint* `:` type `=` gram *)
-  | RelD of id * typ * hint list              (* `relation` relid `:` typ hint* *)
-  | RuleD of id * id * exp * premise nl_list  (* `rule` relid ruleid? `:` exp (`--` premise)* *)
-  | VarD of id * typ * hint list              (* `var` varid `:` typ *)
-  | DecD of id * exp * typ * hint list        (* `def` `$` defid exp? `:` typ hint* *)
-  | DefD of id * exp * exp * premise nl_list  (* `def` `$` defid exp? `=` exp (`--` premise)* *)
-  | SepD                                      (* separator *)
+  | SynD of id * id * param list * typ * hint list (* `syntax` synid params hint* `=` typ *)
+  | GramD of id * id * param list * typ * gram * hint list (* `grammar` gramid params hint* `:` type `=` gram *)
+  | RelD of id * typ * hint list                   (* `relation` relid `:` typ hint* *)
+  | RuleD of id * id * exp * premise nl_list       (* `rule` relid ruleid? `:` exp (`--` premise)* *)
+  | VarD of id * typ * hint list                   (* `var` varid `:` typ *)
+  | DecD of id * param list * typ * hint list      (* `def` `$` defid params `:` typ hint* *)
+  | DefD of id * arg list * exp * premise nl_list  (* `def` `$` defid exp? `=` exp (`--` premise)* *)
+  | SepD                                           (* separator *)
   | HintD of hintdef
 
 and premise = premise' phrase

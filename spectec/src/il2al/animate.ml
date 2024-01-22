@@ -3,7 +3,6 @@ This transformation
 1) reorders premises and
 2) explicitly denotate a premise if it is an assignment.
 by performing dataflow analysis.
-
 *)
 
 open Util
@@ -11,13 +10,18 @@ open Source
 open Il.Ast
 open Il.Free
 
+
 (* Helpers *)
+
 let rec list_count' pred acc = function
 | [] -> acc
 | hd :: tl -> list_count' pred (acc + if pred hd then 1 else 0) tl
 let list_count pred = list_count' pred 0
 
 let not_ f x = not (f x)
+
+(* let debug = print_endline *)
+let debug _ = ()
 
 (* Remove or *)
 let remove_or_exp e = match e.it with (* TODO: recursive *)
@@ -199,6 +203,11 @@ let wrap x = [x]
 
 let singletons = List.map wrap
 
+let arg_grouper e _ = match e.it with
+| CallE (_, { it = TupE args; _ }) -> List.map (fun arg -> free_exp_list arg) args
+| CallE (_, arg) -> [ free_exp_list arg ]
+| _ -> failwith "Unreachable"
+
 let large_enough_subsets xs =
   let yss = powset xs in
   let n = List.length xs in
@@ -206,6 +215,8 @@ let large_enough_subsets xs =
   (* TODO: Increase this limit by reducing execution time *)
   let min = if n >= 2 then n-1 else n in
   List.filter ( fun ys -> min <= List.length ys ) yss
+
+let (@@) f g x = f x @ g x
 
 let is_not_lhs e = match e.it with
 | LenE _ | IterE (_, (ListN (_, Some _), _)) | DotE _ -> true
@@ -223,7 +234,7 @@ let is_call e = match e.it with
 
 let subset_selector e =
   if is_not_lhs e then (fun _ -> [])
-  else if is_call e then singletons
+  else if is_call e then singletons @@ arg_grouper e
   else if is_atomic_lhs e then wrap
   else large_enough_subsets
 
@@ -300,19 +311,15 @@ let animate_prems known_vars prems =
   best := (List.length cols + 1, []);
   let candidates = match knuth rows cols [] with
     | [] ->
-      (*
-      print_endline "Animation failed (binding inference).";
-      prems |> List.map Il.Print.string_of_prem |> List.iter print_endline;
-      *)
+      debug "Animation failed (binding inference).";
+      prems |> List.map Il.Print.string_of_prem |> List.iter debug;
       [ snd !best ]
     | xs -> List.map List.rev xs in
   best' := (-1, []);
   match List.find_map (fun cand -> select_tight cand other known_vars) candidates with
   | None ->
-    (*
-    print_endline "...Animation failed (reorder)";
-    (List.hd candidates) |> List.map unwrap |> List.map Il.Print.string_of_prem |> List.iter print_endline;
-    *)
+    debug "...Animation failed (reorder)";
+    (List.hd candidates) |> List.map unwrap |> List.map Il.Print.string_of_prem |> List.iter debug;
     snd !best'
   | Some x -> x
 

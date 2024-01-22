@@ -54,6 +54,161 @@ $${rule: Step_pure/extend}
 
 $${rule+: Step_pure/cvtop-*}
 
+Vector Instructions
+~~~~~~~~~~~~~~~~~~~~
+
+.. _exec-VVUNOP:
+
+%{prose-algo: VVUNOP}
+
+\
+
+$${rule+: Step_pure/vvunop}
+
+.. _exec-VVBINOP:
+
+%{prose-algo: VVBINOP}
+
+\
+
+$${rule+: Step_pure/vvbinop}
+
+.. _exec-VVTERNOP:
+
+%{prose-algo: VVTERNOP}
+
+\
+
+$${rule+: Step_pure/vvternop}
+
+.. _exec-VVTESTOP:
+
+%{prose-algo: VVTESTOP}
+
+\
+
+$${rule+: Step_pure/vvtestop}
+
+.. _exec-SHUFFLE:
+
+%{prose-algo: SHUFFLE}
+
+\
+
+$${rule+: Step_pure/shuffle}
+
+.. _exec-SPLAT:
+
+%{prose-algo: SPLAT}
+
+\
+
+$${rule+: Step_pure/splat}
+
+.. _exec-EXTRACT_LANE:
+
+%{prose-algo: EXTRACT_LANE}
+
+\
+
+$${rule+: Step_pure/extract_lane-*}
+
+.. _exec-REPLACE_LANE:
+
+%{prose-algo: REPLACE_LANE}
+
+\
+
+$${rule+: Step_pure/replace_lane}
+
+.. _exec-VUNOP:
+
+%{prose-algo: VUNOP}
+
+\
+
+$${rule+: Step_pure/vunop}
+
+.. _exec-VBINOP:
+
+%{prose-algo: VBINOP}
+
+\
+
+$${rule+: Step_pure/vbinop-*}
+
+.. _exec-VRELOP:
+
+%{prose-algo: VRELOP}
+
+\
+
+$${rule+: Step_pure/vrelop}
+
+.. _exec-VISHIFTOP:
+
+%{prose-algo: VISHIFTOP}
+
+\
+
+$${rule+: Step_pure/vishiftop}
+
+.. _exec-ALL_TRUE:
+
+%{prose-algo: ALL_TRUE}
+
+\
+
+$${rule+: Step_pure/all_true-*}
+
+.. _exec-BITMASK:
+
+%{prose-algo: BITMASK}
+
+\
+
+$${rule+: Step_pure/bitmask}
+
+.. _exec-NARROW:
+
+%{prose-algo: NARROW}
+
+\
+
+$${rule+: Step_pure/narrow}
+
+.. _exec-VCVTOP:
+
+%{prose-algo: VCVTOP}
+
+\
+
+$${rule+: Step_pure/vcvtop-*}
+
+.. _exec-DOT:
+
+%{prose-algo: DOT}
+
+\
+
+$${rule+: Step_pure/dot}
+
+.. _exec-EXTMUL_HALF:
+
+%{prose-algo: EXTMUL_HALF}
+
+\
+
+$${rule+: Step_pure/extmul_half}
+
+.. _exec-EXTADD_PAIRWISE:
+
+%{prose-algo: EXTADD_PAIRWISE}
+
+\
+
+$${rule+: Step_pure/extadd_pairwise}
+
 Reference Instructions
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -79,7 +234,6 @@ $${rule+: Step_pure/ref.is_null-*}
 
 \
 
-<<<<<<< HEAD
 $${rule+: Step_pure/ref.as_non_null-*}
 
 .. _exec-REF.EQ:
@@ -258,7 +412,7 @@ $${rule+: Step_read/array.fill-*}
 ARRAY.COPY
 ^^^^^^^^^^
 
-TODO (too deeply nested)
+%{prose-algo: ARRAY.COPY}
 
 \
 
@@ -296,11 +450,6 @@ $${rule+: Step_pure/extern.convert_any-*}
 
 $${rule+: Step_pure/any.convert_extern-*}
 
-.. _exec-instructions-parametric:
-=======
-$${rule: Step_read/ref.func}
->>>>>>> al
-
 Parametric Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -319,8 +468,6 @@ $${rule: Step_pure/drop}
 \
 
 $${rule+: Step_pure/select-*}
-
-.. _exec-INSTRUCTIONS-VARIABLE:
 
 Variable Instructions
 ~~~~~~~~~~~~~~~~~~~~~
@@ -499,8 +646,6 @@ $${rule+: Step_read/memory.init-*}
 
 $${rule: Step/data.drop}
 
-.. _exec-instructions-control:
-
 Control Instructions
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -534,11 +679,7 @@ $${definition: blocktype}
 
 \
 
-<<<<<<< HEAD
 $${rule+: Step_read/block}
-=======
-$${rule: Step_pure/block}
->>>>>>> al
 
 .. _exec-LOOP:
 
@@ -546,11 +687,7 @@ $${rule: Step_pure/block}
 
 \
 
-<<<<<<< HEAD
 $${rule+: Step_read/loop}
-=======
-$${rule: Step_pure/loop}
->>>>>>> al
 
 .. _exec-IF:
 
@@ -635,7 +772,7 @@ $${rule: Step_read/call}
 CALL_REF
 ^^^^^^^^
 
-TODO (too deeply nested)
+%{prose-algo: CALL_REF}
 
 \
 
@@ -696,12 +833,7 @@ Function Calls
 
 $${rule+: Step_pure/frame-vals}
 
-.. _exec-instructions-expressions:
-
 Expressions
 ~~~~~~~~~~~
 
-$${rule+:
-  Eval/*
-  Eval_expr
-}
+$${rule: Eval_expr}

@@ -1,7 +1,8 @@
 open Prose
 open Print
 open Il
-open Backend_interpreter.Translate
+open Al.Al_util
+open Il2al.Translate
 open Util.Source
 
 let cmpop_to_cmpop = function
@@ -16,7 +17,7 @@ let swap = function Lt -> Gt | Gt -> Lt | Le -> Ge | Ge -> Le | op -> op
 
 let transpile_expr =
   Al.Walk.walk_expr { Al.Walk.default_config with
-    post_expr = Backend_interpreter.Transpile.simplify_record_concat
+    post_expr = Il2al.Transpile.simplify_record_concat
   }
 
 let exp_to_expr e = exp2expr e |> transpile_expr
@@ -32,18 +33,18 @@ let rec if_expr_to_instrs e =
     let op = cmpop_to_cmpop op in
     let e1 = exp_to_expr e1 in
     let e2 = exp_to_expr e2 in
-    [ match e2 with LenE _ -> CmpI (e2, swap op, e1) | _ -> CmpI (e1, op, e2) ]
+    [ match e2.it with LenE _ -> CmpI (e2, swap op, e1) | _ -> CmpI (e1, op, e2) ]
   | Ast.BinE (Ast.AndOp, e1, e2) ->
     if_expr_to_instrs e1 @ if_expr_to_instrs e2
   | Ast.BinE (Ast.OrOp, e1, e2) ->
     let neg_cond = if_expr_to_instrs e1 in
     let body = if_expr_to_instrs e2 in
     [ match neg_cond with
-      | [ CmpI (IterE (VarE name, _, Opt), Eq, OptE None) ] ->
-          IfI (Al.Ast.IsDefinedC (Al.Ast.VarE name), body)
+      | [ CmpI ({ it = IterE ({ it = VarE name; _ }, _, Opt); _ }, Eq, { it = OptE None; _ }) ] ->
+          IfI (isDefinedE (varE name), body)
       | _ -> fail() ]
   | Ast.BinE (Ast.EquivOp, e1, e2) ->
-      [ EquivI (exp2cond e1, exp2cond e2) ]
+      [ EquivI (exp2expr e1, exp2expr e2) ]
   | _ -> [ fail() ]
 
 let rec prem_to_instrs prem = match prem.it with
@@ -64,10 +65,10 @@ let rec prem_to_instrs prem = match prem.it with
     )
   | Ast.IterPr (prem, iter) ->
     ( match iter with
-    | Ast.Opt, [id] -> [ IfI (Al.Ast.IsDefinedC (Al.Ast.VarE id.it), prem_to_instrs prem) ]
-    | Ast.List, [id] ->
-        let name = Al.Ast.VarE id.it in
-        [ ForallI (name, Al.Ast.IterE (name, [id.it], Al.Ast.List), prem_to_instrs prem) ]
+    | Ast.Opt, [id] -> [ IfI (isDefinedE (varE id.it), prem_to_instrs prem) ]
+    | Ast.(List | ListN _), [id] ->
+        let name = varE id.it in
+        [ ForallI (name, iterE (name, [id.it], Al.Ast.List), prem_to_instrs prem) ]
     | _ -> print_endline "prem_to_instr: Invalid prem 3"; [ YetI "TODO: prem_to_intrs 3" ])
   | _ ->
     let s = Il.Print.string_of_prem prem in

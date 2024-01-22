@@ -2,118 +2,150 @@ open Al
 open Ast
 open Al_util
 open Print
-open Util.Record
+open Util
+open Source
+
+
+(* Map *)
+
+module InfoMap = Map.Make (Int)
+module Env = Map.Make (String)
+module Map = Map.Make (String)
+
 
 (* Program *)
 
-module RuleMap = Map.Make (String)
-type rule_map = algorithm RuleMap.t ref
+type rule_map = algorithm Map.t
+type func_map = algorithm Map.t
 
-module FuncMap = Map.Make (String)
-type func_map = algorithm FuncMap.t ref
-
-let rule_map: rule_map = ref RuleMap.empty
-
-let func_map: func_map = ref FuncMap.empty
+let rule_map: rule_map ref = ref Map.empty
+let func_map: func_map ref = ref Map.empty
 
 let to_map algos =
   let f acc algo =
     let rmap, fmap = acc in
     match algo with
-    | RuleA ((name, _), _, _) -> (RuleMap.add name algo rmap, fmap)
-    | FuncA (name, _, _) -> (rmap, FuncMap.add name algo fmap)
+    | RuleA ((name, _), _, _) -> Map.add name algo rmap, fmap
+    | FuncA (name, _, _) -> rmap, Map.add name algo fmap
   in
-  List.fold_left f (RuleMap.empty, FuncMap.empty) algos
+  List.fold_left f (Map.empty, Map.empty) algos
 
-let lookup name =
-  if RuleMap.mem name !rule_map then
-    RuleMap.find name !rule_map
-  else if FuncMap.mem name !func_map then
-    FuncMap.find name !func_map
+let bound_rule name = Map.mem name !rule_map
+let bound_func name = Map.mem name !func_map
+
+let lookup_algo name =
+  if bound_rule name then
+    Map.find name !rule_map
+  else if bound_func name then
+    Map.find name !func_map
   else failwith ("Algorithm not found: " ^ name)
-
-
-(* Info *)
-
-type info = { algo_name: string; instr: instr; mutable covered: bool }
-module InfoMap = struct include Map.Make (Int)
-  type t = int * info
-
-  let make_info algo_name instr =
-    { algo_name; instr; covered = false }
-
-  let uncovered =
-    filter (fun _ info -> not info.covered)
-
-  let rec partition_by_algo info_map =
-    match choose_opt info_map with
-    | None -> []
-    | Some (_, info) ->
-      let f _ v = v.algo_name = info.algo_name in
-      let im1, im2 = partition f info_map in
-      im1 :: partition_by_algo im2
-
-  let print info_map =
-    partition_by_algo info_map
-    |> List.iter
-      (fun im ->
-        let _, v = choose im in
-        Printf.printf "\n[%s]\n" v.algo_name;
-        iter
-          (fun _ v' ->
-            Al.Print.string_of_instr (ref 0) 0 v'.instr
-            |> print_endline)
-          im)
-end
-
-let info_map = ref InfoMap.empty
 
 
 (* Store *)
 
-let store : store ref = ref Record.empty
+let _store : store ref = ref Record.empty
+let get_store () = !_store
 
-(* Environmet *)
 
-module Env = struct include Map.Make (String)
-
-  (* Printer *)
-  let string_of_env env =
-    string_of_list
-      (fun (k, v) ->
-        k ^ ": " ^ string_of_value v)
-      "\n{" ",\n  " "\n}"
-      (bindings env)
-
-  (* Environment API *)
-  let find key env =
-    try find key env
-    with Not_found ->
-      Printf.sprintf "The key '%s' is not in the map: %s."
-        key (string_of_env env)
-      |> prerr_endline;
-      raise Not_found
-
-  let add_store = add "s" (StoreV store)
-end
+(* Environment *)
 
 type env = value Env.t
 
+let string_of_env env =
+  "\n{" ^
+  Print.string_of_list
+    (fun (k, v) ->
+      k ^ ": " ^ Print.string_of_value v)
+    ",\n  "
+    (Env.bindings env) ^
+  "\n}"
+
+let lookup_env key env =
+  try Env.find key env
+  with Not_found ->
+    Printf.sprintf "The key '%s' is not in the map: %s."
+      key (string_of_env env)
+    |> prerr_endline;
+    raise Not_found
+
+let add_store = Env.add "s" (Ast.StoreV _store)
+
+
+(* Info *)
+
+module Info = struct
+  type info = { algo_name: string; instr: instr; mutable covered: bool }
+  let info_map : info InfoMap.t ref = ref InfoMap.empty
+
+  let make_info algo_name instr =
+    { algo_name; instr; covered = false }
+
+  let rec partition_by_algo info_map =
+    match InfoMap.choose_opt info_map with
+    | None -> []
+    | Some (_, info) ->
+      let f _ v = v.algo_name = info.algo_name in
+      let im1, im2 = InfoMap.partition f info_map in
+      im1 :: partition_by_algo im2
+
+  let print () =
+    partition_by_algo !info_map
+    |> List.iter
+      (fun im ->
+        let _, v = InfoMap.choose im in
+        Printf.printf "\n[%s]\n" v.algo_name;
+        InfoMap.iter
+          (fun _ v' ->
+            Al.Print.string_of_instr v'.instr
+            |> print_endline)
+          im)
+
+  let add k i = info_map := InfoMap.add k i !info_map
+
+  let find k = InfoMap.find k !info_map
+end
+
+
+(* Register *)
+
+module Register = struct
+  let _register : value Map.t ref = ref Map.empty
+  let _latest = ""
+
+  let add name moduleinst = _register := Map.add name moduleinst !_register
+
+  let add_with_var var moduleinst =
+    let open Reference_interpreter.Source in
+    add _latest moduleinst;
+    match var with
+    | Some name -> add name.it moduleinst
+    | _ -> ()
+
+  let find name = Map.find name !_register
+
+  let get_module_name var =
+    let open Reference_interpreter.Source in
+    match var with
+    | Some name -> name.it
+    | None -> _latest
+end
+
+
 (* AL Context *)
 
-module AL_Context = struct
+module AlContext = struct
   (* TODO: Change name *)
   type return_value =
     | Bot
     | None
     | Some of value
 
-  type t = string * return_value * int
+  type t = string * env * return_value * int
 
   let context_stack: t list ref = ref []
   let context_stack_length = ref 0
 
-  let create_context name = (name, Bot, 0)
+  let create_context name = name, Env.empty, Bot, 0
 
   let init_context () =
     context_stack := [];
@@ -135,7 +167,7 @@ module AL_Context = struct
     | _ -> failwith "AL context stack underflow"
 
   let get_name () =
-    let name, _, _ = get_context () in
+    let name, _, _, _ = get_context () in
     name
 
   (* Print *)
@@ -146,7 +178,7 @@ module AL_Context = struct
     | Some v -> string_of_value v
 
   let string_of_context ctx =
-    let name, return_value, depth = ctx in
+    let name, _, return_value, depth = ctx in
     Printf.sprintf "(%s, %s, %s)"
       name
       (string_of_return_value return_value)
@@ -157,41 +189,57 @@ module AL_Context = struct
       (fun acc ctx -> (string_of_context ctx) ^ " :: " ^ acc)
       "[]" !context_stack
 
+  (* Env *)
+
+  let set_env env =
+    let name, _, return_value, depth = pop_context () in
+    push_context (name, env, return_value, depth)
+
+  let update_env n v =
+    let name, env, return_value, depth = pop_context () in
+    push_context (name, Env.add n v env, return_value, depth)
+
+  let get_env () =
+    let _, env, _, _ = get_context () in
+    env
+
   (* Return value *)
+
   let set_return_value v =
-    let name, return_value, depth = pop_context () in
+    let name, env, return_value, depth = pop_context () in
     assert (return_value = Bot);
-    push_context (name, Some v, depth)
+    push_context (name, env, Some v, depth)
 
   let set_return () =
-    let name, return_value, depth = pop_context () in
+    let name, env, return_value, depth = pop_context () in
     assert (return_value = Bot);
-    push_context (name, None, depth)
+    push_context (name, env, None, depth)
 
   let get_return_value () =
-    let _, return_value, _ = get_context () in
+    let _, _, return_value, _ = get_context () in
     return_value
 
   (* Depth *)
 
   let get_depth () =
-    let _, _, depth = get_context () in
+    let _, _, _, depth = get_context () in
     depth
 
   let increase_depth () =
-    let name, return_value, depth = pop_context () in
-    push_context (name, return_value, depth + 1)
+    let name, env, return_value, depth = pop_context () in
+    push_context (name, env, return_value, depth + 1)
 
   let rec decrease_depth () =
-    let name, return_value, depth = pop_context () in
+    let name, env, return_value, depth = pop_context () in
     if depth > 0 then
-      push_context (name, return_value, depth - 1)
+      push_context (name, env, return_value, depth - 1)
     else (
       decrease_depth ();
-      push_context (name, return_value, depth)
+      push_context (name, env, return_value, depth)
     )
 
 end
+
 
 (* Wasm Context *)
 
@@ -205,11 +253,6 @@ module WasmContext = struct
     match !context_stack with
     | h :: _ -> h
     | _ -> failwith "Wasm context stack underflow"
-
-  let get_nth_context n =
-    match List.nth_opt !context_stack n with
-    | Some ctx -> ctx
-    | None -> failwith "Wasm context stack underflow"
 
   let init_context () = context_stack := [top_level_context]
 
@@ -226,8 +269,8 @@ module WasmContext = struct
     let v, vs, vs_instr = ctx in
     Printf.sprintf "(%s, %s, %s)"
       (string_of_value v)
-      (string_of_value (listV vs))
-      (string_of_value (listV vs_instr))
+      (string_of_list string_of_value ", " vs)
+      (string_of_list string_of_value ", " vs_instr)
 
   let string_of_context_stack () =
     List.fold_left
@@ -235,17 +278,21 @@ module WasmContext = struct
       "[]" !context_stack
 
   (* Context *)
+
+  let get_value_with_condition f =
+    match List.find_opt (fun (v, _, _) -> f v) !context_stack with
+    | Some (v, _, _) -> v
+    | None -> failwith "Wasm context stack underflow"
+
   let get_current_context () =
     let ctx, _, _ = get_context () in
     ctx
 
   let get_current_frame () =
-    let rec get_current_frame' n =
-      match get_nth_context n with
-      | (FrameV _ as f, _, _) -> f
-      | _ -> get_current_frame' (n+1)
-    in
-    get_current_frame' 0
+    let match_frame = function
+      | FrameV _ -> true
+      | _ -> false
+    in get_value_with_condition match_frame 
 
   let get_module_instance () =
     match get_current_frame () with
@@ -253,17 +300,16 @@ module WasmContext = struct
     | _ -> failwith "Invalid frame"
 
   let get_current_label () =
-    let rec get_current_label' n =
-      match get_nth_context n with
-      | (LabelV _ as l, _, _) -> l
-      | _ -> get_current_label' (n+1)
-    in
-    get_current_label' 0
+    let match_label = function
+      | LabelV _ -> true
+      | _ -> false
+    in get_value_with_condition match_label 
 
   (* Value stack *)
 
   let is_value = function
     | CaseV ("CONST", _) -> true
+    | CaseV ("VVCONST", _) -> true
     | CaseV (ref, _)
       when String.starts_with ~prefix:"REF." ref -> true
     | _ -> false
@@ -296,19 +342,18 @@ module WasmContext = struct
     | _ -> failwith "Wasm instr stack underflow"
 end
 
+
 (* Initialization *)
 
 let init algos =
-
   (* Initialize info_map *)
-
   let init_info algo =
     let algo_name = get_name algo in
     let config = {
       Walk.default_config with pre_instr =
         (fun i ->
-          let info = InfoMap.make_info algo_name i in
-          info_map := InfoMap.add i.nid info !info_map;
+          let info = Info.make_info algo_name i in
+          Info.add i.note info;
           [i])
     } in
     Walk.walk config algo
@@ -322,13 +367,13 @@ let init algos =
   func_map := fmap;
 
   (* Initialize store *)
-  store :=
+  _store :=
     Record.empty
-    |> Record.add "FUNC" (listV [])
-    |> Record.add "GLOBAL" (listV [])
-    |> Record.add "TABLE" (listV [])
-    |> Record.add "MEM" (listV [])
-    |> Record.add "ELEM" (listV [])
-    |> Record.add "DATA" (listV [])
-    |> Record.add "STRUCT" (listV [])
-    |> Record.add "ARRAY" (listV [])
+    |> Record.add "FUNC" (listV [||])
+    |> Record.add "GLOBAL" (listV [||])
+    |> Record.add "TABLE" (listV [||])
+    |> Record.add "MEM" (listV [||])
+    |> Record.add "ELEM" (listV [||])
+    |> Record.add "DATA" (listV [||])
+    |> Record.add "STRUCT" (listV [||])
+    |> Record.add "ARRAY" (listV [||])

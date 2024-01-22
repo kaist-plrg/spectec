@@ -2,7 +2,7 @@ open Al
 open Ast
 open Al_util
 open Utils
-open Util.Record
+open Util
 
 type valtype =
 | T of value
@@ -12,10 +12,10 @@ type valtype =
 | SeqT of valtype
 type restype = valtype list
 
-let i32T = singleton "I32"
-let i64T = singleton "I64"
-let f32T = singleton "F32"
-let f64T = singleton "F64"
+let i32T = nullary "I32"
+let i64T = nullary "I64"
+let f32T = nullary "F32"
+let f64T = nullary "F64"
 
 (* Helper *)
 let nt_matches_op nt op = match nt, op with
@@ -29,12 +29,12 @@ let is_inn nt = nt = i32T || nt = i64T
 let is_fnn nt = nt = f32T || nt = f64T
 
 let default = function
-| T (CaseV ("I32", [])) -> case_vv "CONST" (singleton "I32") zero
-| T (CaseV ("I64", [])) -> case_vv "CONST" (singleton "I64") zero
-| T (CaseV ("F32", [])) -> case_vv "CONST" (singleton "F32") zero
-| T (CaseV ("F64", [])) -> case_vv "CONST" (singleton "F64") zero
-| T (CaseV (("FUNCREF" | "EXTERNREF"), []) as rt) -> case_v "REF.NULL" rt
-| _ -> singleton "UNREACHABLE"
+| T (CaseV ("I32", [])) -> caseV ("CONST", [nullary "I32"; zero])
+| T (CaseV ("I64", [])) -> caseV ("CONST", [nullary "I64"; zero])
+| T (CaseV ("F32", [])) -> caseV ("CONST", [nullary "F32"; zero])
+| T (CaseV ("F64", [])) -> caseV ("CONST", [nullary "F64"; zero])
+| T (CaseV (("FUNCREF" | "EXTERNREF"), []) as rt) -> caseV ("REF.NULL", [rt])
+| _ -> nullary "UNREACHABLE"
 
 (** Estimate if the given module is valid **)
 
@@ -65,7 +65,7 @@ let validate_instr case args const (_rt1, rt2) =
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )
   | "EXTEND" -> ( match args with
-    | [ CaseV ("I32", []) as nt; NumV 32L ] -> Some [ nt; choose [ numV 8; numV 16 ] ]
+    | [ CaseV ("I32", []) as nt; NumV 32L ] -> Some [ nt; choose [ numV 8L; numV 16L ] ]
     | nt :: _ when is_inn nt -> Some args
     | _ -> None )
   | "CVTOP" -> if correct_cvtop args then Some args else None
@@ -84,17 +84,20 @@ let validate_instr case args const (_rt1, rt2) =
 
       let decompose_opt = function
       | OptV None -> false, n, ""
-      | OptV (Some (TupV [ m; s ])) -> true, al_to_int m, case_of_case s
-      | OptV (Some m) -> true, al_to_int m, ""
+      | OptV (Some (TupV [ m; s ])) -> true, unwrap_numv_to_int m, casev_of_case s
+      | OptV (Some m) -> true, unwrap_numv_to_int m, ""
       | _ -> failwith "Unreachable" in
       let compose_opt is_some m s = match is_some, s with
-      | true, "" -> OptV (Some ( numV m ))
-      | true, _  -> OptV (Some ( TupV [ numV m; singleton s ]))
+      | true, "" -> OptV (Some ( numV_of_int m ))
+      | true, _  -> OptV (Some ( TupV [ numV_of_int m; nullary s ]))
       | false, _ -> OptV None in
       let (is_some, m, s) = decompose_opt opt in
 
-      let decompose_memop s = field_of_str "ALIGN" s |> al_to_int, field_of_str "OFFSET" s |> al_to_int in
-      let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV a) |> Record.add "OFFSET" (numV o)) in
+      let decompose_memop s = (
+          s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
+          s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_numv_to_int
+        )in
+      let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV_of_int a) |> Record.add "OFFSET" (numV_of_int o)) in
       let (a, o) = decompose_memop memop in
 
       let is_some' = if x = "F" then false else is_some in
@@ -116,6 +119,6 @@ let validate_instr case args const (_rt1, rt2) =
     | _ -> None)
   | "SELECT" -> ( match args, rt2 with
     | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t then Some args else None
-    | [ OptV _ ], [ T t ] -> Some [ OptV (Some (listV [t])) ]
+    | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
   | _ -> Some args

@@ -3,7 +3,7 @@ open Utils
 open Valid
 
 open Util.Source
-open Util.Record
+open Util
 open Backend_interpreter
 open Al.Al_util
 
@@ -69,7 +69,7 @@ let rec string_of_vt = function
 | SeqT t -> (string_of_vt t) ^ "*"
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 let print_rts () =
-  Record.iter (fun (k, v) ->
+  Record.iter (fun k v ->
     let (rt1, rt2, _) = v in
     Printf.sprintf "%s : %s -> %s" k (string_of_rt rt1) (string_of_rt rt2) |> print_endline
   ) !rts
@@ -78,7 +78,7 @@ let estimate_rt () =
   let open Il.Ast in
   let rec get_rt e =
     match e.it with
-    | CaseE (atom, { it = TupE []; _}) -> [ T (singleton (string_of_atom atom)) ]
+    | CaseE (atom, { it = TupE []; _}) -> [ T (nullary (string_of_atom atom)) ]
     | ListE es -> List.concat_map get_rt es
     | VarE id -> [ SubT (id.it, Il.Print.string_of_typ e.note) ]
     | SubE ({ it = VarE id; _ }, { it = VarT id'; _ }, _)  -> [ SubT (id.it, id'.it) ]
@@ -239,7 +239,7 @@ let default_context = {
 }
 
 let types_cache = ref []
-let type_cache = ref (numV 0)
+let type_cache = ref (numV 0L)
 let locals_cache = ref []
 let tids_cache = ref []
 let globals_cache = ref []
@@ -249,7 +249,7 @@ let refs_cache = ref []
 
 let init_cache () =
   types_cache := [];
-  type_cache := (numV 0);
+  type_cache := (numV 0L);
   locals_cache := [];
   tids_cache := [];
   globals_cache := [];
@@ -264,11 +264,11 @@ let cache_if cond ref v = if cond then ref := v; v
 let append_cache_if cond ref v = if cond then ref := v :: !ref; v
 
 let get_type types tid =
-  let arrow = List.nth types tid |> arg_of_case "TYPE" 0 in
+  let arrow = List.nth types tid |> casev_nth_arg 0 in
   let f i =
-    arrow
-    |> arg_of_tup i (* Wasm 2.0 *)
-    |> al_to_list
+    i
+    |> List.nth (unwrap_tupv arrow)
+    |> unwrap_listv_to_list
     |> List.map (fun v -> T v) in
   f 0, f 1
 
@@ -300,19 +300,19 @@ let rec gen c name =
     let out =
       match c.parent_case with
       | "FUNC" | "GLOBAL" | "ELEM" -> estimate_out !type_cache !types_cache
-      | "ACTIVE" -> [ T (singleton "I32") ]
+      | "ACTIVE" -> [ T (nullary "I32") ]
       | _ -> [ TopT ]
     in
     gen_wasm_expr c' [] out out
   (* HARDCODE: name *)
   | "name" -> Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])
   (* HARDCODE: memidx to be always 0 *)
-  | "memidx" -> numV 0
+  | "memidx" -> numV 0L
   (* HARCODE: typeidx of function is already cached *)
   | "typeidx" when c.parent_case = "FUNC" ->
-    List.nth !tids_cache c.i |> numV |> do_cache type_cache
+    List.nth !tids_cache c.i |> numV_of_int |> do_cache type_cache
   (* HARDCODE: pack_size to be 8/16/32 *)
-  | "n" when List.mem c.parent_case [ "LOAD"; "STORE"; "EXTEND" ] -> numV (choose [8; 16; 32])
+  | "n" when List.mem c.parent_case [ "LOAD"; "STORE"; "EXTEND" ] -> numV_of_int (choose [8; 16; 32])
   | _ ->
     let syn = find_syn name in
     let result =
@@ -325,15 +325,13 @@ let rec gen c name =
         let pair = gen_typs c' typs in
         let fst = List.hd pair in
         let snd = List.hd (List.tl pair) in
-        let new_snd = add_num fst snd in
+        let new_snd = map2 unwrap_numv numV Int64.add fst snd in
         Al.Ast.TupV [ fst; new_snd ]
       (* ArrowV *)
       | NotationT ([[]; [Arrow]; []], typs)
       | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
         let pair = gen_typs c' typs in
-        let fst = List.hd pair in
-        let snd = List.hd (List.tl pair) in
-        Al.Ast.ArrowV (fst, snd)
+        Al.Ast.TupV pair
       (* CaseV *)
       | NotationT ((Atom atomid :: _) :: _, typs)
       | NotationT ([[]; [Atom atomid]], typs) (* Hack for I8 *) ->
@@ -436,8 +434,8 @@ and gen_wasm_expr c rt1 rt2 label =
   let max_life = 100 in
   let rec try_expr life =
     if life = 0 then
-      let l = List.map (fun _ -> singleton "DROP") rt1 @ List.map default rt2 in
-      listV l
+      let l = List.map (fun _ -> nullary "DROP") rt1 @ List.map default rt2 in
+      listV_of_list l
     else
       let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
       (* TODO: make input optional? *)
@@ -445,7 +443,7 @@ and gen_wasm_expr c rt1 rt2 label =
       try
         let l = List.init n (fun i -> gen { c with i = i } "instr") in
         pop expr_info_stack;
-        listV l
+        listV_of_list l
       with
         OutOfLife -> pop expr_info_stack; try_expr (life - 1)
   in
@@ -454,7 +452,7 @@ and gen_wasm_expr c rt1 rt2 label =
 and gen_wasm_funcs c = function
   | CaseV ("DEFERRED_FUNCS", []) ->
     let l = List.init (List.length !tids_cache) (fun i -> gen { c with i = i } "func") in
-    listV l
+    listV_of_list l
   | v -> v
 
 and gen_typ c typ =
@@ -462,31 +460,31 @@ and gen_typ c typ =
   (* HARDCODE: imported builtins *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
     let import name kind t =
-      Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; case_v kind t ])
+      Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; caseV (kind, [t])])
     in
-    let const = empty "MUT" in
-    listV [
+    let const = none "MUT" in
+    listV_of_list [
       (* import "print" "FUNC" zero; *)
-      import "global_i32" "GLOBAL" (TupV [const; singleton "I32"]);
-      import "global_i64" "GLOBAL" (TupV [const; singleton "I64"]);
-      import "global_f32" "GLOBAL" (TupV [const; singleton "F32"]);
-      import "global_f64" "GLOBAL" (TupV [const; singleton "F64"]);
-      import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; singleton "FUNCREF" ]);
+      import "global_i32" "GLOBAL" (TupV [const; nullary "I32"]);
+      import "global_i64" "GLOBAL" (TupV [const; nullary "I64"]);
+      import "global_f32" "GLOBAL" (TupV [const; nullary "F32"]);
+      import "global_f64" "GLOBAL" (TupV [const; nullary "F64"]);
+      import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; nullary "FUNCREF" ]);
       (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
     ]
   (* HARDCODE: export functios *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "export" ->
     let l =
       List.init (List.length !tids_cache) (fun i ->
-        let funcidx = numV i in
+        let funcidx = numV_of_int i in
         refs_cache := funcidx :: !refs_cache;
-        case_vv "EXPORT" (TextV ("f" ^ string_of_int i)) (case_v "FUNC" funcidx)
+        caseV ("EXPORT", [TextV ("f" ^ string_of_int i); caseV ("FUNC", [funcidx])])
       )
     in
-    listV l
+    listV_of_list l
   (* General types *)
   | VarT id -> gen c id.it
-  | NumT NatT -> numV (Random.int 3) (* 0, 1, 2 *)
+  | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
     let name = match typ'.it with VarT id -> id.it | _ -> "" in
     let n =
@@ -497,7 +495,7 @@ and gen_typ c typ =
     (* Hardcode: Defer generating functions *)
     if name = "func" then (
       tids_cache := List.init n (fun _ -> Random.int (List.length !types_cache));
-      singleton "DEFERRED_FUNCS"
+      nullary "DEFERRED_FUNCS"
     )
     else
       let l = List.init n (fun i -> gen_typ { c with i = i } typ') in
@@ -506,11 +504,11 @@ and gen_typ c typ =
       if name = "table" then tables_cache := l;
       if name = "global" then globals_cache := l;
       if name = "elem" then elems_cache := l;
-      listV l
+      listV_of_list l
   | TupT typs -> TupV (List.map (gen_typ c) typs)
   | IterT (typ', Opt) ->
-    if Random.bool() then optV_none
-    else optV_some (gen_typ c typ')
+    if Random.bool() then optV None
+    else optV (Some (gen_typ c typ'))
   | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.structured_string_of_typ typ)
 
 and gen_typs c typs =
@@ -523,14 +521,14 @@ and fix_rts case const_required rt1 rt2 entangles =
   let bot = [ BotT ], [], [] in
 
   if List.mem case [ "BLOCK"; "LOOP"; "IF" ] then
-    let i32_opt = if case = "IF" then [ T (singleton "I32") ] else [] in
+    let i32_opt = if case = "IF" then [ T (nullary "I32") ] else [] in
     let bt = gen default_context "blocktype" in
     let pair = [ 0, bt ] in
     match bt with
     | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
     | CaseV ("_RESULT", [ OptV (Some t) ]) -> i32_opt, [ T t ], pair
     | CaseV ("_IDX", [ tid ]) ->
-      let rt1', rt2' = get_type !types_cache (al_to_int tid) in
+      let rt1', rt2' = get_type !types_cache (unwrap_numv_to_int tid) in
       rt1' @ i32_opt, rt2', pair
     | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
 
@@ -540,24 +538,24 @@ and fix_rts case const_required rt1 rt2 entangles =
 
   (*TODO: Perhaps automate this? *)
   else if List.mem case [ "LOCAL.GET"; "LOCAL.SET"; "LOCAL.TEE" ] then
-    let params = !type_cache |> al_to_int |> get_type !types_cache |> fst in
-    let locals = List.map (fun l -> T (arg_of_case "LOCAL" 0 l)) !locals_cache in
+    let params = !type_cache |> unwrap_numv_to_int |> get_type !types_cache |> fst in
+    let locals = List.map (fun l -> T (casev_nth_arg 0 l)) !locals_cache in
     let ls = params @ locals in
     if ls = [] then bot
     else
       let lid = Random.int (List.length ls) in
       let subst = function SubT _ -> List.nth ls lid | t -> t in
-      List.map subst rt1, List.map subst rt2, [ 0, numV lid ]
+      List.map subst rt1, List.map subst rt2, [ 0, numV_of_int lid ]
 
   else if List.mem case [ "GLOBAL.GET"; "GLOBAL.SET" ] then (*TODO: Perhaps automate this? *)
-    let no_mut = case_v "MUT" (OptV None) in
+    let no_mut = caseV ("MUT", [OptV None]) in
     let gs =
       List.map (function
         | CaseV ("GLOBAL", [ TupV [ m; t ]; _ ]) -> m <> no_mut, t
         | _ -> failwith "Unreachable: Global"
       ) !globals_cache
     in
-    let g x = false, singleton x in
+    let g x = false, nullary x in
     let gs_builtins = [ g "I32"; g "I64"; g "F32"; g "F64" ] in
     let gs' = if const_required then gs_builtins else gs_builtins @ gs in
     let gids = find_index_all (fun (is_mut, _) -> (case = "GLOBAL.SET") --> is_mut) gs' in
@@ -565,7 +563,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     else
       let gid = choose gids in
       let subst = function SubT _ -> T (snd (List.nth gs' gid)) | t -> t in
-      List.map subst rt1, List.map subst rt2, [ 0, numV gid ]
+      List.map subst rt1, List.map subst rt2, [ 0, numV_of_int gid ]
 
   else if List.mem case [ "TABLE.GET"; "TABLE.SET"; "TABLE.GROW"; "TABLE.FILL" ] then
     let tid, table = choosei !tables_cache in
@@ -575,7 +573,7 @@ and fix_rts case const_required rt1 rt2 entangles =
       | _ -> failwith "Unreachable: Table"
     in
     let subst = function SubT _ -> T rt | t -> t in
-    List.map subst rt1, List.map subst rt2, [ 0, numV tid ]
+    List.map subst rt1, List.map subst rt2, [ 0, numV_of_int tid ]
 
   else if case = "TABLE.COPY" then
     let get_rt = function
@@ -584,7 +582,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     in
     let groups = groupi_by get_rt !tables_cache in
     let _, tids = choose groups in
-    rt1, rt2, [ 0, numV (choose tids); 1, numV (choose tids) ]
+    rt1, rt2, [ 0, numV_of_int (choose tids); 1, numV_of_int (choose tids) ]
 
   else if case = "TABLE.INIT" then
     let get_rt = function
@@ -603,7 +601,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     if tegroups = [] then bot
     else
       let tids, eids = choose tegroups in
-      rt1, rt2, [ 0, numV (choose tids); 1, numV (choose eids) ]
+      rt1, rt2, [ 0, numV_of_int (choose tids); 1, numV_of_int (choose eids) ]
 
   else if case = "RETURN" then
     (* TODO: Signal arbitrary size better *)
@@ -619,13 +617,13 @@ and fix_rts case const_required rt1 rt2 entangles =
     (
       List.init (Random.int 3) (fun _ -> TopT) @ t,
       List.init 3 (fun _ -> TopT),
-      [ 0, numV lid ]
+      [ 0, numV_of_int lid ]
     )
 
   else if case = "BR_IF" then
     let lid = Random.int (List.length !expr_info_stack) in
     let _, _, t, _ = List.nth !expr_info_stack lid in
-    t @ [ T (singleton "I32") ], t, [ 0, numV lid ]
+    t @ [ T (nullary "I32") ], t, [ 0, numV_of_int lid ]
 
   else if case = "BR_TABLE" then
     let lid_groups = groupi_by (fun (_, _, t, _) -> t) !expr_info_stack in
@@ -633,15 +631,15 @@ and fix_rts case const_required rt1 rt2 entangles =
     let lids = List.init (Random.int 3) (fun _ -> choose is) in
     let lid = choose is in
     (
-      List.init (Random.int 3) (fun _ -> TopT) @ t @ [ T (singleton "I32") ],
+      List.init (Random.int 3) (fun _ -> TopT) @ t @ [ T (nullary "I32") ],
       List.init 3 (fun _ -> TopT),
-      [ 0, listV (List.map numV lids); 1, numV lid ]
+      [ 0, listV_of_list (List.map numV_of_int lids); 1, numV_of_int lid ]
     )
 
   else if case = "CALL" then
     let fid, tid = choosei !tids_cache in
     let rt1', rt2' = get_type !types_cache tid in
-    rt1', rt2', [ 0, numV fid ]
+    rt1', rt2', [ 0, numV_of_int fid ]
 
   else if case = "CALL_INDIRECT" then
     let tables = find_index_all is_func_table !tables_cache in
@@ -649,7 +647,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     let table = choose tables in
     let tid = Random.int (List.length !types_cache) in
     let rt1', rt2' = get_type !types_cache tid in
-    rt1' @ [ T (singleton "I32") ], rt2', [ 0, numV table; 1, numV (tid + 1) (* move to patch? *) ]
+    rt1' @ [ T (nullary "I32") ], rt2', [ 0, numV_of_int table; 1, numV_of_int (tid + 1) (* move to patch? *) ]
 
   else
     let cache = ref Record.empty in
@@ -683,22 +681,22 @@ let mutate modules =
 
 (** Injection **)
 type invoke = string * Al.Ast.value list
-type exn' = exn * string list * Al.Ast.cond list
-type invoke_result = (Al.Ast.value list, exn') result
+type invoke_result = (Al.Ast.value list, exn) result
 type assertion = invoke * invoke_result
-type instant_result = (assertion list, exn') result
+type instant_result = (assertion list, exn) result
 
 let mk_assertion funcinst =
-  let name = field_of_str "NAME" funcinst |> al_to_string in
-  let addr = field_of_str "VALUE" funcinst |> arg_of_case "FUNC" 0 in
+  let name = strv_access "NAME" funcinst |> unwrap_textv in
+  let addr = strv_access "VALUE" funcinst |> casev_nth_arg 0 in
   let arg_types = try
-    !Ds.store
+    Ds.get_store ()
     |> Record.find "FUNC"
-    |> al_to_list
-    |> (fun l -> List.nth l (al_to_int addr))
-    |> field_of_str "TYPE"
-    |> arg_of_tup 0 (* Wasm 2.0 *)
-    |> al_to_list
+    |> unwrap_listv_to_list
+    |> (fun l -> List.nth l (unwrap_numv_to_int addr))
+    |> strv_access "TYPE"
+    |> unwrap_tupv
+    |> (fun l -> List.nth l 0)
+    |> unwrap_listv_to_list
   with _ -> []
   in
   let args =
@@ -706,16 +704,16 @@ let mk_assertion funcinst =
       | Al.Ast.CaseV ("I32", [])
       | Al.Ast.CaseV ("I64", [])
       | Al.Ast.CaseV ("F32", [])
-      | Al.Ast.CaseV ("F64", []) as t -> case_vv "CONST" t (numV (Random.full_int 0x7fffffff))
-      | t -> (* Assumpnion: is ref *) case_v "REF.NULL" t
+      | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; numV_of_int (Random.full_int 0x7fffffff)])
+    | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
     ) arg_types
   in
   let invoke = name, args in
 
   try
-    let returns = Interpreter.call_invoke [ addr; listV args ] in
-    invoke, Ok (al_to_list returns)
-  with e -> invoke, Error (e, !Interpreter.algo_name_stack, !Interpreter.cond_stack)
+    let returns = Interpreter.invoke [ addr; listV_of_list args ] in
+    invoke, Ok (unwrap_listv_to_list returns)
+  with e -> invoke, Error e
 
 let print_assertion ((f, args), result) =
   print_endline (match result with
@@ -723,31 +721,30 @@ let print_assertion ((f, args), result) =
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
     (returns |> List.map Al.Print.string_of_value |> String.concat " ")
-  | Error (Exception.Trap, _, _) -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
+  | Error Exception.Trap -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
-  | Error (e, stack, _) -> Printf.sprintf "Invocation of %s failed due to %s during %s"
+  | Error e -> Printf.sprintf "Invocation of %s failed due to %s"
     f
-    (Printexc.to_string e)
-    (String.concat "," (stack |> List.filteri (fun i _ -> i < 10))) )
+    (Printexc.to_string e))
 
 let get_instant_result m : instant_result =
   try
-    let externvals = listV (
-      (* List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV i])) *)
-      List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV i]))
-      (* @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV i])) *)
-      (* @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV i])) *)
+    let externvals = listV_of_list (
+      (* List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV_of_int i])) *)
+      List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV_of_int i]))
+      (* @ List.init 1 (fun i -> Al.Ast.CaseV ("TABLE", [numV_of_int i])) *)
+      (* @ List.init 1 (fun i -> Al.Ast.CaseV ("MEM", [numV_of_int i])) *)
     ) in (*TODO *)
-    let mm = Interpreter.call_instantiate [ m; externvals ] in
+    let mm = Interpreter.instantiate [ m; externvals ] in
     let exported_funcs =
       mm
-      |> field_of_str "EXPORT"
-      |> al_to_list
-      |> List.filter (fun inst -> inst |> field_of_str "VALUE" |> is_case "FUNC")
+      |> strv_access "EXPORT"
+      |> unwrap_listv_to_list
+      |> List.filter (fun inst -> inst |> strv_access "VALUE" |> casev_of_case = "FUNC")
     in
     Ok (List.map mk_assertion exported_funcs)
-  with e -> Error (e, !Interpreter.algo_name_stack, !Interpreter.cond_stack)
+  with e -> Error e
 let inject i m =
   prerr_endline ("Injecting " ^ string_of_int i ^ "th module..");
   m, get_instant_result m
@@ -763,37 +760,15 @@ let print_test (m, result) =
   | Ok assertions ->
     print_endline "Instantiation success";
     List.iter print_assertion assertions
-  | Error (Exception.Trap, stack, _) ->
-    print_endline ("Instantiation trapped during " ^ (String.concat "," stack))
-  | Error (e, stack, _) ->
-    print_endline ("Instantiation failed: " ^ Printexc.to_string e ^ " during " ^ (String.concat "," stack))
+  | Error Exception.Trap ->
+    print_endline ("Instantiation failed")
+  | Error e ->
+    Printf.printf "Unexpected error during instantiation: %s" (Printexc.to_string e)
   );
   print_endline "================"
 
 let to_phrase x = Reference_interpreter2.Source.(x @@ no_region)
-let infer_msg (e, algo_stack, cond_stack) =
-  match e, List.hd algo_stack with
-  | Exception.Exhaustion, _ -> "exhaust"
-  | _, "UNREACHABLE" -> "unreachable"
-  | _, "BINOP" -> "integer divide by zero"
-  | _, "TABLE.GET"
-  | _, "TABLE.SET"
-  | _, "TABLE.FILL"
-  | _, "TABLE.GROW"
-  | _, "TABLE.COPY"
-  | _, "TABLE.INIT" -> "out of bounds table access"
-  | _, "LOAD"
-  | _, "STORE"
-  | _, "MEMORY.GROW"
-  | _, "MEMORY.FILL"
-  | _, "MEMORY.COPY"
-  | _, "MEMORY.INIT" -> "out of bounds memory access"
-  | Exception.Trap, "CALL_INDIRECT" ->
-    (match List.hd cond_stack with
-    | Al.Ast.CmpC _ -> "undefined element"
-    | _ -> "uninitialized element"
-    )
-  | _, case -> case
+
 
 let value_to_wast v =
   let open Reference_interpreter2.Script in
@@ -811,10 +786,14 @@ let invoke_to_wast ((f, args), result) =
   let args' = List.map (Construct2.al_to_value %> to_phrase) args in
   let action = Invoke (None, f', args') |> to_phrase in
   (match result with
-  | Ok returns -> AssertReturn (action, List.map value_to_wast returns)
-  | Error (Exception.Exhaustion, _, _) -> AssertExhaustion (action, "")
-  | Error e -> AssertTrap (action, infer_msg e)
-  ) |> (fun a -> Assertion (to_phrase a) |> to_phrase)
+  | Ok returns -> Some (AssertReturn (action, List.map value_to_wast returns))
+  | Error Exception.Exhaustion -> Some (AssertExhaustion (action, ""))
+  | Error Exception.Trap -> Some (AssertTrap (action, ""))
+  | _ ->
+    Printf.sprintf "Unexpected error in invoking %s" f |> prerr_endline;
+    None
+
+  ) |> Option.map (fun a -> Assertion (to_phrase a) |> to_phrase)
 
 let to_wast i (m, result) =
   let open Reference_interpreter2.Script in
@@ -825,9 +804,12 @@ let to_wast i (m, result) =
     match result with
     | Ok assertions ->
       (Module (None, def) |> to_phrase)
-      :: List.map invoke_to_wast assertions
-    | Error e ->
-      [ Assertion (AssertUninstantiable (def, infer_msg e) |> to_phrase) |> to_phrase ]
+      :: List.filter_map invoke_to_wast assertions
+    | Error Exception.Trap ->
+      [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
+    | _ ->
+      Printf.sprintf "Unexpected error in instantiating %sth module" (string_of_int i) |> prerr_endline;
+      []
   in
 
   let file = Filename.concat !Flag.out (string_of_int i ^ ".wast") in
@@ -857,7 +839,6 @@ let gen_test el' il' al' =
   Ds.init !al;
   estimate_rt ();
   estimate_const ();
-  Tester.init_tester ();
 
   (* Generate tests *)
   let seeds =
@@ -871,6 +852,9 @@ let gen_test el' il' al' =
   (* Mutatiion *)
   let modules = mutate seeds in
 
+  (* TODO *)
+  Builtin.builtin () |> ignore;
+
   (* Injection *)
   let tests = List.mapi inject modules in
 
@@ -880,5 +864,6 @@ let gen_test el' il' al' =
   (* Convert to Wast *)
   List.iteri to_wast tests;
 
+
   (* Print Coverage *)
-  Ds.(InfoMap.print (InfoMap.uncovered !info_map))
+  (* Ds.(Info.print (InfoMap.uncovered !info_map)) *)

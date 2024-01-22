@@ -15,18 +15,13 @@ $${syntax: byte}
 .. _syntax-iN:
 .. _syntax-u31:
 .. _syntax-u32:
-<<<<<<< HEAD
 .. _syntax-u64:
 .. _syntax-u128:
 .. _syntax-s33:
-.. _syntax-values-integers:
-=======
->>>>>>> al
 
 Integers
 ~~~~~~~~
 
-<<<<<<< HEAD
 $${syntax+: 
   uN
   sN
@@ -38,30 +33,28 @@ $${syntax+:
   s33
 }
 
-.. _syntax-values-floating-point:
-
 Floating-Point
 ~~~~~~~~~~~~~~
 
 .. _syntax-fN:
-.. _syntax-fNmag:
+.. _syntax-fmag:
 .. _syntax-f32:
 .. _syntax-f64:
 
 $${syntax+: 
   fN
-  fNmag
+  fmag
   f32
   f64
 }
 
-.. _def-fNzero:
+.. _def-fzero:
 
-%{prose-func: fNzero}
+%{prose-func: fzero}
 
 \
 
-$${definition: fNzero}
+$${definition: fzero}
 
 .. _def-signif:
 
@@ -97,17 +90,10 @@ $${definition: E}
 
 .. _syntax-name:
 .. _syntax-char:
-.. _syntax-values-names:
-=======
-$${syntax: u32}
-
-.. _syntax-name:
->>>>>>> al
 
 Names
 ~~~~~
 
-<<<<<<< HEAD
 $${syntax+: 
   name
   char
@@ -120,6 +106,3 @@ $${syntax+:
 \
 
 $${definition: utf8}
-=======
-$${syntax: name}
->>>>>>> al

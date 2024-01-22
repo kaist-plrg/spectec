@@ -13,13 +13,10 @@ Numeric Instructions
 
 .. _valid-CONST:
 
-<<<<<<< HEAD
-=======
 %{prose-pred: CONST}
 
 \
 
->>>>>>> al
 $${rule: Instr_ok/const}
 
 .. _valid-UNOP:
@@ -60,11 +57,7 @@ $${rule: Instr_ok/relop}
 
 \
 
-<<<<<<< HEAD
-$${rule: Instr_ok/reinterpret}
-=======
 $${rule: Instr_ok/extend}
->>>>>>> al
 
 .. _valid-CVTOP:
 
@@ -81,27 +74,12 @@ Reference Instructions
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. _valid-REF.NULL:
-<<<<<<< HEAD
-=======
 
 %{prose-pred: REF.NULL}
 
 \
 
 $${rule: Instr_ok/ref.null}
-
-.. _valid-REF.IS_NULL:
->>>>>>> al
-
-%{prose-pred: REF.NULL}
-
-\
-
-<<<<<<< HEAD
-$${rule: Instr_ok/ref.null}
-=======
-$${rule: Instr_ok/ref.is_null}
->>>>>>> al
 
 .. _valid-REF.FUNC:
 
@@ -110,7 +88,6 @@ $${rule: Instr_ok/ref.is_null}
 \
 
 $${rule: Instr_ok/ref.func}
-<<<<<<< HEAD
 
 .. _valid-REF.IS_NULL:
 
@@ -306,6 +283,171 @@ $${rule: Instr_ok/ref.i31}
 
 $${rule: Instr_ok/i31.get}
 
+.. _valid-instructions-vector:
+
+Vector Instructions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. _valid-VVCONST:
+
+%{prose-pred: VVCONST}
+
+\
+
+$${rule: Instr_ok/vvconst}
+
+.. _valid-VVUNOP:
+
+%{prose-pred: VVUNOP}
+
+\
+
+$${rule: Instr_ok/vvunop}
+
+.. _valid-VVBINOP:
+
+%{prose-pred: VVBINOP}
+
+\
+
+$${rule: Instr_ok/vvbinop}
+
+.. _valid-VVTERNOP:
+
+%{prose-pred: VVTERNOP}
+
+\
+
+$${rule: Instr_ok/vvternop}
+
+.. _valid-VVTESTOP:
+
+%{prose-pred: VVTESTOP}
+
+\
+
+$${rule: Instr_ok/vvtestop}
+
+.. _valid-SHUFFLE:
+
+%{prose-pred: SHUFFLE}
+
+\
+
+$${rule: Instr_ok/shuffle}
+
+.. _valid-SPLAT:
+
+%{prose-pred: SPLAT}
+
+\
+
+$${rule: Instr_ok/splat}
+
+.. _valid-EXTRACT_LANE:
+
+%{prose-pred: EXTRACT_LANE}
+
+\
+
+$${rule: Instr_ok/extract_lane}
+
+.. _valid-REPLACE_LANE:
+
+%{prose-pred: REPLACE_LANE}
+
+\
+
+$${rule: Instr_ok/replace_lane}
+
+.. _valid-VUNOP:
+
+%{prose-pred: VUNOP}
+
+\
+
+$${rule: Instr_ok/vunop}
+
+.. _valid-VBINOP:
+
+%{prose-pred: VBINOP}
+
+\
+
+$${rule: Instr_ok/vbinop}
+
+.. _valid-VRELOP:
+
+%{prose-pred: VRELOP}
+
+\
+
+$${rule: Instr_ok/vrelop}
+
+.. _valid-VISHIFTOP:
+
+%{prose-pred: VISHIFTOP}
+
+\
+
+$${rule: Instr_ok/vishiftop}
+
+.. _valid-VTESTOP:
+
+%{prose-pred: ALL_TRUE}
+
+\
+
+$${rule: Instr_ok/vtestop}
+
+.. _valid-VCVTOP:
+
+%{prose-pred: VCVTOP}
+
+\
+
+$${rule: Instr_ok/vcvtop}
+
+.. _valid-NARROW:
+
+%{prose-pred: NARROW}
+
+\
+
+$${rule: Instr_ok/narrow}
+
+.. _valid-BITMASK:
+
+%{prose-pred: BITMASK}
+
+\
+
+$${rule: Instr_ok/bitmask}
+
+.. _valid-DOT:
+
+%{prose-pred: DOT}
+
+\
+
+$${rule: Instr_ok/dot}
+
+.. _valid-EXTMUL_HALF:
+
+%{prose-pred: EXTMUL_HALF}
+
+\
+
+$${rule: Instr_ok/extmul_half}
+
+.. _valid-EXTADD_PAIRWISE:
+
+%{prose-pred: EXTADD_PAIRWISE}
+
+\
+
+$${rule: Instr_ok/extadd_pairwise}
+
 .. _valid-instructions-external-reference:
 
 External Reference Instructions
@@ -328,8 +470,6 @@ $${rule: Instr_ok/extern.convert_any}
 $${rule: Instr_ok/any.convert_extern}
 
 .. _valid-instructions-parametric:
-=======
->>>>>>> al
 
 Parametric Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -372,11 +512,7 @@ TODO (not found)
 
 \
 
-<<<<<<< HEAD
 $${rule+: Instrf_ok/local.set}
-=======
-$${rule: Instr_ok/local.set}
->>>>>>> al
 
 .. _valid-LOCAL.TEE:
 
@@ -387,11 +523,7 @@ TODO (not found)
 
 \
 
-<<<<<<< HEAD
 $${rule+: Instrf_ok/local.tee}
-=======
-$${rule: Instr_ok/local.tee}
->>>>>>> al
 
 .. _valid-GLOBAL.GET:
 
@@ -496,6 +628,32 @@ $${rule: Instr_ok/load}
 \
 
 $${rule: Instr_ok/store}
+
+.. _valid-VLOAD:
+
+%{prose-pred: VLOAD}
+
+\
+
+$${rule: Instr_ok/vload}
+$${rule: Instr_ok/vload-splat}
+$${rule: Instr_ok/vload-zero}
+
+.. _valid-VSTORE:
+
+%{prose-pred: VSTORE_LANE}
+
+\
+
+$${rule: Instr_ok/vstore_lane}
+
+.. _valid-VLOAD_LANE:
+
+%{prose-pred: VLOAD_LANE}
+
+\
+
+$${rule: Instr_ok/vload_lane}
 
 .. _valid-MEMORY.SIZE:
 
@@ -677,7 +835,6 @@ $${rule+: Instr_ok/call_ref}
 
 \
 
-<<<<<<< HEAD
 $${rule+: Instr_ok/call_indirect}
 
 .. _valid-RETURN_CALL:
@@ -705,32 +862,22 @@ $${rule+: Instr_ok/return_call_ref}
 $${rule+: Instr_ok/return_call_indirect}
 
 .. _valid-instructions-sequences:
-=======
-$${rule: Instr_ok/call_indirect}
->>>>>>> al
 
 Instruction Sequences
 ~~~~~~~~~~~~~~~~~~~~~
 
 $${rule+:
-<<<<<<< HEAD
   Instrf_ok/instr
   Instrs_ok/*
 }
 
 .. _valid-instructions-expressions:
 
-=======
-  InstrSeq_ok/*
-}
-
->>>>>>> al
 Expressions
 ~~~~~~~~~~~
 
 $${rule+: 
   Expr_ok
-<<<<<<< HEAD
   Instr_const/*
   Expr_const
   Expr_ok_const
@@ -751,9 +898,3 @@ $${definition: in_binop}
 \
 
 $${definition: in_numtype}
-=======
-  Expr_const
-  Expr_ok_const
-  Instr_const/*
-}
->>>>>>> al

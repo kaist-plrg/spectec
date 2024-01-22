@@ -1,11 +1,9 @@
-(* Note *)
-
-(* TODO: type ('a, 'b) note = { it : 'a; nid : int; note : 'b } *)
-type 'a node = { it : 'a; nid : int }
+open Util.Source
 
 (* Types *)
 
 type ty = string (* TODO *)
+type vec128 = string
 
 (* Identifiers *)
 
@@ -25,13 +23,14 @@ and store = (kwd', value) record
 
 and value =
   | NumV of int64                      (* number *)
+  | BoolV of bool                      (* boolean *)
+  | VecV of vec128                     (* vector *)
   | TextV of string                    (* string *)
   | ListV of value growable_array      (* list of values *)
   | StrV of (kwd', value) record       (* key-value mapping *)
   | CaseV of kwd' * value list         (* constructor *)
   | OptV of value option               (* optional value *)
-  | TupV of value list                 (* pair of values *)
-  | ArrowV of value * value            (* Wasm function type as an AL value *)
+  | TupV of value list                 (* tuple of values *)
   | FrameV of value option * value     (* TODO: desugar using CaseV? *)
   | LabelV of value * value            (* TODO: desugar using CaseV? *)
   | StoreV of store ref                (* TODO: check Wasm specificity? *)
@@ -47,8 +46,6 @@ type unop =
   | MinusOp  (* `-` *)
 
 type binop =
-  | AndOp    (* `/\` *)
-  | OrOp     (* `\/` *)
   | ImplOp   (* `=>` *)
   | EquivOp  (* `<=>` *)
   | AddOp    (* `+` *)
@@ -56,8 +53,9 @@ type binop =
   | MulOp    (* `*` *)
   | DivOp    (* `/` *)
   | ExpOp    (* `^` *)
-
-type cmpop =
+  (* compare operation *)
+  | AndOp    (* `/\` *)
+  | OrOp     (* `\/` *)
   | EqOp     (* `=` *)
   | NeOp     (* `=/=` *)
   | LtOp     (* `<` *)
@@ -75,9 +73,11 @@ type iter =
 
 (* Expressions *)
 
-and expr =
+and expr = expr' phrase
+and expr' =
   | VarE of id                          (* varid *)
   | NumE of int64                       (* number *)
+  | BoolE of bool                       (* boolean *)
   | UnE of unop * expr                  (* unop expr *)
   | BinE of binop * expr * expr         (* expr binop expr *)
   | AccE of expr * path                 (* expr `[` path `]` *)
@@ -92,7 +92,7 @@ and expr =
   | IterE of expr * id list * iter      (* expr (`{` id* `}`)* *)
   | OptE of expr option                 (* expr?  *)
   | ListE of expr list                  (* `[` expr* `]` *)
-  | ArrowE of expr * expr               (* "expr -> expr" *) (* TODO: Remove ArrowE using hint *)
+  | InfixE of expr * string * expr      (* "expr infix expr" *) (* TODO: Remove InfixE using hint *)
   | ArityE of expr                      (* "the arity of expr" *)
   | FrameE of expr option * expr        (* "the activation of expr (with arity expr)?" *)
   | LabelE of expr * expr               (* "the label whose arity is expr and whose continuation is expr" *)
@@ -100,41 +100,37 @@ and expr =
   | GetCurLabelE                        (* "the current lbael" *)
   | GetCurContextE                      (* "the current context" *)
   | ContE of expr                       (* "the continuation of expr" *)
+  (* Conditions *)
+  | IsCaseOfE of expr * kwd             (* expr is of the case kwd *)
+  | IsValidE of expr                    (* expr is valid *)
+  | ContextKindE of kwd * expr          (* TODO: desugar using IsCaseOf? *)
+  | IsDefinedE of expr                  (* expr is defined *)
+  | MatchE of expr * expr               (* expr matches expr *)
+  | HasTypeE of expr * ty               (* the type of expr is ty *)
+  (* Conditions used in assertions *)
+  | TopLabelE                           (* "a label is now on the top of the stack" *)
+  | TopFrameE                           (* "a frame is now on the top of the stack" *)
+  | TopValueE of expr option            (* "a value (of type expr)? is now on the top of the stack" *)
+  | TopValuesE of expr                  (* "at least expr number of values on the top of the stack" *)
   (* Administrative Instructions *)
   | SubE of id * ty                     (* varid, with specific type *)
   | YetE of string                      (* for future not yet implemented feature *)
 
-and path =
+and path = path' phrase
+and path' =
   | IdxP of expr                    (* `[` expr `]` *)
   | SliceP of expr * expr           (* `[` expr `:` expr `]` *)
   | DotP of kwd                     (* `.` atom *)
 
-and cond =
-  | UnC of unop * cond              (* unop expr *)
-  | BinC of binop * cond * cond     (* expr binop expr *)
-  | CmpC of cmpop * expr * expr     (* expr cmpop expr *)
-  | IsCaseOfC of expr * kwd         (* expr is of the case kwd *)
-  | IsValidC of expr                (* expr is valid *)
-  | ContextKindC of kwd * expr      (* TODO: desugar using IsCaseOf? *)
-  | IsDefinedC of expr              (* expr is defined *)
-  | MatchC of expr * expr           (* expr matches expr *)
-  | HasTypeC of expr * ty           (* the type of expr is ty *)
-  (* Conditions used in assertions *)
-  | TopLabelC                       (* "a label is now on the top of the stack" *)
-  | TopFrameC                       (* "a frame is now on the top of the stack" *)
-  | TopValueC of expr option        (* "a value (of type expr)? is now on the top of the stack" *)
-  | TopValuesC of expr              (* "at least expr number of values on the top of the stack" *)
-  (* Administrative instructions *)
-  | YetC of string                  (* for future not yet implemented feature *)
 
 (* Instructions *)
 
-type instr = instr' node
+type instr = (instr', int) note_phrase
 and instr' =
-  | IfI of cond * instr list * instr list (* `if` cond `then` instr* `else` instr* *)
+  | IfI of expr * instr list * instr list (* `if` cond `then` instr* `else` instr* *)
   | EitherI of instr list * instr list    (* `either` instr* `or` instr* *)
   | EnterI of expr * expr * instr list    (* `enter` expr`:` expr `after` instr* *)
-  | AssertI of cond                       (* `assert` cond *)
+  | AssertI of expr                       (* `assert` cond *)
   | PushI of expr                         (* `push` expr *)
   | PopI of expr                          (* `pop` expr *)
   | PopAllI of expr                       (* `popall` expr *)
