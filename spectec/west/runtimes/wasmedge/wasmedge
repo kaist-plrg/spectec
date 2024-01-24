@@ -1,0 +1,152 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+import json
+import argparse
+import subprocess
+
+from os import listdir
+from os.path import isdir, isfile, join, basename, splitext, abspath, dirname
+from shutil import copyfile
+
+from tempfile import TemporaryDirectory
+
+def test_wast (path: str) -> tuple[int, int]:
+    if (basename(path) in ["imports.wast", "names.wast"]):
+        """ Not supported """
+        return 0, 0
+
+    temp_dir = TemporaryDirectory(prefix="west-wasmedge-")
+    temp_dir_path = temp_dir.name
+
+    dst_path = join(temp_dir_path, basename(path))
+    copyfile(path, dst_path)
+
+    subprocess.run (["wast2json", dst_path], cwd=temp_dir_path)
+
+    with open(join(temp_dir_path, splitext(basename(path))[0] + ".json")) as f:
+        commands = json.load(f)['commands']
+
+    total = 0
+
+    text = ""
+
+    for command in commands:
+        if (command['type'] == "module"):
+            ty = 'mon' if 'name' in command else 'mo'
+            na = command.get('name', False)
+
+            text += ','.join(filter(lambda x: x, [ty, command['filename'], na]))
+            text += '\n'
+
+        if (command['type'] == 'register'):
+            pass
+
+        if (command['type'] == 'assert_return'):
+            action = command['action']
+
+            if (action['type'] == 'invoke'):
+                args = ','.join(sum(([arg['type'], arg['value']] for arg in action['args']), []))
+                exps = ','.join(sum(([exp['type'], exp['value']] for exp in command['expected']), []))
+
+                if "funcref" in args or "externref" in args:
+                    continue
+
+                ty = 'arim' if 'module' in action else 'ari'
+                mod = action.get('module', False)
+
+                text += ','.join(filter(lambda x: x, (ty, mod, action['field'], args, exps)))
+                text += '\n'
+
+                total += 1
+
+        if (command['type'] == 'assert_trap'):
+            action = command['action']
+
+            if (action['type'] == 'invoke'):
+                args = ','.join(sum(([arg['type'], arg['value']] for arg in action['args']), []))
+
+                if "funcref" in args or "externref" in args:
+                    continue
+
+                ty = 'ati'
+
+                text += ','.join(filter(lambda x: x, (ty, action['field'], args, command['text'])))
+                text += '\n'
+
+                total += 1
+
+        if (command['type'] == 'register'):
+            pass
+
+    with open(join(temp_dir_path, "wasmedge.txt"), "w", encoding="utf-8") as f:
+        f.write(text)
+
+    print(f'==== {basename(path)} ====')
+
+    ps = subprocess.run ([join(abspath(dirname(__file__)), "tester"), "wasmedge.txt"], cwd=temp_dir_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    print(ps.stderr.decode("utf-8"), end='', file=sys.stderr)
+
+    out = ps.stdout.decode("utf-8")
+
+    correct = 0
+
+    try:
+        correct = int(out.split()[-1])
+    except:
+        pass
+
+    temp_dir.cleanup()
+
+    try:
+        print(f'- {correct}/{total} ({correct/total*100:.2f}%)\n')
+    except ZeroDivisionError:
+        print(f'- {correct}/{total} (nan%)\n')
+
+    return correct, total
+
+def get_wast_files (path: str) -> list[str]:
+    if isfile(path) and path.endswith(".wast"):
+        return [path]
+
+    if isdir(path):
+        return sum((get_wast_files(join(path, file)) for file in listdir(path)), [])
+
+    return []
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Test WasmEdge with .wast files"
+    )
+    parser.add_argument(
+        "path",
+        type=str,
+        help="Path to .wast file or directory containing .wast files",
+    )
+    args = parser.parse_args()
+
+    wast_files = get_wast_files(args.path)
+
+    if not wast_files:
+        print (f'No .wast files found in {args.path}')
+        print ('exiting...')
+        exit (1)
+
+    correct = 0
+    total = 0
+
+    wast_files.sort()
+
+    for wast_file in wast_files:
+        c, t = test_wast (wast_file)
+
+        correct += c
+        total += t
+
+    try:
+        print(f'Total [{correct}/{total}] ({correct/total*100:.2f}%)')
+    except ZeroDivisionError:
+        print(f'Total [{correct}/{total}] (nan%)')
+

@@ -1,0 +1,4 @@
+wasmedge/**
+!wasmedge/Makefile
+!wasmedge/tester.c
+!wasmedge/wasmedge
