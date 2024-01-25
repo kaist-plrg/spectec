@@ -402,9 +402,7 @@ and structured_string_of_typ typ =
         (structured_string_of_typ typ1)
         (structured_string_of_iter iter)
 
-and structured_string_of_typs _typs =
-  (* structured_string_of_list structured_string_of_typ typs *)
-  "TODO: structured_string_of_typs"
+and structured_string_of_typs typs = structured_string_of_list structured_string_of_typ typs
 
 and structured_string_of_deftyp deftyp =
   match deftyp.it with
@@ -419,21 +417,13 @@ and structured_string_of_deftyp deftyp =
       sprintf "VariantT (%s)"
         (structured_string_of_list structured_string_of_typcase typcases)
 
-and _structured_string_of_typfield (atom, typ, hints) =
-  sprintf "(%s, %s, %s)"
+and structured_string_of_typfields typfields = structured_string_of_list structured_string_of_typcase typfields
+
+and structured_string_of_typcase (atom, (_binds, typ, prems), hints) =
+  sprintf "(%s, (binds, %s, %s), %s)"
     (structured_string_of_atom atom)
     (structured_string_of_typ typ)
-    (structured_string_of_hints hints)
-
-and structured_string_of_typfields _typfields =
-  (* structured_string_of_list structured_string_of_typfield typfields *)
-  "TODO: structured_string_of_typs"
-
-and structured_string_of_typcase (atom, _typ, hints) =
-  sprintf "(%s, %s, %s)"
-    (structured_string_of_atom atom)
-    (* (structured_string_of_typ typ) *)
-    "TODO: structured_string_of_typcases"
+    (structured_string_of_list structured_string_of_premise prems)
     (structured_string_of_hints hints)
 
 
@@ -553,17 +543,17 @@ and structured_string_of_path path =
 
 (* Definitions *)
 
-let structured_string_of_bind (id, typ, iters) =
+and structured_string_of_bind (id, typ, iters) =
   sprintf "(\"%s\", %s, %s)"
     id.it
     (structured_string_of_typ typ)
     (structured_string_of_list structured_string_of_iter iters)
 
-let structured_string_of_binds binds =
+and structured_string_of_binds binds =
   structured_string_of_list structured_string_of_bind binds
 
 
-let rec structured_string_of_premise prem =
+and structured_string_of_premise prem =
   match prem.it with
   | RulePr (id, mixop, exp) ->
       sprintf "RulePr (\"%s\", %s, %s)"
