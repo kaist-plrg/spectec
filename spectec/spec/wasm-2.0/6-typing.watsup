@@ -348,7 +348,7 @@ rule Instr_ok/vrelop:
 rule Instr_ok/vishiftop:
   C |- VISHIFTOP sh vishiftop : V128 V128 -> V128
 
-rule Instr_ok/vtestop:
+rule Instr_ok/vall_true:
   C |- VALL_TRUE sh : V128 -> I32
 
 rule Instr_ok/vcvtop:
