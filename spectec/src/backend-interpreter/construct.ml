@@ -238,62 +238,62 @@ and al_to_value: value -> Value.value = function
 (* Destruct operator *)
 
 let al_to_op f1 f2 = function
-  | [ CaseV ("I32", []); op ] -> I32 (f1 op)
-  | [ CaseV ("I64", []); op ] -> I64 (f1 op)
-  | [ CaseV ("F32", []); op ] -> F32 (f2 op)
-  | [ CaseV ("F64", []); op ] -> F64 (f2 op)
+  | [ CaseV ("I32", []); CaseV ("_I", [op]) ] -> I32 (f1 op)
+  | [ CaseV ("I64", []); CaseV ("_I", [op]) ] -> I64 (f1 op)
+  | [ CaseV ("F32", []); CaseV ("_F", [op]) ] -> F32 (f2 op)
+  | [ CaseV ("F64", []); CaseV ("_F", [op]) ] -> F64 (f2 op)
   | l -> fail_list "op" l
 
 let al_to_int_unop: value -> IntOp.unop = function
-  | TextV "Clz" -> IntOp.Clz
-  | TextV "Ctz" -> IntOp.Ctz
-  | TextV "Popcnt" -> IntOp.Popcnt
-  | TextV "Extend8S" -> IntOp.ExtendS Pack.Pack8
-  | TextV "Extend16S" -> IntOp.ExtendS Pack.Pack16
-  | TextV "Extend32S" -> IntOp.ExtendS Pack.Pack32
-  | TextV "Extend64S" -> IntOp.ExtendS Pack.Pack64
+  | CaseV ("CLZ", []) -> IntOp.Clz
+  | CaseV ("CTZ", []) -> IntOp.Ctz
+  | CaseV ("POPCNT", []) -> IntOp.Popcnt
+  | CaseV ("EXTEND8S", []) -> IntOp.ExtendS Pack.Pack8
+  | CaseV ("EXTEND16S", []) -> IntOp.ExtendS Pack.Pack16
+  | CaseV ("EXTEND32S", []) -> IntOp.ExtendS Pack.Pack32
+  | CaseV ("EXTEND64S", []) -> IntOp.ExtendS Pack.Pack64
   | v -> fail "integer unop" v
 let al_to_float_unop: value -> FloatOp.unop = function
-  | TextV "Neg" -> FloatOp.Neg
-  | TextV "Abs" -> FloatOp.Abs
-  | TextV "Ceil" -> FloatOp.Ceil
-  | TextV "Floor" -> FloatOp.Floor
-  | TextV "Trunc" -> FloatOp.Trunc
-  | TextV "Nearest" -> FloatOp.Nearest
-  | TextV "Sqrt" -> FloatOp.Sqrt
+  | CaseV ("NEG", []) -> FloatOp.Neg
+  | CaseV ("ABS", []) -> FloatOp.Abs
+  | CaseV ("CEIL", []) -> FloatOp.Ceil
+  | CaseV ("FLOOR", []) -> FloatOp.Floor
+  | CaseV ("TRUNC", []) -> FloatOp.Trunc
+  | CaseV ("NEAREST", []) -> FloatOp.Nearest
+  | CaseV ("SQRT", []) -> FloatOp.Sqrt
   | v -> fail "float unop" v
 let al_to_unop: value list -> Ast.unop = al_to_op al_to_int_unop al_to_float_unop
 
 let al_to_int_binop: value -> IntOp.binop = function
-  | TextV "Add" -> IntOp.Add
-  | TextV "Sub" -> IntOp.Sub
-  | TextV "Mul" -> IntOp.Mul
-  | TextV "DivS" -> IntOp.DivS
-  | TextV "DivU" -> IntOp.DivU
-  | TextV "RemS" -> IntOp.RemS
-  | TextV "RemU" -> IntOp.RemU
-  | TextV "And" -> IntOp.And
-  | TextV "Or" -> IntOp.Or
-  | TextV "Xor" -> IntOp.Xor
-  | TextV "Shl" -> IntOp.Shl
-  | TextV "ShrS" -> IntOp.ShrS
-  | TextV "ShrU" -> IntOp.ShrU
-  | TextV "Rotl" -> IntOp.Rotl
-  | TextV "Rotr" -> IntOp.Rotr
+  | CaseV ("ADD", []) -> IntOp.Add
+  | CaseV ("SUB", []) -> IntOp.Sub
+  | CaseV ("MUL", []) -> IntOp.Mul
+  | CaseV ("DIV", [CaseV ("S", [])]) -> IntOp.DivS
+  | CaseV ("DIV", [CaseV ("U", [])]) -> IntOp.DivU
+  | CaseV ("REM", [CaseV ("S", [])]) -> IntOp.RemS
+  | CaseV ("REM", [CaseV ("U", [])]) -> IntOp.RemU
+  | CaseV ("AND", []) -> IntOp.And
+  | CaseV ("OR", []) -> IntOp.Or
+  | CaseV ("XOR", []) -> IntOp.Xor
+  | CaseV ("SHL", []) -> IntOp.Shl
+  | CaseV ("SHR", [CaseV ("S", [])]) -> IntOp.ShrS
+  | CaseV ("SHR", [CaseV ("U", [])]) -> IntOp.ShrU
+  | CaseV ("ROTL", []) -> IntOp.Rotl
+  | CaseV ("ROTR", []) -> IntOp.Rotr
   | v -> fail "integer binop" v
 let al_to_float_binop: value -> FloatOp.binop = function
-  | TextV "Add" -> FloatOp.Add
-  | TextV "Sub" -> FloatOp.Sub
-  | TextV "Mul" -> FloatOp.Mul
-  | TextV "Div" -> FloatOp.Div
-  | TextV "Min" -> FloatOp.Min
-  | TextV "Max" -> FloatOp.Max
-  | TextV "CopySign" -> FloatOp.CopySign
+  | CaseV ("ADD", []) -> FloatOp.Add
+  | CaseV ("SUB", []) -> FloatOp.Sub
+  | CaseV ("MUL", []) -> FloatOp.Mul
+  | CaseV ("DIV", []) -> FloatOp.Div
+  | CaseV ("MIN", []) -> FloatOp.Min
+  | CaseV ("MAX", []) -> FloatOp.Max
+  | CaseV ("COPYSIGN", []) -> FloatOp.CopySign
   | v -> fail "float binop" v
 let al_to_binop: value list -> Ast.binop = al_to_op al_to_int_binop al_to_float_binop
 
 let al_to_int_testop: value -> IntOp.testop = function
-  | TextV "Eqz" -> IntOp.Eqz
+  | CaseV ("EQZ", []) -> IntOp.Eqz
   | v -> fail "integer testop" v
 let al_to_testop: value list -> Ast.testop = function
   | [ CaseV ("I32", []); op ] -> Value.I32 (al_to_int_testop op)
@@ -301,24 +301,24 @@ let al_to_testop: value list -> Ast.testop = function
   | l -> fail_list "testop" l
 
 let al_to_int_relop: value -> IntOp.relop = function
-  | TextV "Eq" -> IntOp.Eq
-  | TextV "Ne" -> IntOp.Ne
-  | TextV "LtS" -> IntOp.LtS
-  | TextV "LtU" -> IntOp.LtU
-  | TextV "GtS" -> IntOp.GtS
-  | TextV "GtU" -> IntOp.GtU
-  | TextV "LeS" -> IntOp.LeS
-  | TextV "LeU" -> IntOp.LeU
-  | TextV "GeS" -> IntOp.GeS
-  | TextV "GeU" -> IntOp.GeU
+  | CaseV ("EQ", []) -> IntOp.Eq
+  | CaseV ("NE", []) -> IntOp.Ne
+  | CaseV ("LT", [CaseV ("S", [])]) -> IntOp.LtS
+  | CaseV ("LT", [CaseV ("U", [])]) -> IntOp.LtU
+  | CaseV ("GT", [CaseV ("S", [])]) -> IntOp.GtS
+  | CaseV ("GT", [CaseV ("U", [])]) -> IntOp.GtU
+  | CaseV ("LE", [CaseV ("S", [])]) -> IntOp.LeS
+  | CaseV ("LE", [CaseV ("U", [])]) -> IntOp.LeU
+  | CaseV ("GE", [CaseV ("S", [])]) -> IntOp.GeS
+  | CaseV ("GE", [CaseV ("U", [])]) -> IntOp.GeU
   | v -> fail "integer relop" v
 let al_to_float_relop: value -> FloatOp.relop = function
-  | TextV "Eq" -> FloatOp.Eq
-  | TextV "Ne" -> FloatOp.Ne
-  | TextV "Lt" -> FloatOp.Lt
-  | TextV "Gt" -> FloatOp.Gt
-  | TextV "Le" -> FloatOp.Le
-  | TextV "Ge" -> FloatOp.Ge
+  | CaseV ("EQ", []) -> FloatOp.Eq
+  | CaseV ("NE", []) -> FloatOp.Ne
+  | CaseV ("LT", []) -> FloatOp.Lt
+  | CaseV ("GT", []) -> FloatOp.Gt
+  | CaseV ("LE", []) -> FloatOp.Le
+  | CaseV ("GE", []) -> FloatOp.Ge
   | v -> fail "float relop" v
 let al_to_relop: value list -> relop = al_to_op al_to_int_relop al_to_float_relop
 
@@ -1086,80 +1086,79 @@ let al_of_value = function
 (* Construct operation *)
 
 let al_of_op f1 f2 = function
-  | I32 op -> [ nullary "I32"; f1 op ]
-  | I64 op -> [ nullary "I64"; f1 op ]
-  | F32 op -> [ nullary "F32"; f2 op ]
-  | F64 op -> [ nullary "F64"; f2 op ]
+  | I32 op -> [ nullary "I32"; caseV ("_I", [f1 op]) ]
+  | I64 op -> [ nullary "I64"; caseV ("_I", [f1 op]) ]
+  | F32 op -> [ nullary "F32"; caseV ("_F", [f2 op]) ]
+  | F64 op -> [ nullary "F64"; caseV ("_F", [f2 op]) ]
 
 let al_of_int_unop = function
-  | IntOp.Clz -> TextV "Clz"
-  | IntOp.Ctz -> TextV "Ctz"
-  | IntOp.Popcnt -> TextV "Popcnt"
-  | IntOp.ExtendS Pack.Pack8 -> TextV "Extend8S"
-  | IntOp.ExtendS Pack.Pack16 -> TextV "Extend16S"
-  | IntOp.ExtendS Pack.Pack32 -> TextV "Extend32S"
-  | IntOp.ExtendS Pack.Pack64 -> TextV "Extend64S"
+  | IntOp.Clz -> CaseV ("CLZ", [])
+  | IntOp.Ctz -> CaseV ("CTZ", [])
+  | IntOp.Popcnt -> CaseV ("POPCNT", [])
+  | IntOp.ExtendS Pack.Pack8 -> CaseV ("EXTEND8S", [])
+  | IntOp.ExtendS Pack.Pack16 -> CaseV ("EXTEND16S", [])
+  | IntOp.ExtendS Pack.Pack32 -> CaseV ("EXTEND32S", [])
+  | IntOp.ExtendS Pack.Pack64 -> CaseV ("EXTEND64S", [])
 let al_of_float_unop = function
-  | FloatOp.Neg -> TextV "Neg"
-  | FloatOp.Abs -> TextV "Abs"
-  | FloatOp.Ceil -> TextV "Ceil"
-  | FloatOp.Floor -> TextV "Floor"
-  | FloatOp.Trunc -> TextV "Trunc"
-  | FloatOp.Nearest -> TextV "Nearest"
-  | FloatOp.Sqrt -> TextV "Sqrt"
+  | FloatOp.Neg -> CaseV ("NEG", [])
+  | FloatOp.Abs -> CaseV ("ABS", [])
+  | FloatOp.Ceil -> CaseV ("CEIL", [])
+  | FloatOp.Floor -> CaseV ("FLOOR", [])
+  | FloatOp.Trunc -> CaseV ("TRUNC", [])
+  | FloatOp.Nearest -> CaseV ("NEAREST", [])
+  | FloatOp.Sqrt -> CaseV ("SQRT", [])
 let al_of_unop = al_of_op al_of_int_unop al_of_float_unop
 
 let al_of_int_binop = function
-  | IntOp.Add -> TextV "Add"
-  | IntOp.Sub -> TextV "Sub"
-  | IntOp.Mul -> TextV "Mul"
-  | IntOp.DivS -> TextV "DivS"
-  | IntOp.DivU -> TextV "DivU"
-  | IntOp.RemS -> TextV "RemS"
-  | IntOp.RemU -> TextV "RemU"
-  | IntOp.And -> TextV "And"
-  | IntOp.Or -> TextV "Or"
-  | IntOp.Xor -> TextV "Xor"
-  | IntOp.Shl -> TextV "Shl"
-  | IntOp.ShrS -> TextV "ShrS"
-  | IntOp.ShrU -> TextV "ShrU"
-  | IntOp.Rotl -> TextV "Rotl"
-  | IntOp.Rotr -> TextV "Rotr"
+  | IntOp.Add -> CaseV ("ADD", [])
+  | IntOp.Sub -> CaseV ("SUB", [])
+  | IntOp.Mul -> CaseV ("MUL", [])
+  | IntOp.DivS -> CaseV ("DIV", [CaseV ("S", [])])
+  | IntOp.DivU -> CaseV ("DIV", [CaseV ("U", [])])
+  | IntOp.RemS -> CaseV ("REM", [CaseV ("S", [])])
+  | IntOp.RemU -> CaseV ("REM", [CaseV ("U", [])])
+  | IntOp.And -> CaseV ("AND", [])
+  | IntOp.Or -> CaseV ("OR", [])
+  | IntOp.Xor -> CaseV ("XOR", [])
+  | IntOp.Shl -> CaseV ("SHL", [])
+  | IntOp.ShrS -> CaseV ("SHR", [CaseV ("S", [])])
+  | IntOp.ShrU -> CaseV ("SHR", [CaseV ("U", [])])
+  | IntOp.Rotl -> CaseV ("ROTL", [])
+  | IntOp.Rotr -> CaseV ("ROTR", [])
 let al_of_float_binop = function
-  | FloatOp.Add -> TextV "Add"
-  | FloatOp.Sub -> TextV "Sub"
-  | FloatOp.Mul -> TextV "Mul"
-  | FloatOp.Div -> TextV "Div"
-  | FloatOp.Min -> TextV "Min"
-  | FloatOp.Max -> TextV "Max"
-  | FloatOp.CopySign -> TextV "CopySign"
+  | FloatOp.Add -> CaseV ("ADD", [])
+  | FloatOp.Sub -> CaseV ("SUB", [])
+  | FloatOp.Mul -> CaseV ("MUL", [])
+  | FloatOp.Div -> CaseV ("DIV", [])
+  | FloatOp.Min -> CaseV ("MIN", [])
+  | FloatOp.Max -> CaseV ("MAX", [])
+  | FloatOp.CopySign -> CaseV ("COPYSIGN", [])
 let al_of_binop = al_of_op al_of_int_binop al_of_float_binop
 
-let al_of_int_testop = function
-  | IntOp.Eqz -> TextV "Eqz"
-let al_of_testop: testop -> value list = function
-  | I32 op -> [ nullary "I32"; al_of_int_testop op ]
-  | I64 op -> [ nullary "I64"; al_of_int_testop op ]
+let al_of_int_testop: IntOp.testop -> value = function
+  | IntOp.Eqz -> CaseV ("EQZ", [])
+let al_of_float_testop: FloatOp.testop -> value = function
   | _ -> .
+let al_of_testop: testop -> value list = al_of_op al_of_int_testop al_of_float_testop
 
 let al_of_int_relop = function
-  | IntOp.Eq -> TextV "Eq"
-  | IntOp.Ne -> TextV "Ne"
-  | IntOp.LtS -> TextV "LtS"
-  | IntOp.LtU -> TextV "LtU"
-  | IntOp.GtS -> TextV "GtS"
-  | IntOp.GtU -> TextV "GtU"
-  | IntOp.LeS -> TextV "LeS"
-  | IntOp.LeU -> TextV "LeU"
-  | IntOp.GeS -> TextV "GeS"
-  | IntOp.GeU -> TextV "GeU"
+  | IntOp.Eq -> CaseV ("EQ", [])
+  | IntOp.Ne -> CaseV ("NE", [])
+  | IntOp.LtS -> CaseV ("LT", [CaseV ("S", [])])
+  | IntOp.LtU -> CaseV ("LT", [CaseV ("U", [])])
+  | IntOp.GtS -> CaseV ("GT", [CaseV ("S", [])])
+  | IntOp.GtU -> CaseV ("GT", [CaseV ("U", [])])
+  | IntOp.LeS -> CaseV ("LE", [CaseV ("S", [])])
+  | IntOp.LeU -> CaseV ("LE", [CaseV ("U", [])])
+  | IntOp.GeS -> CaseV ("GE", [CaseV ("S", [])])
+  | IntOp.GeU -> CaseV ("GE", [CaseV ("U", [])])
 let al_of_float_relop = function
-  | FloatOp.Eq -> TextV "Eq"
-  | FloatOp.Ne -> TextV "Ne"
-  | FloatOp.Lt -> TextV "Lt"
-  | FloatOp.Gt -> TextV "Gt"
-  | FloatOp.Le -> TextV "Le"
-  | FloatOp.Ge -> TextV "Ge"
+  | FloatOp.Eq -> CaseV ("EQ", [])
+  | FloatOp.Ne -> CaseV ("NE", [])
+  | FloatOp.Lt -> CaseV ("LT", [])
+  | FloatOp.Gt -> CaseV ("GT", [])
+  | FloatOp.Le -> CaseV ("LE", [])
+  | FloatOp.Ge -> CaseV ("GE", [])
 let al_of_relop = al_of_op al_of_int_relop al_of_float_relop
 
 let al_of_int_cvtop num_bits = function

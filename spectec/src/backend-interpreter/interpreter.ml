@@ -812,7 +812,7 @@ and call_algo (name: string) (args: value list): AlContext.return_value =
   print_endline "";
   *)
   let depth = !AlContext.context_stack_length in
-  if depth > 100 then
+  if depth > 70_000 then
     raise Exception.Exhaustion;
 
   (* Push AL context *)

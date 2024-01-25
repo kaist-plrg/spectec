@@ -909,10 +909,10 @@ let al_of_value = function
 (* Construct operation *)
 
 let al_of_op f1 f2 = function
-  | I32 op -> [ nullary "I32"; f1 op ]
-  | I64 op -> [ nullary "I64"; f1 op ]
-  | F32 op -> [ nullary "F32"; f2 op ]
-  | F64 op -> [ nullary "F64"; f2 op ]
+  | I32 op -> [ nullary "I32"; caseV ("_I", [f1 op]) ]
+  | I64 op -> [ nullary "I64"; caseV ("_I", [f1 op]) ]
+  | F32 op -> [ nullary "F32"; caseV ("_F", [f2 op]) ]
+  | F64 op -> [ nullary "F64"; caseV ("_F", [f2 op]) ]
 
 let al_of_int_unop = function
   | IntOp.Clz -> CaseV ("CLZ", [])
@@ -958,12 +958,11 @@ let al_of_float_binop = function
   | FloatOp.CopySign -> CaseV ("COPYSIGN", [])
 let al_of_binop = al_of_op al_of_int_binop al_of_float_binop
 
-let al_of_int_testop = function
+let al_of_int_testop: IntOp.testop -> value = function
   | IntOp.Eqz -> CaseV ("EQZ", [])
-let al_of_testop: testop -> value list = function
-  | I32 op -> [ nullary "I32"; al_of_int_testop op ]
-  | I64 op -> [ nullary "I64"; al_of_int_testop op ]
+let al_of_float_testop: FloatOp.testop -> value = function
   | _ -> .
+let al_of_testop: testop -> value list = al_of_op al_of_int_testop al_of_float_testop
 
 let al_of_int_relop = function
   | IntOp.Eq -> CaseV ("EQ", [])

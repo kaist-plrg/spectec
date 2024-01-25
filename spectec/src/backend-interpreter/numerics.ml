@@ -155,7 +155,7 @@ let testop : numerics =
     name = "testop";
     f =
       (function
-      | [ CaseV ("_I", [CaseV ("Eqz", [])]); CaseV (t, []); i ] -> (
+      | [ CaseV ("_I", [CaseV ("EQZ", [])]); CaseV (t, []); i ] -> (
           match t with
           | "I32" -> wrap_i32_testop I32.eqz i
           | "I64" -> wrap_i64_testop I64.eqz i
