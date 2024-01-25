@@ -1,9 +1,9 @@
 open Reference_interpreter
-open Construct
 open Ds
 open Al
 open Ast
 open Al_util
+open Construct
 open Print
 open Util
 open Source
@@ -15,7 +15,7 @@ let fail_on_instr msg instr =
   |> failwith
 
 let fail_on_expr msg expr =
-  (sprintf "%s: %s @%s" msg 
+  (sprintf "%s: %s @%s" msg
     (structured_string_of_expr expr) (string_of_region expr.at))
   |> failwith
 
@@ -86,32 +86,25 @@ let match_heap_type v1 v2 =
 
 (* Expression *)
 
-let rec create_sub_env names iter env =
+let rec create_sub_al_context names iter env =
+  let option_name_to_list name = lookup_env name env |> unwrap_optv |> Option.to_list in
+  let name_to_list name = lookup_env name env |> unwrap_listv_to_list in
   let length_to_list l = List.init l al_of_int in
-  let names', env' =
-    match iter with
-    | ListN (e, Some id) ->
-      (* If iter is iter_with_index, pretend as if there were i = [0 ... n] in the original env *)
-      let indices = eval_expr e
-        |> al_to_int
-        |> length_to_list
-        |> listV_of_list in
-      id :: names, Env.add id indices env
-    | _ -> names, env
-  in
 
-  let option_name_to_list name = lookup_env name env' |> unwrap_optv |> Option.to_list in
-  let name_to_list name = lookup_env name env' |> unwrap_listv_to_list in
   let name_to_values name =
     match iter with
     | Opt -> option_name_to_list name
+    | ListN (e_n, Some n') when name = n' ->
+      eval_expr e_n
+      |> al_to_int
+      |> length_to_list
     | _ -> name_to_list name
   in
 
-  names'
+  names
   |> List.map name_to_values
   |> transpose
-  |> List.map (fun vs -> List.fold_right2 Env.add names' vs env')
+  |> List.map (fun vs -> List.fold_right2 Env.add names vs env)
 
 and access_path base path =
   match path.it with
@@ -135,7 +128,7 @@ and access_path base path =
     | FrameV (_, StrV r) -> Record.find str r
     | StoreV s -> Record.find str !s
     | StrV r -> Record.find str r
-    | v -> 
+    | v ->
       fail_on_path
         (sprintf "Base %s is not a record" (string_of_value v))
         path)
@@ -199,12 +192,6 @@ and eval_expr expr =
     begin match dsl_function_call fname args with
     | Some v -> v
     | _ -> raise Exception.MissingReturnValue
-    (*
-    | _ ->
-      string_of_expr expr
-     |> sprintf "%s doesn't have return value"
-     |> failwith
-    *)
     end
   (* Data Structure *)
   | ListE el -> List.map eval_expr el |> listV_of_list
@@ -215,10 +202,7 @@ and eval_expr expr =
   | LenE e ->
     eval_expr e |> unwrap_listv_to_array |> Array.length |> I64.of_int_u |> numV
   | StrE r ->
-    Record.to_list r
-    |> List.map (fun (k, e) -> string_of_kwd k, !e |> eval_expr |> ref)
-    |> Record.of_list
-    |> strV
+    r |> Record.map string_of_kwd eval_expr |> strV
   | AccE (e, p) ->
     let base = eval_expr e in
     access_path base p
@@ -286,7 +270,7 @@ and eval_expr expr =
   | IterE (inner_e, ids, iter) ->
     let env = AlContext.get_env () in
     let vs =
-      create_sub_env ids iter env
+      create_sub_al_context ids iter env
       |> List.map (fun env' -> AlContext.set_env env'; eval_expr inner_e) in
     AlContext.set_env env;
 
@@ -704,8 +688,8 @@ and interp_instr (instr: instr): unit =
     (* TODO remove this *)
     | FrameE _, FrameV _ -> ()
     | (_, h) ->
-      fail_on_instr 
-        (sprintf "Invalid pop for value %s: " (structured_string_of_value h)) 
+      fail_on_instr
+        (sprintf "Invalid pop for value %s: " (structured_string_of_value h))
         instr
     end
   | PopAllI ({ it = IterE ({ it = VarE name; _ }, [name'], List); _ }) when name = name' ->
@@ -717,8 +701,8 @@ and interp_instr (instr: instr): unit =
     in
     pop_all [] |> listV_of_list |> AlContext.update_env name
   | PopAllI _ -> fail_on_instr "Invalid pop" instr
-  | LetI (pattern, e) ->
-    AlContext.get_env () |> assign pattern (eval_expr e) |> AlContext.set_env
+  | LetI (e1, e2) ->
+    AlContext.get_env () |> assign e1 (eval_expr e2) |> AlContext.set_env
   | PerformI (f, el) ->
     List.map eval_expr el |> dsl_function_call f |> ignore
   | TrapI -> raise Exception.Trap
@@ -761,7 +745,7 @@ and interp_instr (instr: instr): unit =
     let i2 = eval_expr e3 |> al_to_int in   (* length *)
     let a2 = eval_expr e4 |> unwrap_listv_to_array in (* src *)
     assert (Array.length a2 = i2);
-    Array.iteri (fun i v -> Array.set a1 (i1 + i) v) a2
+    Array.blit a2 0 a1 i1 i2
   | ReplaceI (e1, { it = DotP (s, _); _ }, e2) ->
     (match eval_expr e1 with
     | StrV r ->

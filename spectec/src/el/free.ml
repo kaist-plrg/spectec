@@ -48,6 +48,7 @@ let bound_opt = free_opt
 let bound_list = free_list
 let bound_nl_list = free_nl_list
 
+
 (* Identifiers *)
 
 let free_synid id = {empty with synid = Set.singleton id.it}
@@ -66,7 +67,7 @@ let bound_varid id = if id.it = "" then empty else free_varid id
 let rec free_iter iter =
   match iter with
   | Opt | List | List1 -> empty
-  | ListN (e, _) -> free_exp e
+  | ListN (e, id_opt) -> union (free_exp e) (free_opt free_varid id_opt)
 
 
 (* Types *)
@@ -79,8 +80,8 @@ and free_typ t =
   | TupT ts -> free_list free_typ ts
   | IterT (t1, iter) -> union (free_typ t1) (free_iter iter)
   | StrT tfs -> free_nl_list free_typfield tfs
-  | CaseT (_, ids, tcs, _) ->
-    union (free_nl_list free_synid ids) (free_nl_list free_typcase tcs)
+  | CaseT (_, ts, tcs, _) ->
+    union (free_nl_list free_typ ts) (free_nl_list free_typcase tcs)
   | RangeT tes -> free_nl_list free_typenum tes
   | AtomT _ -> empty
   | SeqT ts -> free_list free_typ ts
@@ -100,7 +101,7 @@ and free_typenum (e, eo) =
 and free_exp e =
   match e.it with
   | VarE (id, args) -> union (free_varid id) (free_list free_arg args)
-  | AtomE _ | BoolE _ | NatE _ | HexE _ | CharE _ | TextE _ | EpsE | HoleE _ ->
+  | AtomE _ | BoolE _ | NatE _ | TextE _ | EpsE | HoleE _ ->
     empty
   | UnE (_, e1) | DotE (e1, _) | LenE e1
   | ParenE (e1, _) | BrackE (_, e1, _) -> free_exp e1
@@ -114,7 +115,7 @@ and free_exp e =
     union (free_list free_exp [e1; e2]) (free_path p)
   | StrE efs -> free_nl_list free_expfield efs
   | CallE (id, args) -> union (free_defid id) (free_list free_arg args)
-  | IterE (e1, iter) -> union (diff (free_exp e1) (binding_iter iter)) (free_iter iter)
+  | IterE (e1, iter) -> union (free_exp e1) (free_iter iter)
   | TypE (e1, t) -> union (free_exp e1) (free_typ t)
 
 and free_expfield (_, e) = free_exp e
@@ -132,7 +133,7 @@ and free_path p =
 and bound_exp e =
   match e.it with
   | CmpE (e1, EqOp, e2) -> union (pat_exp e1) (pat_exp e2)
-  | VarE _ | AtomE _ | BoolE _ | NatE _ | HexE _ | CharE _ | TextE _
+  | VarE _ | AtomE _ | BoolE _ | NatE _ | TextE _
   | SizeE _ | EpsE | HoleE _ -> empty
   | UnE (_, e1) | DotE (e1, _) | LenE e1
   | ParenE (e1, _) | BrackE (_, e1, _) -> bound_exp e1
@@ -203,10 +204,6 @@ and pat_iter iter =
   | Opt | List | List1 -> empty
   | ListN (e, id_opt) -> union (pat_exp e) (bound_opt bound_varid id_opt)
 
-and binding_iter iter=
-  match iter with
-  | Opt | List | List1 | ListN (_, None) -> empty
-  | ListN (_, Some id) -> free_varid id
 
 (* Premises *)
 
@@ -215,7 +212,7 @@ and free_prem prem =
   | RulePr (id, e) -> union (free_relid id) (free_exp e)
   | IfPr e -> free_exp e
   | ElsePr -> empty
-  | IterPr (prem1, iter) -> union (diff (free_prem prem1) (binding_iter iter)) (free_iter iter)
+  | IterPr (prem1, iter) -> union (free_prem prem1) (free_iter iter)
 
 (* We consider all variables "bound" that occur in a judgement
  * or are bound in a condition. *)
@@ -224,7 +221,7 @@ and bound_prem prem =
   | RulePr (_id, e) -> free_exp e
   | IfPr e -> bound_exp e
   | ElsePr -> empty
-  | IterPr (prem1, _iter) -> bound_prem prem1
+  | IterPr (prem1, iter) -> union (bound_prem prem1) (bound_iter iter)
 
 
 (* Grammars *)
@@ -232,9 +229,9 @@ and bound_prem prem =
 and free_sym g =
   match g.it with
   | VarG (id, args) -> union (free_gramid id) (free_list free_arg args)
-  | NatG _ | HexG _ | CharG _ | TextG _ | EpsG -> empty
+  | NatG _ | TextG _ | EpsG -> empty
   | SeqG gs | AltG gs -> free_nl_list free_sym gs
-  | RangeG (g1, g2) -> union (free_sym g1) (free_sym g2)
+  | RangeG (g1, g2) | FuseG (g1, g2) -> union (free_sym g1) (free_sym g2)
   | ParenG g1 -> free_sym g1
   | TupG gs -> free_list free_sym gs
   | IterG (g1, iter) -> union (free_sym g1) (free_iter iter)
@@ -270,24 +267,27 @@ let bound_param p =
   | SynP id -> bound_synid id
   | GramP (id, _) -> bound_gramid id
 
+let free_args args = free_list free_arg args
+let free_params ps = free_list free_param ps
+let bound_args args = free_list pat_arg args
 let bound_params ps = free_list bound_param ps
 
 let free_def d =
   match d.it with
   | SynD (_id1, _id2, ps, t, _hints) ->
-    union (free_list free_param ps) (diff (free_typ t) (bound_params ps))
+    union (free_params ps) (diff (free_typ t) (bound_params ps))
   | GramD (_id1, _id2, ps, t, gram, _hints) ->
     union
-      (free_list free_param ps)
+      (free_params ps)
       (diff (union (free_typ t) (free_gram gram)) (bound_params ps))
   | VarD _ | SepD -> empty
   | RelD (_id, t, _hints) -> free_typ t
   | RuleD (id1, _id2, e, prems) ->
     union (free_relid id1) (union (free_exp e) (free_nl_list free_prem prems))
   | DecD (_id, ps, t, _hints) ->
-    union (free_list free_param ps) (diff (free_typ t) (bound_params ps))
+    union (free_params ps) (diff (free_typ t) (bound_params ps))
   | DefD (id, args, e, prems) ->
     union
-      (union (free_defid id) (free_list free_arg args))
-      (union (free_exp e) (free_nl_list free_prem prems))
+      (union (free_defid id) (free_args args))
+      (diff (union (free_exp e) (free_nl_list free_prem prems)) (bound_args args))
   | HintD _ -> empty

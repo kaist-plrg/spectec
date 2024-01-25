@@ -35,7 +35,7 @@ let rec walk_value f v =
   | LabelV _
   | StoreV _ -> v
   | ListV a -> ListV (ref (Array.map new_ !a))
-  | StrV r -> StrV (Util.Record.map new_ r)
+  | StrV r -> StrV (Util.Record.map Fun.id new_ r)
   | CaseV (c, vl) -> CaseV (c, List.map new_ vl)
   | OptV v_opt ->  OptV (Option.map new_ v_opt)
   | TupV vl -> TupV (List.map new_ vl)

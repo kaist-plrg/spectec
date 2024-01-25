@@ -420,7 +420,7 @@ let rec gen c name =
       | _ ->
         failwith (
           Printf.sprintf "TODO: gen of %s%s"
-            (Il.Print.string_of_deftyp syn) (Il.Print.structured_string_of_deftyp syn)
+            (Il.Print.string_of_deftyp syn) (Il.Print.string_of_deftyp syn)
         )
     in
 
@@ -509,7 +509,7 @@ and gen_typ c typ =
   | IterT (typ', Opt) ->
     if Random.bool() then optV None
     else optV (Some (gen_typ c typ'))
-  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.structured_string_of_typ typ)
+  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
 
 and gen_typs c typs =
   match typs.it with

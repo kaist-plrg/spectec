@@ -75,7 +75,7 @@ let rec check_iter env ctx iter =
   match iter with
   | Opt | List | List1 -> ()
   | ListN (e, id_opt) ->
-    Option.iter (fun id -> check_varid env (strip_index iter::ctx) id) id_opt;
+    Option.iter (fun id -> check_varid env [strip_index iter] id) id_opt;
     check_exp env ctx e
 
 and check_typ env ctx t =
@@ -99,8 +99,8 @@ and check_typ env ctx t =
       check_typ env ctx tI;
       iter_nl_list (check_prem env ctx) prems
     ) tfs
-  | CaseT (_, ids, tcs, _) ->
-    iter_nl_list (check_synid env ctx) ids;
+  | CaseT (_, ts, tcs, _) ->
+    iter_nl_list (check_typ env ctx) ts;
     iter_nl_list (fun (_, (tI, prems), _) ->
       check_typ env ctx tI;
       iter_nl_list (check_prem env ctx) prems
@@ -122,8 +122,6 @@ and check_exp env ctx e =
   | AtomE _
   | BoolE _
   | NatE _
-  | HexE _
-  | CharE _
   | TextE _
   | SizeE _
   | EpsE
@@ -179,13 +177,12 @@ and check_sym env ctx g =
     check_gramid env ctx id;
     List.iter (check_arg env ctx) args
   | NatG _
-  | HexG _
-  | CharG _
   | TextG _
   | EpsG -> ()
   | SeqG gs
   | AltG gs -> iter_nl_list (check_sym env ctx) gs
-  | RangeG (g1, g2) ->
+  | RangeG (g1, g2)
+  | FuseG (g1, g2) ->
     check_sym env ctx g1;
     check_sym env ctx g2
   | ParenG g1 ->
@@ -283,7 +280,6 @@ type occur = Il.Ast.iter list Env.t
 
 let union = Env.union (fun _ ctx1 ctx2 ->
   Some (if List.length ctx1 < List.length ctx2 then ctx1 else ctx2))
-let diff env1 env2 = Env.fold (fun k _ env2 -> Env.remove k env2) env2 env1
 
 let strip_index = function
   | ListN (e, Some _) -> ListN (e, None)
@@ -418,7 +414,7 @@ and annot_iterexp env occur1 (iter, ids) at : Il.Ast.iterexp * occur =
       | [] -> None
       | iter1::iters' ->
         assert (Il.Eq.eq_iter (strip_index iter) iter1); Some iters'
-    ) (diff occur1 occur3)
+    ) (union occur1 occur3)
   in
   let ids' = List.map (fun (x, _) -> x $ at) (Env.bindings occur1') in
   (iter', ids'), union occur1' occur2

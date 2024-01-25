@@ -992,7 +992,7 @@ and al_of_heap_type = function
   | VarHT (RecX i) -> CaseV ("REC", [ al_of_int32 i ])
   | DefHT dt -> al_of_def_type dt
   | BotHT -> nullary "BOT"
-  | ht -> nullary (string_of_heap_type ht)
+  | ht -> string_of_heap_type ht |> nullary
 
 and al_of_ref_type (null, ht) =
   if !version = 3 then
@@ -1003,9 +1003,9 @@ and al_of_ref_type (null, ht) =
     | CaseV ("EXTERN", []) -> nullary "EXTERN" (* TODO: "EXTERNREF" *)
     | _ -> failwith "Not supported reftype for wasm <= 2.0"
 
-and al_of_num_type nt = nullary (string_of_num_type nt)
+and al_of_num_type nt = string_of_num_type nt |> nullary
 
-and al_of_vec_type vt = nullary (string_of_vec_type vt)
+and al_of_vec_type vt = string_of_vec_type vt |> nullary
 
 and al_of_val_type = function
   | RefT rt -> al_of_ref_type rt
@@ -1311,25 +1311,25 @@ let al_of_vbinop = function
   )
 
 let al_of_special_vbinop = function
-  | V128 (V128.I8x16 (V128Op.Swizzle)) -> CaseV ("SWIZZLE", [ TupV [ nullary "I8"; numV 16L ]; ])
-  | V128 (V128.I8x16 (V128Op.Shuffle l)) -> CaseV ("SHUFFLE", [ TupV [ nullary "I8"; numV 16L ]; al_of_list al_of_int l ])
-  | V128 (V128.I8x16 (V128Op.NarrowS)) -> CaseV ("NARROW", [ TupV [ nullary "I8"; numV 16L ]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I16x8 (V128Op.NarrowS)) -> CaseV ("NARROW", [ TupV [ nullary "I16"; numV 8L ]; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I8x16 (V128Op.NarrowU)) -> CaseV ("NARROW", [ TupV [ nullary "I8"; numV 16L ]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ])
-  | V128 (V128.I16x8 (V128Op.NarrowU)) -> CaseV ("NARROW", [ TupV [ nullary "I16"; numV 8L]; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.ZX ])
-  | V128 (V128.I16x8 (V128Op.ExtMulHighS)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I16"; numV 8L ]; nullary "HIGH"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I16x8 (V128Op.ExtMulHighU)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I16"; numV 8L ]; nullary "HIGH"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.ZX ])
-  | V128 (V128.I16x8 (V128Op.ExtMulLowS)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I16"; numV 8L ]; nullary "LOW"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I16x8 (V128Op.ExtMulLowU)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I16"; numV 8L ]; nullary "LOW"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.ZX ] )
-  | V128 (V128.I32x4 (V128Op.ExtMulHighS)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I32"; numV 4L ]; nullary "HIGH"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I32x4 (V128Op.ExtMulHighU)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I32"; numV 4L ]; nullary "HIGH"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ])
-  | V128 (V128.I32x4 (V128Op.ExtMulLowS)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I32"; numV 4L ]; nullary "LOW"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I32x4 (V128Op.ExtMulLowU)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I32"; numV 4L ]; nullary "LOW"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ] )
-  | V128 (V128.I64x2 (V128Op.ExtMulHighS)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I64"; numV 2L ]; nullary "HIGH"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I64x2 (V128Op.ExtMulHighU)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I64"; numV 2L ]; nullary "HIGH"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.ZX ])
-  | V128 (V128.I64x2 (V128Op.ExtMulLowS)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I64"; numV 2L ]; nullary "LOW"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I64x2 (V128Op.ExtMulLowU)) -> CaseV ("EXTMUL_HALF", [ TupV [ nullary "I64"; numV 2L ]; nullary "LOW"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.ZX ] )
-  | V128 (V128.I32x4 (V128Op.DotS)) -> CaseV ("DOT", [ TupV [ nullary "I32"; numV 4L]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I8x16 (V128Op.Swizzle)) -> CaseV ("VSWIZZLE", [ TupV [ nullary "I8"; numV 16L ]; ])
+  | V128 (V128.I8x16 (V128Op.Shuffle l)) -> CaseV ("VSHUFFLE", [ TupV [ nullary "I8"; numV 16L ]; al_of_list al_of_int l ])
+  | V128 (V128.I8x16 (V128Op.NarrowS)) -> CaseV ("VNARROW", [ TupV [ nullary "I8"; numV 16L ]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I16x8 (V128Op.NarrowS)) -> CaseV ("VNARROW", [ TupV [ nullary "I16"; numV 8L ]; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I8x16 (V128Op.NarrowU)) -> CaseV ("VNARROW", [ TupV [ nullary "I8"; numV 16L ]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I16x8 (V128Op.NarrowU)) -> CaseV ("VNARROW", [ TupV [ nullary "I16"; numV 8L]; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I16x8 (V128Op.ExtMulHighS)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I16"; numV 8L ]; nullary "HIGH"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I16x8 (V128Op.ExtMulHighU)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I16"; numV 8L ]; nullary "HIGH"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I16x8 (V128Op.ExtMulLowS)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I16"; numV 8L ]; nullary "LOW"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I16x8 (V128Op.ExtMulLowU)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I16"; numV 8L ]; nullary "LOW"; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.ZX ] )
+  | V128 (V128.I32x4 (V128Op.ExtMulHighS)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I32"; numV 4L ]; nullary "HIGH"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I32x4 (V128Op.ExtMulHighU)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I32"; numV 4L ]; nullary "HIGH"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I32x4 (V128Op.ExtMulLowS)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I32"; numV 4L ]; nullary "LOW"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I32x4 (V128Op.ExtMulLowU)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I32"; numV 4L ]; nullary "LOW"; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ] )
+  | V128 (V128.I64x2 (V128Op.ExtMulHighS)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I64"; numV 2L ]; nullary "HIGH"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I64x2 (V128Op.ExtMulHighU)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I64"; numV 2L ]; nullary "HIGH"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I64x2 (V128Op.ExtMulLowS)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I64"; numV 2L ]; nullary "LOW"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I64x2 (V128Op.ExtMulLowU)) -> CaseV ("VEXTMUL", [ TupV [ nullary "I64"; numV 2L ]; nullary "LOW"; TupV [ nullary "I32"; numV 4L ]; al_of_extension Pack.ZX ] )
+  | V128 (V128.I32x4 (V128Op.DotS)) -> CaseV ("VDOT", [ TupV [ nullary "I32"; numV 4L]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
   | _ -> failwith "invalid vibinop"
 
 let al_of_int_vcvtop = function
@@ -1422,10 +1422,10 @@ let al_of_vcvtop = function
 
 
 let al_of_special_vcvtop = function
-  | V128 (V128.I16x8 (V128Op.ExtAddPairwiseS)) -> CaseV ("EXTADD_PAIRWISE", [ TupV [ nullary "I16"; numV 8L]; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I16x8 (V128Op.ExtAddPairwiseU)) -> CaseV ("EXTADD_PAIRWISE", [ TupV [ nullary "I16"; numV 8L]; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.ZX ])
-  | V128 (V128.I32x4 (V128Op.ExtAddPairwiseS)) -> CaseV ("EXTADD_PAIRWISE", [ TupV [ nullary "I32"; numV 4L]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
-  | V128 (V128.I32x4 (V128Op.ExtAddPairwiseU)) -> CaseV ("EXTADD_PAIRWISE", [ TupV [ nullary "I32"; numV 4L]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I16x8 (V128Op.ExtAddPairwiseS)) -> CaseV ("VEXTADD_PAIRWISE", [ TupV [ nullary "I16"; numV 8L]; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I16x8 (V128Op.ExtAddPairwiseU)) -> CaseV ("VEXTADD_PAIRWISE", [ TupV [ nullary "I16"; numV 8L]; TupV [ nullary "I8"; numV 16L ]; al_of_extension Pack.ZX ])
+  | V128 (V128.I32x4 (V128Op.ExtAddPairwiseS)) -> CaseV ("VEXTADD_PAIRWISE", [ TupV [ nullary "I32"; numV 4L]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.SX ])
+  | V128 (V128.I32x4 (V128Op.ExtAddPairwiseU)) -> CaseV ("VEXTADD_PAIRWISE", [ TupV [ nullary "I32"; numV 4L]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Pack.ZX ])
   | _ -> failwith "invalid vibinop"
 
 let al_of_int_vshiftop : V128Op.ishiftop -> value = function
@@ -1524,9 +1524,9 @@ let al_of_pack_size = function
   | Pack.Pack64 -> al_of_int 64
 
 let al_of_pack_shape = function
-  | Pack.Pack8x8 -> CaseV ("PACKSHAPE", [NumV 8L; NumV 8L])
-  | Pack.Pack16x4 -> CaseV ("PACKSHAPE", [NumV 16L; NumV 4L])
-  | Pack.Pack32x2 -> CaseV ("PACKSHAPE", [NumV 32L; NumV 2L])
+  | Pack.Pack8x8 -> TupV [NumV 8L; NumV 8L]
+  | Pack.Pack16x4 -> TupV [NumV 16L; NumV 4L]
+  | Pack.Pack32x2 -> TupV [NumV 32L; NumV 2L]
 
 let al_of_extension = function
   | Pack.SX -> nullary "S"
@@ -1557,13 +1557,13 @@ let al_of_vloadop vloadop =
   let vmemop = match vloadop.pack with
   | Option.Some (pack_size, vextension) -> (
     match vextension with
-    | Pack.ExtLane (pack_shape, extension) -> CaseV ("SHAPE", [ al_of_pack_shape pack_shape; al_of_extension extension; StrV str ])
-    | Pack.ExtSplat -> CaseV ("SPLAT", [ al_of_pack_size pack_size; StrV str ])
-    | Pack.ExtZero -> CaseV ("ZERO", [ al_of_pack_size pack_size; StrV str ])
-  )
-  | None -> CaseV ("LOAD", [ StrV str ]) in
+    | Pack.ExtLane (pack_shape, extension) -> CaseV ("SHAPE", [ al_of_pack_shape pack_shape; al_of_extension extension ])
+    | Pack.ExtSplat -> CaseV ("SPLAT", [ al_of_pack_size pack_size ])
+    | Pack.ExtZero -> CaseV ("ZERO", [ al_of_pack_size pack_size ])
+  ) |> Option.some |> optV
+  | None -> OptV None in
 
-  [ vmemop ] @ al_of_memidx ()
+  [ vmemop ] @ al_of_memidx () @ [ StrV str ]
 
 let al_of_vstoreop vstoreop =
   let str =
@@ -1603,20 +1603,20 @@ let rec al_of_instr instr =
   | Test op -> CaseV ("TESTOP", al_of_testop op)
   | Compare op -> CaseV ("RELOP", al_of_relop op)
   | Convert op -> CaseV ("CVTOP", al_of_cvtop op)
-  | VecTest vop -> CaseV ("ALL_TRUE", al_of_vtestop vop)
+  | VecTest vop -> CaseV ("VALL_TRUE", al_of_vtestop vop)
   | VecCompare vop -> CaseV ("VRELOP", al_of_vrelop vop)
   | VecUnary vop -> CaseV ("VUNOP", al_of_vunop vop)
   | VecBinary vop -> (match al_of_vbinop vop with Some l -> CaseV ("VBINOP", l) | None -> al_of_special_vbinop vop)
   | VecConvert vop -> (match al_of_vcvtop vop with Some l -> CaseV ("VCVTOP", l) | None -> al_of_special_vcvtop vop)
   | VecShift vop -> CaseV ("VISHIFTOP", al_of_vshiftop vop)
-  | VecBitmask vop -> CaseV ("BITMASK", al_of_vtestop vop)
+  | VecBitmask vop -> CaseV ("VBITMASK", al_of_vtestop vop)
   | VecTestBits vop -> CaseV ("VVTESTOP", al_of_vvtestop vop)
   | VecUnaryBits vop -> CaseV ("VVUNOP", al_of_vvunop vop)
   | VecBinaryBits vop -> CaseV ("VVBINOP", al_of_vvbinop vop)
   | VecTernaryBits vop -> CaseV ("VVTERNOP", al_of_vvternop vop)
-  | VecSplat vop -> CaseV ("SPLAT", al_of_vsplatop vop)
-  | VecExtract vop -> CaseV ("EXTRACT_LANE", al_of_vextractop vop)
-  | VecReplace vop -> CaseV ("REPLACE_LANE", al_of_vreplaceop vop)
+  | VecSplat vop -> CaseV ("VSPLAT", al_of_vsplatop vop)
+  | VecExtract vop -> CaseV ("VEXTRACT_LANE", al_of_vextractop vop)
+  | VecReplace vop -> CaseV ("VREPLACE_LANE", al_of_vreplaceop vop)
   | RefIsNull -> nullary "REF.IS_NULL"
   | RefFunc idx -> CaseV ("REF.FUNC", [ al_of_idx idx ])
   | Select vtl_opt -> CaseV ("SELECT", [ al_of_opt (al_of_list al_of_val_type) vtl_opt ])

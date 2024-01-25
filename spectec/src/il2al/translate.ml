@@ -1,8 +1,8 @@
-open Printf
 open Al
 open Ast
-open Al_util
 open Free
+open Al_util
+open Printf
 open Backend_interpreter.Manual
 open Util
 open Source
@@ -207,6 +207,8 @@ and exp2expr exp =
       | [ []; [ Ast.Star; atom ]; [ Ast.Star ] ], [ e1; e2 ]
       | [ []; [ atom ]; [] ], [ e1; e2 ] ->
           infixE (exp2expr e1, Print.string_of_atom atom, exp2expr e2) ~at:at
+      | [ []; [ Ast.Arrow ]; [ Ast.Star ]; [] ], [ e1; e2; e3 ] -> (* HARDCODE *)
+          infixE (exp2expr e1, "->", catE (exp2expr e2, exp2expr e3)) ~at:at
       (* Constructor *)
       (* TODO: Need a better way to convert these CaseE into ConsturctE *)
       | [ [ Ast.Atom "FUNC" ]; []; [ Ast.Star ]; [] ], _ ->
@@ -244,10 +246,10 @@ and exp2expr exp =
       | [ Ast.Atom name ] :: ll, el
         when List.for_all (fun l -> l = [] || l = [ Ast.Star ] || l = [ Ast.Quest ]) ll ->
           caseE ((name, String.lowercase_ascii name), List.map exp2expr el) ~at:at
-      | _ -> yetE (Print.structured_string_of_exp exp) ~at:at)
+      | _ -> yetE (Print.string_of_exp exp) ~at:at)
   | Ast.OptE inner_exp -> optE (Option.map exp2expr inner_exp) ~at:at
   (* Yet *)
-  | _ -> yetE (Print.structured_string_of_exp exp) ~at:at
+  | _ -> yetE (Print.string_of_exp exp) ~at:at
 
 (* `Ast.exp` -> `expr list` *)
 and exp2args exp =
@@ -328,7 +330,7 @@ let handle_context_winstr winstr =
       ]
   | _ -> []
 
-let handle_context ctx values = 
+let handle_context ctx values =
   let at = ctx.at in
   match ctx.it, values with
   | Ast.CaseE (Ast.Atom "LABEL_", { it = Ast.TupE [ n; instrs; _hole ]; _ }), vs ->
@@ -337,7 +339,7 @@ let handle_context ctx values =
         letI (varE "L", getCurLabelE ()) ~at:at;
         letI (exp2expr n, arityE (varE "L")) ~at:at;
         letI (exp2expr instrs, contE (varE "L")) ~at:at;
-      ] @ List.map (fun v -> popI (exp2expr v) ~at:at) first_vs @ 
+      ] @ List.map (fun v -> popI (exp2expr v) ~at:at) first_vs @
       [
         popallI (exp2expr last_v) ~at:at;
         exitI () ~at:at

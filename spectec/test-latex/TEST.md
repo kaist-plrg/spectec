@@ -2,6 +2,8 @@
 
 ```sh
 $ (dune exec ../src/exe-watsup/main.exe -- test.watsup -o test.tex && cat test.tex)
+[elab def] def test_sub_ATOM_22(nat) : nat
+[elab def] def curried_(nat, nat) : nat
 $$
 \begin{array}{@{}lcl@{}l@{}}
 {\mathrm{test}}_{{\mathit{sub}}_{{\mathsf{atom}}_{{22}}}}({\mathit{n}}_{{3}_{{\mathsf{atom}}_{{\mathit{y}}}}}) &=& 0 &  \\
@@ -35,6 +37,171 @@ $$
 
 ```sh
 $ (dune exec ../src/exe-watsup/main.exe -- ../spec/wasm-3.0/*.watsup)
+[elab def] def Ki : nat
+[elab def] def min(nat, nat) : nat
+[elab def] def sum(nat*) : nat
+[elab def] def signif(N) : nat
+[elab def] def expon(N) : nat
+[elab def] def M(N) : nat
+[elab def] def E(N) : nat
+[elab def] def fzero(N) : fN(N)
+[elab def] def setminus(idx*, idx*) : idx*
+[elab def] def setminus1(idx, idx*) : idx*
+[elab def] def free_dataidx_instr(instr) : dataidx*
+[elab def] def free_dataidx_instrs(instr*) : dataidx*
+[elab def] def free_dataidx_expr(expr) : dataidx*
+[elab def] def free_dataidx_func(func) : dataidx*
+[elab def] def free_dataidx_funcs(func*) : dataidx*
+[elab def] def concat_bytes((byte*)*) : byte*
+[elab def] def size(valtype) : nat
+[elab def] def packedsize(packedtype) : nat
+[elab def] def storagesize(storagetype) : nat
+[elab def] def lanesize(lanetype) : nat
+[elab def] def unpacktype(storagetype) : valtype
+[elab def] def unpacknumtype(storagetype) : numtype
+[elab def] def sxfield(storagetype) : sx?
+[elab def] def diffrt(reftype, reftype) : reftype
+[elab def] def idx(typeidx) : typevar
+[elab def] def subst_typevar(typevar, typevar*, heaptype*) : heaptype
+[elab def] def subst_numtype(numtype, typevar*, heaptype*) : numtype
+[elab def] def subst_vectype(vectype, typevar*, heaptype*) : vectype
+[elab def] def subst_heaptype(heaptype, typevar*, heaptype*) : heaptype
+[elab def] def subst_reftype(reftype, typevar*, heaptype*) : reftype
+[elab def] def subst_valtype(valtype, typevar*, heaptype*) : valtype
+[elab def] def subst_packedtype(packedtype, typevar*, heaptype*) : packedtype
+[elab def] def subst_storagetype(storagetype, typevar*, heaptype*) : storagetype
+[elab def] def subst_fieldtype(fieldtype, typevar*, heaptype*) : fieldtype
+[elab def] def subst_comptype(comptype, typevar*, heaptype*) : comptype
+[elab def] def subst_subtype(subtype, typevar*, heaptype*) : subtype
+[elab def] def subst_rectype(rectype, typevar*, heaptype*) : rectype
+[elab def] def subst_deftype(deftype, typevar*, heaptype*) : deftype
+[elab def] def subst_globaltype(globaltype, typevar*, heaptype*) : globaltype
+[elab def] def subst_functype(functype, typevar*, heaptype*) : functype
+[elab def] def subst_tabletype(tabletype, typevar*, heaptype*) : tabletype
+[elab def] def subst_memtype(memtype, typevar*, heaptype*) : memtype
+[elab def] def subst_externtype(externtype, typevar*, heaptype*) : externtype
+[elab def] def subst_all_reftype(reftype, heaptype*) : reftype
+[elab def] def subst_all_deftype(deftype, heaptype*) : deftype
+[elab def] def subst_all_deftypes(deftype*, heaptype*) : deftype*
+[elab def] def rollrt(typeidx, rectype) : rectype
+[elab def] def unrollrt(rectype) : rectype
+[elab def] def rolldt(typeidx, rectype) : deftype*
+[elab def] def unrolldt(deftype) : subtype
+[elab def] def expanddt(deftype) : comptype
+[elab def] def funcsxt(externtype*) : deftype*
+[elab def] def globalsxt(externtype*) : globaltype*
+[elab def] def tablesxt(externtype*) : tabletype*
+[elab def] def memsxt(externtype*) : memtype*
+[elab def] def memop0 : memop
+[elab def] def s33_to_u32(s33) : u32
+[elab def] def signed(N, nat) : int
+[elab def] def invsigned(N, int) : nat
+[elab def] def unop(unop_numtype, numtype, c) : c_numtype*
+[elab def] def binop(binop_numtype, numtype, c, c) : c_numtype*
+[elab def] def testop(testop_numtype, numtype, c) : c_numtype
+[elab def] def relop(relop_numtype, numtype, c, c) : c_numtype
+[elab def] def cvtop(cvtop, numtype, numtype, sx?, c) : c_numtype*
+[elab def] def wrap(nat, nat, c) : nat
+[elab def] def ext(nat, nat, sx, c) : c_numtype
+[elab def] def ibytes(N, iN(N)) : byte*
+[elab def] def fbytes(N, fN(N)) : byte*
+[elab def] def ntbytes(numtype, c_numtype) : byte*
+[elab def] def vtbytes(vectype, c_vectype) : byte*
+[elab def] def ztbytes(storagetype, c) : byte*
+[elab def] def invibytes(N, byte*) : iN(N)
+[elab def] def invfbytes(N, byte*) : fN(N)
+[elab def] def iadd(N, c, c) : c
+[elab def] def imul(N, c, c) : c
+[elab def] def ine(N, c, c) : c_numtype
+[elab def] def ilt(sx, N, c, c) : c_numtype
+[elab def] def lanes(shape, c_vectype) : c*
+[elab def] def narrow(N, N, sx, c) : c
+[elab def] def ibits(N, N) : c*
+[elab def] def unpacked(shape) : numtype
+[elab def] def dim(shape) : lanesize
+[elab def] def halfop(half, nat, nat) : nat
+[elab def] def ishape(nat) : lanetype
+[elab def] def vvunop(unop_vvectype, vectype, c_vectype) : c_vectype
+[elab def] def vvbinop(binop_vvectype, vectype, c_vectype, c_vectype) : c_vectype
+[elab def] def vvternop(ternop_vvectype, vectype, c_vectype, c_vectype, c_vectype) : c_vectype
+[elab def] def vunop(unop_vectype, shape, c_vectype) : c_vectype
+[elab def] def vbinop(binop_vectype, shape, c_vectype, c_vectype) : c_vectype*
+[elab def] def vrelop(relop_vectype, shape, c, c) : c_numtype
+[elab def] def vishiftop(shiftop_vectype, lanetype, c, c) : c
+[elab def] def vcvtop(cvtop_vectype, N, N, sx?, c) : c
+[elab def] def inst_reftype(moduleinst, reftype) : reftype
+[elab def] def default(valtype) : val?
+[elab def] def packval(storagetype, val) : fieldval
+[elab def] def unpackval(storagetype, sx?, fieldval) : val
+[elab def] def funcsxv(externval*) : funcaddr*
+[elab def] def globalsxv(externval*) : globaladdr*
+[elab def] def tablesxv(externval*) : tableaddr*
+[elab def] def memsxv(externval*) : memaddr*
+[elab def] def store(state) : store
+[elab def] def frame(state) : frame
+[elab def] def funcaddr(state) : funcaddr*
+[elab def] def funcinst(state) : funcinst*
+[elab def] def globalinst(state) : globalinst*
+[elab def] def tableinst(state) : tableinst*
+[elab def] def meminst(state) : meminst*
+[elab def] def eleminst(state) : eleminst*
+[elab def] def datainst(state) : datainst*
+[elab def] def structinst(state) : structinst*
+[elab def] def arrayinst(state) : arrayinst*
+[elab def] def moduleinst(state) : moduleinst
+[elab def] def type(state, typeidx) : deftype
+[elab def] def func(state, funcidx) : funcinst
+[elab def] def global(state, globalidx) : globalinst
+[elab def] def table(state, tableidx) : tableinst
+[elab def] def mem(state, memidx) : meminst
+[elab def] def elem(state, tableidx) : eleminst
+[elab def] def data(state, dataidx) : datainst
+[elab def] def local(state, localidx) : val?
+[elab def] def with_local(state, localidx, val) : state
+[elab def] def with_global(state, globalidx, val) : state
+[elab def] def with_table(state, tableidx, nat, ref) : state
+[elab def] def with_tableinst(state, tableidx, tableinst) : state
+[elab def] def with_mem(state, memidx, nat, nat, byte*) : state
+[elab def] def with_meminst(state, memidx, meminst) : state
+[elab def] def with_elem(state, elemidx, ref*) : state
+[elab def] def with_data(state, dataidx, byte*) : state
+[elab def] def with_struct(state, structaddr, nat, fieldval) : state
+[elab def] def with_array(state, arrayaddr, nat, fieldval) : state
+[elab def] def ext_structinst(state, structinst*) : state
+[elab def] def ext_arrayinst(state, arrayinst*) : state
+[elab def] def growtable(tableinst, nat, ref) : tableinst
+[elab def] def growmemory(meminst, nat) : meminst
+[elab def] def with_locals(context, localidx*, localtype*) : context
+[elab def] def clostype(context, deftype) : deftype
+[elab def] def clostypes(deftype*) : deftype*
+[elab def] def before(heaptype, typeidx, nat) : bool
+[elab def] def unrollht(context, heaptype) : subtype
+[elab def] def in_numtype(numtype, numtype*) : bool
+[elab def] def in_binop(binop_numtype, ibinop*) : bool
+[elab def] def blocktype(state, blocktype) : functype
+[elab def] def vzero : c_vectype
+[elab def] def alloctypes(type*) : deftype*
+[elab def] def allocfunc(store, moduleinst, func) : (store, funcaddr)
+[elab def] def allocfuncs(store, moduleinst, func*) : (store, funcaddr*)
+[elab def] def allocglobal(store, globaltype, val) : (store, globaladdr)
+[elab def] def allocglobals(store, globaltype*, val*) : (store, globaladdr*)
+[elab def] def alloctable(store, tabletype, ref) : (store, tableaddr)
+[elab def] def alloctables(store, tabletype*, ref*) : (store, tableaddr*)
+[elab def] def allocmem(store, memtype) : (store, memaddr)
+[elab def] def allocmems(store, memtype*) : (store, memaddr*)
+[elab def] def allocelem(store, reftype, ref*) : (store, elemaddr)
+[elab def] def allocelems(store, reftype*, (ref*)*) : (store, elemaddr*)
+[elab def] def allocdata(store, byte*) : (store, dataaddr)
+[elab def] def allocdatas(store, (byte*)*) : (store, dataaddr*)
+[elab def] def instexport(funcaddr*, globaladdr*, tableaddr*, memaddr*, export) : exportinst
+[elab def] def allocmodule(store, module, externval*, val*, ref*, (ref*)*) : (store, moduleinst)
+[elab def] def concat_instr((instr*)*) : instr*
+[elab def] def runelem(elem, idx) : instr*
+[elab def] def rundata(data, idx) : instr*
+[elab def] def instantiate(store, module, externval*) : config
+[elab def] def invoke(store, funcaddr, val*) : config
+[elab def] def utf8(name) : byte*
+[elab def] def concat_locals((local*)*) : local*
 \vspace{1ex}
 
 $$
@@ -141,7 +308,7 @@ $$
 
 $$
 \begin{array}{@{}lcl@{}l@{}}
-{\mathrm{fzero}}({\mathit{N}}) &=& {+((1 + 0 \cdot {2^{{-{{\mathrm{M}}}_{{\mathit{N}}}}}}) \cdot {2^{0}})} &  \\
+{+0} &=& {+((1 + 0 \cdot {2^{{-{{\mathrm{M}}}_{{\mathit{N}}}}}}) \cdot {2^{0}})} &  \\
 \end{array}
 $$
 
@@ -177,7 +344,6 @@ $$
 $$
 \begin{array}{@{}lrrl@{}l@{}}
 & {\mathit{nul}} &::=& {\mathsf{null}^?} \\
-& {\mathit{zero}} &::=& {\mathsf{zero}^?} \\
 \mbox{(number type)} & {\mathit{numtype}} &::=& \mathsf{i{\scriptstyle32}} ~|~ \mathsf{i{\scriptstyle64}} ~|~ \mathsf{f{\scriptstyle32}} ~|~ \mathsf{f{\scriptstyle64}} \\
 \mbox{(vector type)} & {\mathit{vectype}} &::=& \mathsf{v{\scriptstyle128}} \\
 \mbox{(abstract heap type)} & {\mathit{absheaptype}} &::=& \mathsf{any} ~|~ \mathsf{eq} ~|~ \mathsf{i{\scriptstyle31}} ~|~ \mathsf{struct} ~|~ \mathsf{array} ~|~ \mathsf{none} \\ &&|&
@@ -189,8 +355,8 @@ $$
 \dots \\
 \mbox{(reference type)} & {\mathit{reftype}} &::=& \mathsf{ref}~{\mathit{nul}}~{\mathit{heaptype}} \\
 \mbox{(value type)} & {\mathit{valtype}} &::=& {\mathit{numtype}} ~|~ {\mathit{vectype}} ~|~ {\mathit{reftype}} ~|~ \mathsf{bot} \\
-& {{\mathsf{i}}{{\mathit{n}}}} &::=& \mathsf{i{\scriptstyle32}} ~|~ \mathsf{i{\scriptstyle64}} \\
-& {{\mathsf{f}}{{\mathit{n}}}} &::=& \mathsf{f{\scriptstyle32}} ~|~ \mathsf{f{\scriptstyle64}} \\
+& {\mathsf{i}}{{\mathit{n}}} &::=& \mathsf{i{\scriptstyle32}} ~|~ \mathsf{i{\scriptstyle64}} \\
+& {\mathsf{f}}{{\mathit{n}}} &::=& \mathsf{f{\scriptstyle32}} ~|~ \mathsf{f{\scriptstyle64}} \\
 \end{array}
 $$
 
@@ -245,6 +411,8 @@ $$
 
 \vspace{1ex}
 
+\vspace{1ex}
+
 $$
 \begin{array}{@{}lrrl@{}l@{}}
 \mbox{(signedness)} & {\mathit{sx}} &::=& \mathsf{u} ~|~ \mathsf{s} \\
@@ -266,38 +434,6 @@ $$
 $$
 
 \vspace{1ex}
-
-$$
-\begin{array}{@{}lrrl@{}l@{}}
-\mbox{(memory argument)} & {\mathit{memarg}} &::=& \{\; \begin{array}[t]{@{}l@{}l@{}}
-\mathsf{align}~{\mathit{u{\scriptstyle32}}},\; \mathsf{offset}~{\mathit{u{\scriptstyle32}}} \;\}\end{array} \\
-\end{array}
-$$
-
-$$
-\begin{array}{@{}lrrl@{}l@{}}
-\mbox{(lane type)} & {\mathit{lanetype}} &::=& {\mathit{packedtype}} ~|~ {\mathit{numtype}} \\
-\mbox{(lane size)} & {\mathit{lanesize}} &::=& {\mathit{nat}} \\
-\end{array}
-$$
-
-$$
-\begin{array}{@{}lrrl@{}l@{}}
-\mbox{(shape)} & {\mathit{shape}} &::=& {\mathit{lanetype}}~\mathsf{x}~{\mathit{lanesize}} \\
-\end{array}
-$$
-
-$$
-\begin{array}{@{}lrrl@{}l@{}}
-& {\mathit{packshape}} &::=& \mathsf{packshape}~{\mathit{nat}}~{\mathit{nat}} \\
-\end{array}
-$$
-
-$$
-\begin{array}{@{}lrrl@{}l@{}}
-& {\mathit{half}} &::=& \mathsf{low} ~|~ \mathsf{high} \\
-\end{array}
-$$
 
 $$
 \begin{array}{@{}lrrl@{}l@{}}
@@ -336,6 +472,15 @@ $$
 $$
 
 \vspace{1ex}
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}lrrl@{}l@{}}
+\mbox{(memory operator)} & {\mathit{memop}} &::=& \{\; \begin{array}[t]{@{}l@{}l@{}}
+\mathsf{align}~{\mathit{u{\scriptstyle32}}},\; \mathsf{offset}~{\mathit{u{\scriptstyle32}}} \;\}\end{array} \\
+\end{array}
+$$
 
 \vspace{1ex}
 
@@ -384,27 +529,48 @@ $$
 {\mathit{numtype}} . {\mathit{relop}}_{{\mathit{numtype}}} \\ &&|&
 {{\mathit{numtype}}.\mathsf{extend}}{{\mathit{n}}} \\ &&|&
 {\mathit{numtype}} . {{{{{\mathit{cvtop}}}{\mathsf{\_}}}{{\mathit{numtype}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}} \\ &&|&
+\dots \\
+\mbox{(lane type)} & {\mathit{lanetype}} &::=& {\mathit{packedtype}} ~|~ {\mathit{numtype}} \\
+\mbox{(lane size)} & {\mathit{lanesize}} &::=& {\mathit{nat}} \\
+\mbox{(shape)} & {\mathit{shape}} &::=& {\mathit{lanetype}}~\mathsf{x}~{\mathit{lanesize}} \\
+& {\mathit{half}} &::=& \mathsf{low} ~|~ \mathsf{high} \\
+& {\mathit{zero}} &::=& {\mathsf{zero}^?} \\
+\end{array}
+$$
+
+$$
+\begin{array}{@{}lrrl@{}l@{}}
+\mbox{(instruction)} & {\mathit{instr}} &::=& \dots \\ &&|&
 {\mathit{vectype}}.\mathsf{const}~{\mathit{c}}_{{\mathit{vectype}}} \\ &&|&
 {\mathit{vectype}} . {\mathit{unop}}_{{\mathit{vvectype}}} \\ &&|&
 {\mathit{vectype}} . {\mathit{binop}}_{{\mathit{vvectype}}} \\ &&|&
 {\mathit{vectype}} . {\mathit{ternop}}_{{\mathit{vvectype}}} \\ &&|&
 {\mathit{vectype}} . {\mathit{testop}}_{{\mathit{vvectype}}} \\ &&|&
-\mathsf{swizzle}~{\mathit{shape}} \\ &&|&
-\mathsf{shuffle}~{\mathit{shape}}~{{\mathit{laneidx}}^\ast} \\ &&|&
-{\mathit{shape}}.\mathsf{splat} \\ &&|&
-{{{{{\mathit{shape}}.\mathsf{extract}}{\mathsf{\_}}}{\mathsf{lane}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}~{\mathit{laneidx}} \\ &&|&
-{{{\mathit{shape}}.\mathsf{replace}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{laneidx}} \\ &&|&
-\mathsf{vunop}~{\mathit{shape}}~{\mathit{unop}}_{{\mathit{vectype}}} \\ &&|&
-\mathsf{vbinop}~{\mathit{shape}}~{\mathit{binop}}_{{\mathit{vectype}}} \\ &&|&
-\mathsf{vrelop}~{\mathit{shape}}~{\mathit{relop}}_{{\mathit{vectype}}} \\ &&|&
-\mathsf{vishiftop}~{\mathit{shape}}~{\mathit{shiftop}}_{{\mathit{vectype}}} \\ &&|&
-{\mathit{shape}}.\mathsf{all\_true} \\ &&|&
-\mathsf{bitmask}~{\mathit{shape}} \\ &&|&
-\mathsf{narrow}~{\mathit{shape}}~{\mathit{shape}}~{\mathit{sx}} \\ &&|&
-\mathsf{vcvtop}~{\mathit{shape}}~{\mathit{cvtop}}_{{\mathit{vectype}}}~{{\mathit{half}}^?}~{\mathit{shape}}~{{\mathit{sx}}^?}~{\mathit{zero}} \\ &&|&
-\mathsf{extmul\_half}~{\mathit{shape}}~{\mathit{half}}~{\mathit{shape}}~{\mathit{sx}} \\ &&|&
-\mathsf{dot}~{\mathit{shape}}~{\mathit{shape}}~{\mathit{sx}} \\ &&|&
-\mathsf{extadd\_pairwise}~{\mathit{shape}}~{\mathit{shape}}~{\mathit{sx}} \\ &&|&
+{\mathit{shape}}.\mathsf{vswizzle} \\ &&|&
+{\mathit{shape}}.\mathsf{vshuffle}~{{\mathit{laneidx}}^\ast} \\ &&|&
+{\mathit{shape}}.\mathsf{vsplat} \\ &&|&
+{{{{{\mathit{shape}}.\mathsf{vextract}}{\mathsf{\_}}}{\mathsf{lane}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}~{\mathit{laneidx}} \\ &&|&
+{{{\mathit{shape}}.\mathsf{vreplace}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{laneidx}} \\ &&|&
+{\mathit{shape}} . {\mathit{unop}}_{{\mathit{vectype}}} \\ &&|&
+{\mathit{shape}} . {\mathit{binop}}_{{\mathit{vectype}}} \\ &&|&
+{\mathit{shape}} . {\mathit{relop}}_{{\mathit{vectype}}} \\ &&|&
+{\mathit{shape}} . {\mathit{shiftop}}_{{\mathit{vectype}}} \\ &&|&
+{\mathit{shape}}.\mathsf{vall\_true} \\ &&|&
+{\mathit{shape}}.\mathsf{vbitmask} \\ &&|&
+{{{{{\mathit{shape}}.\mathsf{vnarrow}}{\mathsf{\_}}}{{\mathit{shape}}}}{\mathsf{\_}}}{{\mathit{sx}}} \\ &&|&
+{\mathit{shape}} . {{{{{{{{{\mathit{cvtop}}_{{\mathit{vectype}}}}{\mathsf{\_}}}{{{\mathit{half}}^?}}}{\mathsf{\_}}}{{\mathit{shape}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}}{\mathsf{\_}}}{{\mathit{zero}}} \\ &&|&
+{{{{{{{\mathit{shape}}.\mathsf{vextmul}}{\mathsf{\_}}}{{\mathit{half}}}}{\mathsf{\_}}}{{\mathit{shape}}}}{\mathsf{\_}}}{{\mathit{sx}}} \\ &&|&
+{{{{{\mathit{shape}}.\mathsf{vdot}}{\mathsf{\_}}}{{\mathit{shape}}}}{\mathsf{\_}}}{{\mathit{sx}}} \\ &&|&
+{{{{{\mathit{shape}}.\mathsf{vextadd\_pairwise}}{\mathsf{\_}}}{{\mathit{shape}}}}{\mathsf{\_}}}{{\mathit{sx}}} \\ &&|&
+\dots \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}lrrl@{}l@{}}
+\mbox{(instruction)} & {\mathit{instr}} &::=& \dots \\ &&|&
 \mathsf{ref.null}~{\mathit{heaptype}} \\ &&|&
 \mathsf{ref.i{\scriptstyle31}} \\ &&|&
 \mathsf{ref.func}~{\mathit{funcidx}} \\ &&|&
@@ -446,7 +612,17 @@ $$
 \mathsf{table.init}~{\mathit{tableidx}}~{\mathit{elemidx}} \\ &&|&
 \mathsf{elem.drop}~{\mathit{elemidx}} \\ &&|&
 \dots \\
-& {\mathit{vloadop}} &::=& \mathsf{load}~{\mathit{memarg}} ~|~ \mathsf{shape}~{\mathit{packshape}}~{\mathit{sx}}~{\mathit{memarg}} ~|~ \mathsf{splat}~{\mathit{nat}}~{\mathit{memarg}} ~|~ \mathsf{zero}~{\mathit{nat}}~{\mathit{memarg}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}lrrl@{}l@{}}
+& {\mathit{packshape}} &::=& {\mathit{nat}}~\mathsf{x}~{\mathit{nat}} \\
+& {\mathit{vloadop}} &::=& {{{\mathit{packshape}}}{\mathsf{\_}}}{{\mathit{sx}}} \\ &&|&
+{{{\mathit{nat}}}{\mathsf{\_}}}{\mathsf{splat}} \\ &&|&
+{{{\mathit{nat}}}{\mathsf{\_}}}{\mathsf{zero}} \\
 \mbox{(instruction)} & {\mathit{instr}} &::=& \dots \\ &&|&
 \mathsf{memory.size}~{\mathit{memidx}} \\ &&|&
 \mathsf{memory.grow}~{\mathit{memidx}} \\ &&|&
@@ -454,12 +630,12 @@ $$
 \mathsf{memory.copy}~{\mathit{memidx}}~{\mathit{memidx}} \\ &&|&
 \mathsf{memory.init}~{\mathit{memidx}}~{\mathit{dataidx}} \\ &&|&
 \mathsf{data.drop}~{\mathit{dataidx}} \\ &&|&
-{{\mathit{numtype}}.\mathsf{load}}{{({\mathit{n}}~\mathsf{\_}~{\mathit{sx}})^?}}~{\mathit{memidx}}~{\mathit{memarg}} \\ &&|&
-{{\mathit{numtype}}.\mathsf{store}}{{{\mathit{n}}^?}}~{\mathit{memidx}}~{\mathit{memarg}} \\ &&|&
-\mathsf{vload}~{\mathit{vloadop}}~{\mathit{memidx}} \\ &&|&
-\mathsf{vload\_lane}~{\mathit{n}}~{\mathit{memidx}}~{\mathit{memarg}}~{\mathit{laneidx}} \\ &&|&
-\mathsf{vstore}~{\mathit{memidx}}~{\mathit{memarg}} \\ &&|&
-\mathsf{vstore\_lane}~{\mathit{n}}~{\mathit{memidx}}~{\mathit{memarg}}~{\mathit{laneidx}} \\
+{{\mathit{numtype}}.\mathsf{load}}{{({\mathit{n}}~\mathsf{\_}~{\mathit{sx}})^?}}~{\mathit{memidx}}~{\mathit{memop}} \\ &&|&
+{{\mathit{numtype}}.\mathsf{store}}{{{\mathit{n}}^?}}~{\mathit{memidx}}~{\mathit{memop}} \\ &&|&
+{\mathsf{v{\scriptstyle128}.load}}{{{\mathit{vloadop}}^?}}~{\mathit{memidx}}~{\mathit{memop}} \\ &&|&
+{{{\mathsf{v{\scriptstyle128}.load}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{memidx}}~{\mathit{memop}}~{\mathit{laneidx}} \\ &&|&
+\mathsf{v{\scriptstyle128}.store}~{\mathit{memidx}}~{\mathit{memop}} \\ &&|&
+{{{\mathsf{v{\scriptstyle128}.store}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{memidx}}~{\mathit{memop}}~{\mathit{laneidx}} \\
 \mbox{(expression)} & {\mathit{expr}} &::=& {{\mathit{instr}}^\ast} \\
 \end{array}
 $$
@@ -511,35 +687,35 @@ $$
 
 $$
 \begin{array}{@{}lcl@{}l@{}}
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instr}}}}(\mathsf{memory.init}~{\mathit{x}}~{\mathit{y}}) &=& {\mathit{y}} &  \\
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instr}}}}(\mathsf{data.drop}~{\mathit{x}}) &=& {\mathit{x}} &  \\
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instr}}}}({\mathit{in}}) &=& \epsilon &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}(\mathsf{memory.init}~{\mathit{x}}~{\mathit{y}}) &=& {\mathit{y}} &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}(\mathsf{data.drop}~{\mathit{x}}) &=& {\mathit{x}} &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}({\mathit{in}}) &=& \epsilon &  \\
 \end{array}
 $$
 
 $$
 \begin{array}{@{}lcl@{}l@{}}
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instrs}}}}(\epsilon) &=& \epsilon &  \\
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instrs}}}}({\mathit{instr}}~{{\mathit{instr}'}^\ast}) &=& {\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instr}}}}({\mathit{instr}})~{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instrs}}}}({{\mathit{instr}'}^\ast}) &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}(\epsilon) &=& \epsilon &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}({\mathit{instr}}~{{\mathit{instr}'}^\ast}) &=& {\mathrm{free}}_{{\mathit{dataidx}}}({\mathit{instr}})~{\mathrm{free}}_{{\mathit{dataidx}}}({{\mathit{instr}'}^\ast}) &  \\
 \end{array}
 $$
 
 $$
 \begin{array}{@{}lcl@{}l@{}}
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{expr}}}}({{\mathit{in}}^\ast}) &=& {\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{instrs}}}}({{\mathit{in}}^\ast}) &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}({{\mathit{in}}^\ast}) &=& {\mathrm{free}}_{{\mathit{dataidx}}}({{\mathit{in}}^\ast}) &  \\
 \end{array}
 $$
 
 $$
 \begin{array}{@{}lcl@{}l@{}}
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{func}}}}(\mathsf{func}~{\mathit{x}}~{{\mathit{loc}}^\ast}~{\mathit{e}}) &=& {\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{expr}}}}({\mathit{e}}) &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}(\mathsf{func}~{\mathit{x}}~{{\mathit{loc}}^\ast}~{\mathit{e}}) &=& {\mathrm{free}}_{{\mathit{dataidx}}}({\mathit{e}}) &  \\
 \end{array}
 $$
 
 $$
 \begin{array}{@{}lcl@{}l@{}}
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{funcs}}}}(\epsilon) &=& \epsilon &  \\
-{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{funcs}}}}({\mathit{func}}~{{\mathit{func}'}^\ast}) &=& {\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{func}}}}({\mathit{func}})~{\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{funcs}}}}({{\mathit{func}'}^\ast}) &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}(\epsilon) &=& \epsilon &  \\
+{\mathrm{free}}_{{\mathit{dataidx}}}({\mathit{func}}~{{\mathit{func}'}^\ast}) &=& {\mathrm{free}}_{{\mathit{dataidx}}}({\mathit{func}})~{\mathrm{free}}_{{\mathit{dataidx}}}({{\mathit{func}'}^\ast}) &  \\
 \end{array}
 $$
 
@@ -578,6 +754,13 @@ $$
 $$
 \begin{array}{@{}lcl@{}l@{}}
 {|{\mathit{valtype}}|} &=& {|{\mathit{valtype}}|} &  \\
+{|{\mathit{packedtype}}|} &=& {|{\mathit{packedtype}}|} &  \\
+\end{array}
+$$
+
+$$
+\begin{array}{@{}lcl@{}l@{}}
+{|{\mathit{numtype}}|} &=& {|{\mathit{numtype}}|} &  \\
 {|{\mathit{packedtype}}|} &=& {|{\mathit{packedtype}}|} &  \\
 \end{array}
 $$
@@ -1054,7 +1237,7 @@ $$
 
 $$
 \begin{array}{@{}lrrl@{}l@{}}
-\mbox{(administrative instruction)} & {{\mathit{instr}}} &::=& {\mathit{instr}} \\ &&|&
+\mbox{(administrative instruction)} & {\mathit{instr}} &::=& {\mathit{instr}} \\ &&|&
 {\mathit{addrref}} \\ &&|&
 {{\mathsf{label}}_{{\mathit{n}}}}{\{{{\mathit{instr}}^\ast}\}}~{{\mathit{instr}}^\ast} \\ &&|&
 {{\mathsf{frame}}_{{\mathit{n}}}}{\{{\mathit{frame}}\}}~{{\mathit{instr}}^\ast} \\ &&|&
@@ -1574,8 +1757,8 @@ $$
 
 $$
 \begin{array}{@{}lrrl@{}l@{}}
-& {{\mathsf{ok}}{({\mathit{typeidx}})}} &::=& {\mathsf{ok}}{{\mathit{typeidx}}} \\
-& {{\mathsf{ok}}{({\mathit{typeidx}},\, {\mathit{n}})}} &::=& {\mathsf{ok}}{({\mathit{typeidx}},\, {\mathit{nat}})} \\
+& {\mathsf{ok}}{({\mathit{typeidx}})} &::=& {\mathsf{ok}}{{\mathit{typeidx}}} \\
+& {\mathsf{ok}}{({\mathit{typeidx}},\, {\mathit{n}})} &::=& {\mathsf{ok}}{({\mathit{typeidx}},\, {\mathit{nat}})} \\
 \end{array}
 $$
 
@@ -3160,221 +3343,6 @@ $$
 $$
 \begin{array}{@{}c@{}}\displaystyle
 \frac{
-}{
-{\mathit{C}} \vdash \mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{c}}_{{\mathit{vt}}} : \epsilon \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vvconst}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvunop}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vvunop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvbinop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vvbinop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvternop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vvternop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvtestop}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{i{\scriptstyle32}}
-} \, {[\textsc{\scriptsize T{-}vvtestop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{swizzle}~{\mathit{sh}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}swizzle}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-({\mathit{laneidx}} < {\mathrm{dim}}({\mathit{sh}}) \cdot 2)^\ast
-}{
-{\mathit{C}} \vdash \mathsf{shuffle}~{\mathit{sh}}~{{\mathit{laneidx}}^\ast} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}shuffle}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{splat} : {\mathrm{unpacked}}({\mathit{sh}}) \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}splat}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-{\mathit{laneidx}} < {\mathrm{dim}}({\mathit{sh}})
-}{
-{\mathit{C}} \vdash {{{{{\mathit{sh}}.\mathsf{extract}}{\mathsf{\_}}}{\mathsf{lane}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}~{\mathit{laneidx}} : \mathsf{v{\scriptstyle128}} \rightarrow {\mathrm{unpacked}}({\mathit{sh}})
-} \, {[\textsc{\scriptsize T{-}extract\_lane}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-{\mathit{laneidx}} < {\mathrm{dim}}({\mathit{sh}})
-}{
-{\mathit{C}} \vdash {{{\mathit{sh}}.\mathsf{replace}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{laneidx}} : \mathsf{v{\scriptstyle128}}~{\mathrm{unpacked}}({\mathit{sh}}) \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}replace\_lane}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{vunop}~{\mathit{sh}}~{\mathit{vunop}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vunop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{vbinop}~{\mathit{sh}}~{\mathit{vbinop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vbinop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{vrelop}~{\mathit{sh}}~{\mathit{vrelop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vrelop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{vishiftop}~{\mathit{sh}}~{\mathit{vishiftop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vishiftop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{all\_true} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{i{\scriptstyle32}}
-} \, {[\textsc{\scriptsize T{-}vtestop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{vcvtop}~{\mathit{sh}}~{\mathit{vcvtop}}~{{\mathit{hf}}^?}~{\mathit{sh}}~{{\mathit{sx}}^?}~{\mathit{zero}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}vcvtop}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{narrow}~{\mathit{sh}}~{\mathit{sh}}~{\mathit{sx}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}narrow}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{bitmask}~{\mathit{sh}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{i{\scriptstyle32}}
-} \, {[\textsc{\scriptsize T{-}bitmask}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{dot}~{\mathit{sh}}~{\mathit{sh}}~{\mathit{sx}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}dot}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{extmul\_half}~{\mathit{sh}}~{\mathit{half}}~{\mathit{sh}}~{\mathit{sx}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}extmul\_half}]}
-\qquad
-\end{array}
-$$
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
-}{
-{\mathit{C}} \vdash \mathsf{extadd\_pairwise}~{\mathit{sh}}~{\mathit{sh}}~{\mathit{sx}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
-} \, {[\textsc{\scriptsize T{-}extadd\_pairwise}]}
-\qquad
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}c@{}}\displaystyle
-\frac{
 {\mathit{C}}.\mathsf{type}[{\mathit{x}}] \approx \mathsf{struct}~{({\mathit{mut}}~{\mathit{zt}})^\ast}
 }{
 {\mathit{C}} \vdash \mathsf{struct.new}~{\mathit{x}} : {{\mathrm{unpack}}({\mathit{zt}})^\ast} \rightarrow (\mathsf{ref}~{\mathit{x}})
@@ -3596,6 +3564,221 @@ $$
 }{
 {\mathit{C}} \vdash \mathsf{any.convert\_extern} : (\mathsf{ref}~{\mathit{nul}}~\mathsf{extern}) \rightarrow (\mathsf{ref}~{\mathit{nul}}~\mathsf{any})
 } \, {[\textsc{\scriptsize T{-}any.convert\_extern}]}
+\qquad
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash \mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{c}}_{{\mathit{vt}}} : \epsilon \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vvconst}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvunop}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vvunop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvbinop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vvbinop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvternop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vvternop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{vt}} . {\mathit{vvtestop}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{i{\scriptstyle32}}
+} \, {[\textsc{\scriptsize T{-}vvtestop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{vswizzle} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vswizzle}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+({\mathit{laneidx}} < {\mathrm{dim}}({\mathit{sh}}) \cdot 2)^\ast
+}{
+{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{vshuffle}~{{\mathit{laneidx}}^\ast} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vshuffle}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{vsplat} : {\mathrm{unpacked}}({\mathit{sh}}) \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vsplat}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+{\mathit{laneidx}} < {\mathrm{dim}}({\mathit{sh}})
+}{
+{\mathit{C}} \vdash {{{{{\mathit{sh}}.\mathsf{vextract}}{\mathsf{\_}}}{\mathsf{lane}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}~{\mathit{laneidx}} : \mathsf{v{\scriptstyle128}} \rightarrow {\mathrm{unpacked}}({\mathit{sh}})
+} \, {[\textsc{\scriptsize T{-}vextract\_lane}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+{\mathit{laneidx}} < {\mathrm{dim}}({\mathit{sh}})
+}{
+{\mathit{C}} \vdash {{{\mathit{sh}}.\mathsf{vreplace}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{laneidx}} : \mathsf{v{\scriptstyle128}}~{\mathrm{unpacked}}({\mathit{sh}}) \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vreplace\_lane}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}} . {\mathit{vunop}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vunop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}} . {\mathit{vbinop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vbinop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}} . {\mathit{vrelop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vrelop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}} . {\mathit{vishiftop}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vishiftop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{vall\_true} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{i{\scriptstyle32}}
+} \, {[\textsc{\scriptsize T{-}vtestop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}} . {{{{{{{{{\mathit{vcvtop}}}{\mathsf{\_}}}{{{\mathit{hf}}^?}}}{\mathsf{\_}}}{{\mathit{sh}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}}{\mathsf{\_}}}{{\mathit{zero}}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vcvtop}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {{{{{\mathit{sh}}.\mathsf{vnarrow}}{\mathsf{\_}}}{{\mathit{sh}}}}{\mathsf{\_}}}{{\mathit{sx}}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vnarrow}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {\mathit{sh}}.\mathsf{vbitmask} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{i{\scriptstyle32}}
+} \, {[\textsc{\scriptsize T{-}vbitmask}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {{{{{\mathit{sh}}.\mathsf{vdot}}{\mathsf{\_}}}{{\mathit{sh}}}}{\mathsf{\_}}}{{\mathit{sx}}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vdot}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {{{{{{{\mathit{sh}}.\mathsf{vextmul}}{\mathsf{\_}}}{{\mathit{half}}}}{\mathsf{\_}}}{{\mathit{sh}}}}{\mathsf{\_}}}{{\mathit{sx}}} : \mathsf{v{\scriptstyle128}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vextmul}]}
+\qquad
+\end{array}
+$$
+
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+}{
+{\mathit{C}} \vdash {{{{{\mathit{sh}}.\mathsf{vextadd\_pairwise}}{\mathsf{\_}}}{{\mathit{sh}}}}{\mathsf{\_}}}{{\mathit{sx}}} : \mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
+} \, {[\textsc{\scriptsize T{-}vextadd\_pairwise}]}
 \qquad
 \end{array}
 $$
@@ -3870,10 +4053,10 @@ $$
 \frac{
 {\mathit{C}}.\mathsf{mem}[{\mathit{x}}] = {\mathit{mt}}
  \qquad
-{2^{{\mathit{n}}_{{\mathsf{a}}}}} \leq {\mathit{psl}} / 8 \cdot {\mathit{psr}}
+{2^{{\mathit{n}}_{{\mathsf{a}}}}} \leq {\mathit{M}} / 8 \cdot {\mathit{N}}
 }{
-{\mathit{C}} \vdash \mathsf{vload}~(\mathsf{shape}~(\mathsf{packshape}~{\mathit{psl}}~{\mathit{psr}})~{\mathit{sx}}~\{ \begin{array}[t]{@{}l@{}}
-\mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array})~{\mathit{x}} : \mathsf{i{\scriptstyle32}} \rightarrow \mathsf{v{\scriptstyle128}}
+{\mathit{C}} \vdash {\mathsf{v{\scriptstyle128}.load}}{({{({\mathit{M}}~\mathsf{x}~{\mathit{N}})}{\mathsf{\_}}}{{\mathit{sx}}})}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
+\mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array} : \mathsf{i{\scriptstyle32}} \rightarrow \mathsf{v{\scriptstyle128}}
 } \, {[\textsc{\scriptsize T{-}vload}]}
 \qquad
 \end{array}
@@ -3886,8 +4069,8 @@ $$
  \qquad
 {2^{{\mathit{n}}_{{\mathsf{a}}}}} \leq {\mathit{n}} / 8
 }{
-{\mathit{C}} \vdash \mathsf{vload}~(\mathsf{splat}~{\mathit{n}}~\{ \begin{array}[t]{@{}l@{}}
-\mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array})~{\mathit{x}} : \mathsf{i{\scriptstyle32}} \rightarrow \mathsf{v{\scriptstyle128}}
+{\mathit{C}} \vdash {\mathsf{v{\scriptstyle128}.load}}{({{{\mathit{n}}}{\mathsf{\_}}}{\mathsf{splat}})}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
+\mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array} : \mathsf{i{\scriptstyle32}} \rightarrow \mathsf{v{\scriptstyle128}}
 } \, {[\textsc{\scriptsize T{-}vload{-}splat}]}
 \qquad
 \end{array}
@@ -3900,8 +4083,8 @@ $$
  \qquad
 {2^{{\mathit{n}}_{{\mathsf{a}}}}} < {\mathit{n}} / 8
 }{
-{\mathit{C}} \vdash \mathsf{vload}~(\mathsf{zero}~{\mathit{n}}~\{ \begin{array}[t]{@{}l@{}}
-\mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array})~{\mathit{x}} : \mathsf{i{\scriptstyle32}} \rightarrow \mathsf{v{\scriptstyle128}}
+{\mathit{C}} \vdash {\mathsf{v{\scriptstyle128}.load}}{({{{\mathit{n}}}{\mathsf{\_}}}{\mathsf{zero}})}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
+\mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array} : \mathsf{i{\scriptstyle32}} \rightarrow \mathsf{v{\scriptstyle128}}
 } \, {[\textsc{\scriptsize T{-}vload{-}zero}]}
 \qquad
 \end{array}
@@ -3916,7 +4099,7 @@ $$
  \qquad
 {\mathit{laneidx}} < 128 / {\mathit{n}}
 }{
-{\mathit{C}} \vdash \mathsf{vload\_lane}~{\mathit{n}}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
+{\mathit{C}} \vdash {{{\mathsf{v{\scriptstyle128}.load}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
 \mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array}~{\mathit{laneidx}} : \mathsf{i{\scriptstyle32}}~\mathsf{v{\scriptstyle128}} \rightarrow \mathsf{v{\scriptstyle128}}
 } \, {[\textsc{\scriptsize T{-}vload\_lane}]}
 \qquad
@@ -3930,7 +4113,7 @@ $$
  \qquad
 {2^{{\mathit{n}}_{{\mathsf{a}}}}} \leq {|\mathsf{v{\scriptstyle128}}|} / 8
 }{
-{\mathit{C}} \vdash \mathsf{vstore}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
+{\mathit{C}} \vdash \mathsf{v{\scriptstyle128}.store}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
 \mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array} : \mathsf{i{\scriptstyle32}}~\mathsf{v{\scriptstyle128}} \rightarrow \epsilon
 } \, {[\textsc{\scriptsize T{-}vstore}]}
 \qquad
@@ -3946,7 +4129,7 @@ $$
  \qquad
 {\mathit{laneidx}} < 128 / {\mathit{n}}
 }{
-{\mathit{C}} \vdash \mathsf{vstore\_lane}~{\mathit{n}}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
+{\mathit{C}} \vdash {{{\mathsf{v{\scriptstyle128}.store}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{x}}~\{ \begin{array}[t]{@{}l@{}}
 \mathsf{align}~{\mathit{n}}_{{\mathsf{a}}},\; \mathsf{offset}~{\mathit{n}}_{{\mathsf{o}}} \}\end{array}~{\mathit{laneidx}} : \mathsf{i{\scriptstyle32}}~\mathsf{v{\scriptstyle128}} \rightarrow \epsilon
 } \, {[\textsc{\scriptsize T{-}vstore\_lane}]}
 \qquad
@@ -4806,261 +4989,6 @@ $$
 
 $$
 \begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vvunop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}} . {\mathit{vvunop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{{{\mathit{vvunop}}}{}}_{\mathsf{v{\scriptstyle128}}}}{({\mathit{cv}}_{{1}})} = {\mathit{cv}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vvbinop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{v{\scriptstyle128}} . {\mathit{vvbinop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{{{\mathit{vvbinop}}}{}}_{\mathsf{v{\scriptstyle128}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}})} = {\mathit{cv}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vvternop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{3}})~(\mathsf{v{\scriptstyle128}} . {\mathit{vvternop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{{{\mathit{vvternop}}}{}}_{\mathsf{v{\scriptstyle128}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}},\, {\mathit{cv}}_{{3}})} = {\mathit{cv}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vvtestop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}} . \mathsf{any\_true}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}}) &\quad
-  \mbox{if}~{\mathit{i}} = {\mathrm{ine}}(128, {\mathit{cv}}_{{1}}, {\mathrm{vzero}}) \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}swizzle}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{swizzle}~{\mathit{sh}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}'}) &\quad
-  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{2}}) \\
- &&&&\quad {\land}~{{\mathit{c}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})~{0^{256 - {\mathit{lns}}}} \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}'}) = {{{\mathit{c}}^\ast}[{{\mathit{i}}^\ast}[{\mathit{k}}]]^{{\mathit{k}}<{\mathit{lns}}}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}shuffle}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{shuffle}~{\mathit{sh}}~{{\mathit{laneidx}}^\ast}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{2}}) \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{{\mathit{i}}^\ast}[{{\mathit{laneidx}}^\ast}[{\mathit{k}}]]^{{\mathit{k}}<{\mathit{lns}}}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}splat}]} \quad & ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{1}})~({\mathit{sh}}.\mathsf{splat}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{nt}} = {\mathrm{unpacked}}({\mathit{sh}}) \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{\mathit{c}}_{{1}}^{{\mathrm{dim}}({\mathit{sh}})}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}extract\_lane{-}num}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{extract\_lane}~{\mathit{sh}}~{\mathit{laneidx}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{2}}) &\quad
-  \mbox{if}~{\mathit{nt}} = {\mathrm{unpacked}}({\mathit{sh}}) \\
- &&&&\quad {\land}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{\mathit{c}}_{{2}} = {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}|},\, {|{\mathit{nt}}|})}^{\mathsf{u}}}}{({{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})[{\mathit{laneidx}}])} \\
-{[\textsc{\scriptsize E{-}extract\_lane{-}pack}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({{{{{\mathit{sh}}.\mathsf{extract}}{\mathsf{\_}}}{\mathsf{lane}}}{\mathsf{\_}}}{{\mathit{sx}}}~{\mathit{laneidx}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{2}}) &\quad
-  \mbox{if}~{\mathit{nt}} = {\mathrm{unpacked}}({\mathit{sh}}) \\
- &&&&\quad {\land}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{\mathit{c}}_{{2}} = {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}|},\, {|{\mathit{nt}}|})}^{{\mathit{sx}}}}}{({{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})[{\mathit{laneidx}}])} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}replace\_lane}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{2}})~({{{\mathit{sh}}.\mathsf{replace}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{laneidx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = ({{\mathit{i}}^\ast})[[{\mathit{laneidx}}] = {\mathit{c}}_{{2}}] \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vunop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vunop}~{\mathit{sh}}~{\mathit{vunop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{cv}} = {{{{\mathit{vunop}}}{}}_{{\mathit{sh}}}}{({\mathit{cv}}_{{1}})} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vbinop{-}val}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{vbinop}~{\mathit{sh}}~{\mathit{vbinop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{{{\mathit{vbinop}}}{}}_{{\mathit{sh}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}})} = {\mathit{cv}} \\
-{[\textsc{\scriptsize E{-}vbinop{-}trap}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{vbinop}~{\mathit{sh}}~{\mathit{vbinop}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{{{{\mathit{vbinop}}}{}}_{{\mathit{sh}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}})} = \epsilon \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vrelop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{vrelop}~{\mathit{sh}}~{\mathit{vrelop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathit{j}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{2}}) \\
- &&&&\quad {\land}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{{{{\mathrm{ext}}}_{(1,\, {|{\mathit{lnt}}|})}^{\mathsf{s}}}}{({{{{\mathit{vrelop}}}{}}_{{\mathit{sh}}}}{({\mathit{i}},\, {\mathit{j}})})}^\ast} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vishiftop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{n}})~(\mathsf{vishiftop}~{\mathit{sh}}~{\mathit{vishiftop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{{{{\mathit{vishiftop}}}{}}_{{\mathit{lnt}}}}{({\mathit{i}},\, {\mathit{n}})}^\ast} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}all\_true{-}true}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({\mathit{sh}}.\mathsf{all\_true}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~1) &\quad
-  \mbox{if}~{{\mathit{i}}_{{1}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) \\
- &&&&\quad {\land}~({\mathit{i}}_{{1}} \neq 0)^\ast \\
-{[\textsc{\scriptsize E{-}all\_true{-}false}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({\mathit{sh}}.\mathsf{all\_true}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~0) &\quad
-  \mbox{otherwise} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}bitmask}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{bitmask}~{\mathit{sh}}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}}) &\quad
-  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
- &&&&\quad {\land}~{{\mathit{i}}_{{1}}^{{\mathit{lns}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) \\
- &&&&\quad {\land}~{\mathrm{ibits}}(32, {\mathit{i}}) = {{\mathrm{ilt}}(\mathsf{s}, {|{\mathit{lnt}}|}, {\mathit{i}}_{{1}}, 0)^{{\mathit{lns}}}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}narrow}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{narrow}~{\mathit{sh}}_{{2}}~{\mathit{sh}}_{{1}}~{\mathit{sx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{{\mathit{i}}_{{1}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathit{i}}_{{2}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{2}}) \\
- &&&&\quad {\land}~{{\mathit{n}}_{{1}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{narrow}}({|{\mathit{lnt}}_{{1}}|}, {|{\mathit{lnt}}_{{2}}|}, {\mathit{sx}}, {\mathit{i}}_{{1}})^{{\mathit{lns}}_{{1}}}} \\
- &&&&\quad {\land}~{{\mathit{n}}_{{2}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{narrow}}({|{\mathit{lnt}}_{{1}}|}, {|{\mathit{lnt}}_{{2}}|}, {\mathit{sx}}, {\mathit{i}}_{{2}})^{{\mathit{lns}}_{{1}}}} \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{\mathit{n}}_{{1}}^{{\mathit{lns}}_{{1}}}}~{{\mathit{n}}_{{2}}^{{\mathit{lns}}_{{1}}}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vcvtop{-}normal}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vcvtop}~{\mathit{sh}}_{{2}}~{\mathit{vcvtop}}~\epsilon~{\mathit{sh}}_{{1}}~{\mathit{sx}}~\epsilon) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{{{\mathit{vcvtop}}}{{{}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}}{({\mathit{i}})}^\ast} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vcvtop{-}half}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vcvtop}~{\mathit{sh}}_{{2}}~{\mathit{vcvtop}}~{\mathit{hf}}~{\mathit{sh}}_{{1}}~{{\mathit{sx}}^?}~\epsilon) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}})[{\mathrm{halfop}}({\mathit{hf}}, 0, {\mathit{lns}}_{{2}}) : {\mathit{lns}}_{{2}}] \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{{{\mathit{vcvtop}}}{{{}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{{\mathit{sx}}^?}}}}}{({\mathit{i}})}^\ast} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}vcvtop{-}zero}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vcvtop}~{\mathit{sh}}_{{2}}~{\mathit{vcvtop}}~\epsilon~{\mathit{sh}}_{{1}}~{{\mathit{sx}}^?}~\mathsf{zero}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{{{\mathit{vcvtop}}}{{{}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{{\mathit{sx}}^?}}}}}{({\mathit{i}})}^\ast}~{0^{{\mathit{lns}}_{{1}}}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}dot}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{dot}~{\mathit{sh}}_{{1}}~{\mathit{sh}}_{{2}}~\mathsf{s}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{\mathit{i}}_{{1}} = {|{\mathit{lnt}}_{{1}}|} \\
- &&&&\quad {\land}~{\mathit{i}}_{{2}} = {|{\mathit{lnt}}_{{2}}|} \\
- &&&&\quad {\land}~{{\mathit{k}}_{{1}}^{{\mathit{k}'}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{{\mathit{k}}_{{2}}^{{\mathit{k}'}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}_{{2}}) \\
- &&&&\quad {\land}~{\mathrm{concat}}({({\mathit{j}}_{{1}}~{\mathit{j}}_{{2}})^\ast}) = {{\mathrm{imul}}({\mathit{i}}_{{1}}, {{{{\mathrm{ext}}}_{({\mathit{i}}_{{2}},\, {\mathit{i}}_{{1}})}^{\mathsf{s}}}}{({\mathit{k}}_{{1}})}, {{{{\mathrm{ext}}}_{({\mathit{i}}_{{2}},\, {\mathit{i}}_{{1}})}^{\mathsf{s}}}}{({\mathit{k}}_{{2}})})^{{\mathit{k}'}}} \\
- &&&&\quad {\land}~{{\mathit{j}'}^\ast} = {{\mathrm{iadd}}({\mathit{i}}_{{1}}, {\mathit{j}}_{{1}}, {\mathit{j}}_{{2}})^\ast} \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}) = {{\mathit{j}'}^\ast} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}extmul\_half}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{extmul\_half}~{\mathit{sh}}_{{2}}~{\mathit{hf}}~{\mathit{sh}}_{{1}}~{\mathit{sx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{{\mathit{i}}^{{\mathit{k}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}})[{\mathrm{halfop}}({\mathit{hf}}, 0, {\mathit{lns}}_{{2}}) : {\mathit{lns}}_{{2}}] \\
- &&&&\quad {\land}~{{\mathit{j}}^{{\mathit{k}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{2}})[{\mathrm{halfop}}({\mathit{hf}}, 0, {\mathit{lns}}_{{2}}) : {\mathit{lns}}_{{2}}] \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{\mathrm{imul}}({|{\mathit{lnt}}_{{2}}|}, {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}{({\mathit{i}})}, {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}{({\mathit{j}})})^{{\mathit{k}}}} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}extadd\_pairwise}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{extadd\_pairwise}~{\mathit{sh}}_{{2}}~{\mathit{sh}}_{{1}}~{\mathit{sx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
- &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
- &&&&\quad {\land}~{{\mathit{i}}^{{\mathit{k}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
- &&&&\quad {\land}~{\mathrm{concat}}({({\mathit{i}}_{{1}}~{\mathit{i}}_{{2}})^\ast}) = {{{{{\mathrm{ext}}}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}{({\mathit{i}})}^{{\mathit{k}}}} \\
- &&&&\quad {\land}~{{\mathit{j}}^\ast} = {{\mathrm{iadd}}({|{\mathit{lnt}}_{{2}}|}, {\mathit{i}}_{{1}}, {\mathit{i}}_{{2}})^\ast} \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{\mathit{j}}^\ast} \\
-\end{array}
-$$
-
-\vspace{1ex}
-
-$$
-\begin{array}{@{}l@{}lcl@{}l@{}}
 {[\textsc{\scriptsize E{-}ref.func}]} \quad & {\mathit{z}} ; (\mathsf{ref.func}~{\mathit{x}}) &\hookrightarrow& (\mathsf{ref.func}~{\mathit{z}}.\mathsf{module}.\mathsf{func}[{\mathit{x}}]) &  \\
 \end{array}
 $$
@@ -5349,6 +5277,261 @@ $$
 
 $$
 \begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vvunop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}} . {\mathit{vvunop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{{{\mathit{vvunop}}}{}}_{\mathsf{v{\scriptstyle128}}}}{({\mathit{cv}}_{{1}})} = {\mathit{cv}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vvbinop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{v{\scriptstyle128}} . {\mathit{vvbinop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{{{\mathit{vvbinop}}}{}}_{\mathsf{v{\scriptstyle128}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}})} = {\mathit{cv}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vvternop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{3}})~(\mathsf{v{\scriptstyle128}} . {\mathit{vvternop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{{{\mathit{vvternop}}}{}}_{\mathsf{v{\scriptstyle128}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}},\, {\mathit{cv}}_{{3}})} = {\mathit{cv}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vvtestop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}} . \mathsf{any\_true}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}}) &\quad
+  \mbox{if}~{\mathit{i}} = {\mathrm{ine}}(128, {\mathit{cv}}_{{1}}, {\mathrm{vzero}}) \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vswizzle}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({\mathit{sh}}.\mathsf{vswizzle}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}'}) &\quad
+  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{2}}) \\
+ &&&&\quad {\land}~{{\mathit{c}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})~{0^{256 - {\mathit{lns}}}} \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}'}) = {{{\mathit{c}}^\ast}[{{\mathit{i}}^\ast}[{\mathit{k}}]]^{{\mathit{k}}<{\mathit{lns}}}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vshuffle}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({\mathit{sh}}.\mathsf{vshuffle}~{{\mathit{laneidx}}^\ast}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{2}}) \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{{\mathit{i}}^\ast}[{{\mathit{laneidx}}^\ast}[{\mathit{k}}]]^{{\mathit{k}}<{\mathit{lns}}}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vsplat}]} \quad & ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{1}})~({\mathit{sh}}.\mathsf{vsplat}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{nt}} = {\mathrm{unpacked}}({\mathit{sh}}) \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{\mathit{c}}_{{1}}^{{\mathrm{dim}}({\mathit{sh}})}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vextract\_lane{-}num}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vextract\_lane}~{\mathit{sh}}~{\mathit{laneidx}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{2}}) &\quad
+  \mbox{if}~{\mathit{nt}} = {\mathrm{unpacked}}({\mathit{sh}}) \\
+ &&&&\quad {\land}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{\mathit{c}}_{{2}} = {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}|},\, {|{\mathit{nt}}|})}^{\mathsf{u}}}}{({{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})[{\mathit{laneidx}}])} \\
+{[\textsc{\scriptsize E{-}vextract\_lane{-}pack}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({{{{{\mathit{sh}}.\mathsf{vextract}}{\mathsf{\_}}}{\mathsf{lane}}}{\mathsf{\_}}}{{\mathit{sx}}}~{\mathit{laneidx}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{2}}) &\quad
+  \mbox{if}~{\mathit{nt}} = {\mathrm{unpacked}}({\mathit{sh}}) \\
+ &&&&\quad {\land}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{\mathit{c}}_{{2}} = {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}|},\, {|{\mathit{nt}}|})}^{{\mathit{sx}}}}}{({{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})[{\mathit{laneidx}}])} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vreplace\_lane}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}}_{{2}})~({{{\mathit{sh}}.\mathsf{vreplace}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{laneidx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = ({{\mathit{i}}^\ast})[[{\mathit{laneidx}}] = {\mathit{c}}_{{2}}] \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vunop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({\mathit{sh}} . {\mathit{vunop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{cv}} = {{{{\mathit{vunop}}}{}}_{{\mathit{sh}}}}{({\mathit{cv}}_{{1}})} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vbinop{-}val}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({\mathit{sh}} . {\mathit{vbinop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{{{\mathit{vbinop}}}{}}_{{\mathit{sh}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}})} = {\mathit{cv}} \\
+{[\textsc{\scriptsize E{-}vbinop{-}trap}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({\mathit{sh}} . {\mathit{vbinop}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{{{{\mathit{vbinop}}}{}}_{{\mathit{sh}}}}{({\mathit{cv}}_{{1}},\, {\mathit{cv}}_{{2}})} = \epsilon \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vrelop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({\mathit{sh}} . {\mathit{vrelop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathit{j}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{2}}) \\
+ &&&&\quad {\land}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{{{{\mathrm{ext}}}_{(1,\, {|{\mathit{lnt}}|})}^{\mathsf{s}}}}{({{{{\mathit{vrelop}}}{}}_{{\mathit{sh}}}}{({\mathit{i}},\, {\mathit{j}})})}^\ast} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vishiftop}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{n}})~({\mathit{sh}} . {\mathit{vishiftop}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{{{{\mathit{vishiftop}}}{}}_{{\mathit{lnt}}}}{({\mathit{i}},\, {\mathit{n}})}^\ast} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vall\_true{-}true}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({\mathit{sh}}.\mathsf{vall\_true}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~1) &\quad
+  \mbox{if}~{{\mathit{i}}_{{1}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) \\
+ &&&&\quad {\land}~({\mathit{i}}_{{1}} \neq 0)^\ast \\
+{[\textsc{\scriptsize E{-}vall\_true{-}false}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({\mathit{sh}}.\mathsf{vall\_true}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~0) &\quad
+  \mbox{otherwise} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vbitmask}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({\mathit{sh}}.\mathsf{vbitmask}) &\hookrightarrow& (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}}) &\quad
+  \mbox{if}~{\mathit{sh}} = {\mathit{lnt}}~\mathsf{x}~{\mathit{lns}} \\
+ &&&&\quad {\land}~{{\mathit{i}}_{{1}}^{{\mathit{lns}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) \\
+ &&&&\quad {\land}~{\mathrm{ibits}}(32, {\mathit{i}}) = {{\mathrm{ilt}}(\mathsf{s}, {|{\mathit{lnt}}|}, {\mathit{i}}_{{1}}, 0)^{{\mathit{lns}}}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vnarrow}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({{{{{\mathit{sh}}_{{2}}.\mathsf{vnarrow}}{\mathsf{\_}}}{{\mathit{sh}}_{{1}}}}{\mathsf{\_}}}{{\mathit{sx}}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{{\mathit{i}}_{{1}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathit{i}}_{{2}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{2}}) \\
+ &&&&\quad {\land}~{{\mathit{n}}_{{1}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{narrow}}({|{\mathit{lnt}}_{{1}}|}, {|{\mathit{lnt}}_{{2}}|}, {\mathit{sx}}, {\mathit{i}}_{{1}})^{{\mathit{lns}}_{{1}}}} \\
+ &&&&\quad {\land}~{{\mathit{n}}_{{2}}^{{\mathit{lns}}_{{1}}}} = {{\mathrm{narrow}}({|{\mathit{lnt}}_{{1}}|}, {|{\mathit{lnt}}_{{2}}|}, {\mathit{sx}}, {\mathit{i}}_{{2}})^{{\mathit{lns}}_{{1}}}} \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{\mathit{n}}_{{1}}^{{\mathit{lns}}_{{1}}}}~{{\mathit{n}}_{{2}}^{{\mathit{lns}}_{{1}}}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vcvtop{-}normal}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({\mathit{sh}}_{{2}} . {{{{{{{{{\mathit{vcvtop}}}{\mathsf{\_}}}{\epsilon}}{\mathsf{\_}}}{{\mathit{sh}}_{{1}}}}{\mathsf{\_}}}{{\mathit{sx}}}}{\mathsf{\_}}}{\epsilon}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{{{\mathit{vcvtop}}}{{{}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}}{({\mathit{i}})}^\ast} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vcvtop{-}half}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({\mathit{sh}}_{{2}} . {{{{{{{{{\mathit{vcvtop}}}{\mathsf{\_}}}{{\mathit{hf}}}}{\mathsf{\_}}}{{\mathit{sh}}_{{1}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}}{\mathsf{\_}}}{\epsilon}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}})[{\mathrm{halfop}}({\mathit{hf}}, 0, {\mathit{lns}}_{{2}}) : {\mathit{lns}}_{{2}}] \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{{{\mathit{vcvtop}}}{{{}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{{\mathit{sx}}^?}}}}}{({\mathit{i}})}^\ast} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vcvtop{-}zero}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({\mathit{sh}}_{{2}} . {{{{{{{{{\mathit{vcvtop}}}{\mathsf{\_}}}{\epsilon}}{\mathsf{\_}}}{{\mathit{sh}}_{{1}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}}}{\mathsf{\_}}}{\mathsf{zero}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^\ast} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{{{\mathit{vcvtop}}}{{{}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{{\mathit{sx}}^?}}}}}{({\mathit{i}})}^\ast}~{0^{{\mathit{lns}}_{{1}}}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vdot}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({{{{{\mathit{sh}}_{{1}}.\mathsf{vdot}}{\mathsf{\_}}}{{\mathit{sh}}_{{2}}}}{\mathsf{\_}}}{\mathsf{s}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{\mathit{i}}_{{1}} = {|{\mathit{lnt}}_{{1}}|} \\
+ &&&&\quad {\land}~{\mathit{i}}_{{2}} = {|{\mathit{lnt}}_{{2}}|} \\
+ &&&&\quad {\land}~{{\mathit{k}}_{{1}}^{{\mathit{k}'}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{{\mathit{k}}_{{2}}^{{\mathit{k}'}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}_{{2}}) \\
+ &&&&\quad {\land}~{\mathrm{concat}}({({\mathit{j}}_{{1}}~{\mathit{j}}_{{2}})^\ast}) = {{\mathrm{imul}}({\mathit{i}}_{{1}}, {{{{\mathrm{ext}}}_{({\mathit{i}}_{{2}},\, {\mathit{i}}_{{1}})}^{\mathsf{s}}}}{({\mathit{k}}_{{1}})}, {{{{\mathrm{ext}}}_{({\mathit{i}}_{{2}},\, {\mathit{i}}_{{1}})}^{\mathsf{s}}}}{({\mathit{k}}_{{2}})})^{{\mathit{k}'}}} \\
+ &&&&\quad {\land}~{{\mathit{j}'}^\ast} = {{\mathrm{iadd}}({\mathit{i}}_{{1}}, {\mathit{j}}_{{1}}, {\mathit{j}}_{{2}})^\ast} \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}) = {{\mathit{j}'}^\ast} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vextmul}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{2}})~({{{{{{{\mathit{sh}}_{{2}}.\mathsf{vextmul}}{\mathsf{\_}}}{{\mathit{hf}}}}{\mathsf{\_}}}{{\mathit{sh}}_{{1}}}}{\mathsf{\_}}}{{\mathit{sx}}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^{{\mathit{k}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}})[{\mathrm{halfop}}({\mathit{hf}}, 0, {\mathit{lns}}_{{2}}) : {\mathit{lns}}_{{2}}] \\
+ &&&&\quad {\land}~{{\mathit{j}}^{{\mathit{k}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{2}})[{\mathrm{halfop}}({\mathit{hf}}, 0, {\mathit{lns}}_{{2}}) : {\mathit{lns}}_{{2}}] \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{\mathrm{imul}}({|{\mathit{lnt}}_{{2}}|}, {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}{({\mathit{i}})}, {{{{\mathrm{ext}}}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}{({\mathit{j}})})^{{\mathit{k}}}} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
+{[\textsc{\scriptsize E{-}vextadd\_pairwise}]} \quad & (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({{{{{\mathit{sh}}_{{2}}.\mathsf{vextadd\_pairwise}}{\mathsf{\_}}}{{\mathit{sh}}_{{1}}}}{\mathsf{\_}}}{{\mathit{sx}}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{\mathit{sh}}_{{1}} = {\mathit{lnt}}_{{1}}~\mathsf{x}~{\mathit{lns}}_{{1}} \\
+ &&&&\quad {\land}~{\mathit{sh}}_{{2}} = {\mathit{lnt}}_{{2}}~\mathsf{x}~{\mathit{lns}}_{{2}} \\
+ &&&&\quad {\land}~{{\mathit{i}}^{{\mathit{k}}}} = {{\mathrm{lanes}}}_{{\mathit{sh}}_{{1}}}({\mathit{cv}}_{{1}}) \\
+ &&&&\quad {\land}~{\mathrm{concat}}({({\mathit{i}}_{{1}}~{\mathit{i}}_{{2}})^\ast}) = {{{{{\mathrm{ext}}}_{({|{\mathit{lnt}}_{{1}}|},\, {|{\mathit{lnt}}_{{2}}|})}^{{\mathit{sx}}}}}{({\mathit{i}})}^{{\mathit{k}}}} \\
+ &&&&\quad {\land}~{{\mathit{j}}^\ast} = {{\mathrm{iadd}}({|{\mathit{lnt}}_{{2}}|}, {\mathit{i}}_{{1}}, {\mathit{i}}_{{2}})^\ast} \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}_{{2}}}({\mathit{cv}}) = {{\mathit{j}}^\ast} \\
+\end{array}
+$$
+
+\vspace{1ex}
+
+$$
+\begin{array}{@{}l@{}lcl@{}l@{}}
 {[\textsc{\scriptsize E{-}local.get}]} \quad & {\mathit{z}} ; (\mathsf{local.get}~{\mathit{x}}) &\hookrightarrow& {\mathit{val}} &\quad
   \mbox{if}~{{\mathit{z}}.\mathsf{local}}{[{\mathit{x}}]} = {\mathit{val}} \\
 \end{array}
@@ -5472,38 +5655,38 @@ $$
 
 $$
 \begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}load{-}num{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{load}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {|{\mathit{nt}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}load{-}num{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{load}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}) &\quad
-  \mbox{if}~{{\mathrm{bytes}}}_{{\mathit{nt}}}({\mathit{c}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {|{\mathit{nt}}|} / 8] \\
-{[\textsc{\scriptsize E{-}load{-}pack{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({{\mathit{nt}}.\mathsf{load}}{({\mathit{n}}~\mathsf{\_}~{\mathit{sx}})}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}load{-}pack{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({{\mathit{nt}}.\mathsf{load}}{({\mathit{n}}~\mathsf{\_}~{\mathit{sx}})}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{{{{\mathrm{ext}}}_{({\mathit{n}},\, {|{\mathit{nt}}|})}^{{\mathit{sx}}}}}{({\mathit{c}})}) &\quad
-  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{c}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {\mathit{n}} / 8] \\
-{[\textsc{\scriptsize E{-}vload{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{load}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {|\mathsf{v{\scriptstyle128}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vload{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{load}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{\mathrm{bytes}}}_{\mathsf{v{\scriptstyle128}}}({\mathit{cv}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {|\mathsf{v{\scriptstyle128}}|} / 8] \\
-{[\textsc{\scriptsize E{-}vload{-}shape{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{shape}~(\mathsf{packshape}~{\mathit{psl}}~{\mathit{psr}})~{\mathit{sx}}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{psl}} \cdot {\mathit{psr}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vload{-}shape{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{shape}~(\mathsf{packshape}~{\mathit{psl}}~{\mathit{psr}})~{\mathit{sx}}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~({{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{psl}}}}({\mathit{m}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{k}} \cdot {\mathit{psl}} / 8 : {\mathit{psl}} / 8])^{{\mathit{k}}<{\mathit{psr}}} \\
- &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathrm{ishape}}({\mathit{psl}} \cdot 2)~\mathsf{x}~{\mathit{psr}}}({\mathit{cv}}) = {{{{{\mathrm{ext}}}_{({\mathit{psl}},\, {\mathit{psl}} \cdot 2)}^{{\mathit{sx}}}}}{({\mathit{m}})}^{{\mathit{psr}}}} \\
-{[\textsc{\scriptsize E{-}vload{-}splat{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{splat}~{\mathit{n}}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vload{-}splat{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{splat}~{\mathit{n}}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{m}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {\mathit{n}} / 8] \\
+{[\textsc{\scriptsize E{-}load{-}num{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {|{\mathit{nt}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}load{-}num{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{\mathit{c}}) &\quad
+  \mbox{if}~{{\mathrm{bytes}}}_{{\mathit{nt}}}({\mathit{c}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {|{\mathit{nt}}|} / 8] \\
+{[\textsc{\scriptsize E{-}load{-}pack{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({{\mathit{nt}}.\mathsf{load}}{({\mathit{n}}~\mathsf{\_}~{\mathit{sx}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}load{-}pack{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({{\mathit{nt}}.\mathsf{load}}{({\mathit{n}}~\mathsf{\_}~{\mathit{sx}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& ({\mathit{nt}}.\mathsf{const}~{{{{\mathrm{ext}}}_{({\mathit{n}},\, {|{\mathit{nt}}|})}^{{\mathit{sx}}}}}{({\mathit{c}})}) &\quad
+  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{c}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {\mathit{n}} / 8] \\
+{[\textsc{\scriptsize E{-}vload{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}.load}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {|\mathsf{v{\scriptstyle128}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vload{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}.load}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{\mathrm{bytes}}}_{\mathsf{v{\scriptstyle128}}}({\mathit{cv}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {|\mathsf{v{\scriptstyle128}}|} / 8] \\
+{[\textsc{\scriptsize E{-}vload{-}shape{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathsf{v{\scriptstyle128}.load}}{({{({\mathit{M}}~\mathsf{x}~{\mathit{N}})}{\mathsf{\_}}}{{\mathit{sx}}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{M}} \cdot {\mathit{N}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vload{-}shape{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathsf{v{\scriptstyle128}.load}}{({{({\mathit{M}}~\mathsf{x}~{\mathit{N}})}{\mathsf{\_}}}{{\mathit{sx}}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~({{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{M}}}}({\mathit{m}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{k}} \cdot {\mathit{M}} / 8 : {\mathit{M}} / 8])^{{\mathit{k}}<{\mathit{N}}} \\
+ &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathrm{ishape}}({\mathit{M}} \cdot 2)~\mathsf{x}~{\mathit{N}}}({\mathit{cv}}) = {{{{{\mathrm{ext}}}_{({\mathit{M}},\, {\mathit{M}} \cdot 2)}^{{\mathit{sx}}}}}{({\mathit{m}})}^{{\mathit{N}}}} \\
+{[\textsc{\scriptsize E{-}vload{-}splat{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathsf{v{\scriptstyle128}.load}}{({{{\mathit{n}}}{\mathsf{\_}}}{\mathsf{splat}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vload{-}splat{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathsf{v{\scriptstyle128}.load}}{({{{\mathit{n}}}{\mathsf{\_}}}{\mathsf{splat}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{m}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {\mathit{n}} / 8] \\
  &&&&\quad {\land}~{\mathit{l}} = 128 / {\mathit{n}} \\
  &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathrm{ishape}}({\mathit{n}})~\mathsf{x}~{\mathit{l}}}({\mathit{cv}}) = {{\mathit{m}}^{{\mathit{l}}}} \\
-{[\textsc{\scriptsize E{-}vload{-}zero{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{zero}~{\mathit{n}}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vload{-}zero{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{vload}~(\mathsf{zero}~{\mathit{n}}~{\mathit{marg}})~{\mathit{x}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{c}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {\mathit{n}} / 8] \\
+{[\textsc{\scriptsize E{-}vload{-}zero{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathsf{v{\scriptstyle128}.load}}{({{{\mathit{n}}}{\mathsf{\_}}}{\mathsf{zero}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vload{-}zero{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathsf{v{\scriptstyle128}.load}}{({{{\mathit{n}}}{\mathsf{\_}}}{\mathsf{zero}})}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{c}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {\mathit{n}} / 8] \\
  &&&&\quad {\land}~{\mathit{cv}} = {{{{\mathrm{ext}}}_{(128,\, {\mathit{n}})}^{\mathsf{u}}}}{({\mathit{c}})} \\
-{[\textsc{\scriptsize E{-}vload\_lane{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vload\_lane}~{\mathit{n}}~{\mathit{x}}~{\mathit{marg}}~{\mathit{laneidx}}) &\hookrightarrow& \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vload\_lane{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~(\mathsf{vload\_lane}~{\mathit{n}}~{\mathit{x}}~{\mathit{marg}}~{\mathit{laneidx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
-  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{m}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {\mathit{n}} / 8] \\
+{[\textsc{\scriptsize E{-}vload\_lane{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({{{\mathsf{v{\scriptstyle128}.load}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{x}}~{\mathit{mo}}~{\mathit{laneidx}}) &\hookrightarrow& \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vload\_lane{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}_{{1}})~({{{\mathsf{v{\scriptstyle128}.load}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{x}}~{\mathit{mo}}~{\mathit{laneidx}}) &\hookrightarrow& (\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}}) &\quad
+  \mbox{if}~{{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({\mathit{m}}) = {{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {\mathit{n}} / 8] \\
  &&&&\quad {\land}~{\mathit{sh}} = {\mathrm{ishape}}({\mathit{n}})~\mathsf{x}~128 / {\mathit{n}} \\
  &&&&\quad {\land}~{{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}) = {{\mathrm{lanes}}}_{{\mathit{sh}}}({\mathit{cv}}_{{1}})[[{\mathit{laneidx}}] = {\mathit{m}}] \\
 \end{array}
@@ -5513,21 +5696,21 @@ $$
 
 $$
 \begin{array}{@{}l@{}lcl@{}l@{}}
-{[\textsc{\scriptsize E{-}store{-}num{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({\mathit{nt}}.\mathsf{store}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {|{\mathit{nt}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}store{-}num{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({\mathit{nt}}.\mathsf{store}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {|{\mathit{nt}}|} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
+{[\textsc{\scriptsize E{-}store{-}num{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({\mathit{nt}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {|{\mathit{nt}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}store{-}num{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({\mathit{nt}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {|{\mathit{nt}}|} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
   \mbox{if}~{{\mathit{b}}^\ast} = {{\mathrm{bytes}}}_{{\mathit{nt}}}({\mathit{c}}) \\
-{[\textsc{\scriptsize E{-}store{-}pack{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({{\mathit{nt}}.\mathsf{store}}{{\mathit{n}}}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}store{-}pack{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({{\mathit{nt}}.\mathsf{store}}{{\mathit{n}}}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {\mathit{n}} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
+{[\textsc{\scriptsize E{-}store{-}pack{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({{\mathit{nt}}.\mathsf{store}}{{\mathit{n}}}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{n}} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}store{-}pack{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~({\mathit{nt}}.\mathsf{const}~{\mathit{c}})~({{\mathit{nt}}.\mathsf{store}}{{\mathit{n}}}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {\mathit{n}} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
   \mbox{if}~{{\mathit{b}}^\ast} = {{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({{{\mathrm{wrap}}}_{({|{\mathit{nt}}|},\, {\mathit{n}})}}{({\mathit{c}})}) \\
-{[\textsc{\scriptsize E{-}vstore{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{vstore}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {|\mathsf{v{\scriptstyle128}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vstore{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{vstore}~{\mathit{x}}~{\mathit{marg}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {|\mathsf{v{\scriptstyle128}}|} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
+{[\textsc{\scriptsize E{-}vstore{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{v{\scriptstyle128}.store}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {|\mathsf{v{\scriptstyle128}}|} / 8 > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vstore{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{v{\scriptstyle128}.store}~{\mathit{x}}~{\mathit{mo}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {|\mathsf{v{\scriptstyle128}}|} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
   \mbox{if}~{{\mathit{b}}^\ast} = {{\mathrm{bytes}}}_{\mathsf{v{\scriptstyle128}}}({\mathit{cv}}) \\
-{[\textsc{\scriptsize E{-}vstore\_lane{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{vstore\_lane}~{\mathit{n}}~{\mathit{x}}~{\mathit{marg}}~{\mathit{laneidx}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
-  \mbox{if}~{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} + {\mathit{n}} > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
-{[\textsc{\scriptsize E{-}vstore\_lane{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~(\mathsf{vstore\_lane}~{\mathit{n}}~{\mathit{x}}~{\mathit{marg}}~{\mathit{laneidx}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{marg}}.\mathsf{offset} : {\mathit{n}} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
+{[\textsc{\scriptsize E{-}vstore\_lane{-}oob}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({{{\mathsf{v{\scriptstyle128}.store}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{x}}~{\mathit{mo}}~{\mathit{laneidx}}) &\hookrightarrow& {\mathit{z}} ; \mathsf{trap} &\quad
+  \mbox{if}~{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} + {\mathit{n}} > {|{{\mathit{z}}.\mathsf{mem}}{[{\mathit{x}}]}.\mathsf{data}|} \\
+{[\textsc{\scriptsize E{-}vstore\_lane{-}val}]} \quad & {\mathit{z}} ; (\mathsf{i{\scriptstyle32}}.\mathsf{const}~{\mathit{i}})~(\mathsf{v{\scriptstyle128}}.\mathsf{const}~{\mathit{cv}})~({{{\mathsf{v{\scriptstyle128}.store}}{{\mathit{n}}}}{\mathsf{\_}}}{\mathsf{lane}}~{\mathit{x}}~{\mathit{mo}}~{\mathit{laneidx}}) &\hookrightarrow& {\mathit{z}}[\mathsf{mem}[{\mathit{x}}].\mathsf{data}[{\mathit{i}} + {\mathit{mo}}.\mathsf{offset} : {\mathit{n}} / 8] = {{\mathit{b}}^\ast}] ; \epsilon &\quad
   \mbox{if}~{{\mathit{b}}^\ast} = {{\mathrm{bytes}}}_{{{\mathit{i}}}{{\mathit{n}}}}({{\mathrm{lanes}}}_{{\mathrm{ishape}}({\mathit{n}})~\mathsf{x}~128 / {\mathit{n}}}({\mathit{cv}})[{\mathit{laneidx}}]) \\
 \end{array}
 $$
@@ -5848,17 +6031,17 @@ $$
 $$
 \begin{array}{@{}l@{}rrlll@{}l@{}}
 & {\mathtt{byte}} &::=& {\mathit{b}}{:}\mathtt{0x00} ~|~ \dots ~|~ {\mathit{b}}{:}\mathtt{0xFF} &\Rightarrow& {\mathit{b}} \\
-& {\mathtt{uN}}({\mathit{N}}) &::=& {\mathit{n}}{:}{\mathtt{byte}} &\Rightarrow& {\mathit{n}} &\quad
+& {{\mathtt{u}}}{{\mathit{N}}} &::=& {\mathit{n}}{:}{\mathtt{byte}} &\Rightarrow& {\mathit{n}} &\quad
   \mbox{if}~{\mathit{n}} < {2^{7}} \land {\mathit{n}} < {2^{{\mathit{N}}}} \\ &&|&
-{\mathit{n}}{:}{\mathtt{byte}}~{\mathit{m}}{:}{\mathtt{uN}}(({\mathit{N}} - 7)) &\Rightarrow& {2^{7}} \cdot {\mathit{m}} + ({\mathit{n}} - {2^{7}}) &\quad
+{\mathit{n}}{:}{\mathtt{byte}}~{\mathit{m}}{:}{{\mathtt{u}}}{({\mathit{N}} - 7)} &\Rightarrow& {2^{7}} \cdot {\mathit{m}} + ({\mathit{n}} - {2^{7}}) &\quad
   \mbox{if}~{\mathit{n}} \geq {2^{7}} \land {\mathit{N}} > 7 \\
-& {\mathtt{sN}}({\mathit{N}}) &::=& {\mathit{n}}{:}{\mathtt{byte}} &\Rightarrow& {\mathit{n}} &\quad
+& {{\mathtt{s}}}{{\mathit{N}}} &::=& {\mathit{n}}{:}{\mathtt{byte}} &\Rightarrow& {\mathit{n}} &\quad
   \mbox{if}~{\mathit{n}} < {2^{6}} \land {\mathit{n}} < {2^{{\mathit{N}} - 1}} \\ &&|&
 {\mathit{n}}{:}{\mathtt{byte}} &\Rightarrow& {\mathit{n}} - {2^{7}} &\quad
   \mbox{if}~{2^{6}} \leq {\mathit{n}} < {2^{7}} \land {\mathit{n}} \geq {2^{7}} - {2^{{\mathit{N}} - 1}} \\ &&|&
-{\mathit{n}}{:}{\mathtt{byte}}~{\mathit{i}}{:}{\mathtt{uN}}(({\mathit{N}} - 7)) &\Rightarrow& {2^{7}} \cdot {\mathit{i}} + ({\mathit{n}} - {2^{7}}) &\quad
+{\mathit{n}}{:}{\mathtt{byte}}~{\mathit{i}}{:}{{\mathtt{u}}}{({\mathit{N}} - 7)} &\Rightarrow& {2^{7}} \cdot {\mathit{i}} + ({\mathit{n}} - {2^{7}}) &\quad
   \mbox{if}~{\mathit{n}} \geq {2^{7}} \land {\mathit{N}} > 7 \\
-& {\mathtt{iN}}({\mathit{N}}) &::=& {\mathit{i}}{:}{\mathtt{sN}}({\mathit{N}}) &\Rightarrow& {{{{{\mathrm{signed}}^{{-1}}}}{}}_{{\mathit{N}}}}{{\mathit{i}}} \\
+& {{\mathtt{i}}}{{\mathit{N}}} &::=& {\mathit{i}}{:}{{\mathtt{s}}}{{\mathit{N}}} &\Rightarrow& {{{{{\mathrm{signed}}^{{-1}}}}{}}_{{\mathit{N}}}}{{\mathit{i}}} \\
 \end{array}
 $$
 
@@ -5866,7 +6049,7 @@ $$
 
 $$
 \begin{array}{@{}l@{}rrlll@{}l@{}}
-& {\mathtt{fN}}({\mathit{N}}) &::=& {{\mathit{b}}^\ast}{:}{{\mathtt{byte}}^{{\mathit{N}} / 8}} &\Rightarrow& {\mathrm{invfbytes}}({\mathit{N}}, {{\mathit{b}}^\ast}) \\
+& {{\mathtt{f}}}{{\mathit{N}}} &::=& {{\mathit{b}}^\ast}{:}{{\mathtt{byte}}^{{\mathit{N}} / 8}} &\Rightarrow& {\mathrm{invfbytes}}({\mathit{N}}, {{\mathit{b}}^\ast}) \\
 \end{array}
 $$
 
@@ -5874,11 +6057,11 @@ $$
 
 $$
 \begin{array}{@{}l@{}rrlll@{}l@{}}
-& {\mathtt{u{\scriptstyle32}}} &::=& {\mathit{n}}{:}{\mathtt{uN}}(32) &\Rightarrow& {\mathit{n}} \\
-& {\mathtt{u{\scriptstyle64}}} &::=& {\mathit{n}}{:}{\mathtt{uN}}(64) &\Rightarrow& {\mathit{n}} \\
-& {\mathtt{s{\scriptstyle33}}} &::=& {\mathit{i}}{:}{\mathtt{sN}}(33) &\Rightarrow& {\mathit{i}} \\
-& {\mathtt{f{\scriptstyle32}}} &::=& {\mathit{p}}{:}{\mathtt{fN}}(32) &\Rightarrow& {\mathit{p}} \\
-& {\mathtt{f{\scriptstyle64}}} &::=& {\mathit{p}}{:}{\mathtt{fN}}(64) &\Rightarrow& {\mathit{p}} \\
+& {\mathtt{u{\scriptstyle32}}} &::=& {\mathit{n}}{:}{{\mathtt{u}}}{32} &\Rightarrow& {\mathit{n}} \\
+& {\mathtt{u{\scriptstyle64}}} &::=& {\mathit{n}}{:}{{\mathtt{u}}}{64} &\Rightarrow& {\mathit{n}} \\
+& {\mathtt{s{\scriptstyle33}}} &::=& {\mathit{i}}{:}{{\mathtt{s}}}{33} &\Rightarrow& {\mathit{i}} \\
+& {\mathtt{f{\scriptstyle32}}} &::=& {\mathit{p}}{:}{{\mathtt{f}}}{32} &\Rightarrow& {\mathit{p}} \\
+& {\mathtt{f{\scriptstyle64}}} &::=& {\mathit{p}}{:}{{\mathtt{f}}}{64} &\Rightarrow& {\mathit{p}} \\
 \end{array}
 $$
 
@@ -6156,42 +6339,42 @@ $$
 
 $$
 \begin{array}{@{}lrrl@{}l@{}}
-& {\mathit{memidxop}} &::=& ({\mathit{memidx}},\, {\mathit{memarg}}) \\
+& {\mathit{memidxop}} &::=& ({\mathit{memidx}},\, {\mathit{memop}}) \\
 \end{array}
 $$
 
 $$
 \begin{array}{@{}l@{}rrlll@{}l@{}}
-& {\mathtt{memarg}} &::=& {\mathit{n}}{:}{\mathtt{u{\scriptstyle32}}}~{\mathit{m}}{:}{\mathtt{u{\scriptstyle32}}} &\Rightarrow& (0,\, \{ \begin{array}[t]{@{}l@{}}
+& {\mathtt{memop}} &::=& {\mathit{n}}{:}{\mathtt{u{\scriptstyle32}}}~{\mathit{m}}{:}{\mathtt{u{\scriptstyle32}}} &\Rightarrow& (0,\, \{ \begin{array}[t]{@{}l@{}}
 \mathsf{align}~{\mathit{n}},\; \mathsf{offset}~{\mathit{m}} \}\end{array}) &\quad
   \mbox{if}~{\mathit{n}} < {2^{6}} \\ &&|&
 {\mathit{n}}{:}{\mathtt{u{\scriptstyle32}}}~{\mathit{x}}{:}{\mathtt{memidx}}~{\mathit{m}}{:}{\mathtt{u{\scriptstyle32}}} &\Rightarrow& ({\mathit{x}},\, \{ \begin{array}[t]{@{}l@{}}
 \mathsf{align}~{\mathit{n}},\; \mathsf{offset}~{\mathit{m}} \}\end{array}) &\quad
   \mbox{if}~{2^{6}} \leq {\mathit{n}} < {2^{7}} \\
 & {\mathtt{instr}} &::=& \dots \\ &&|&
-\mathtt{0x28}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{i{\scriptstyle32}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x29}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{i{\scriptstyle64}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x2A}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{f{\scriptstyle32}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x2B}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{f{\scriptstyle64}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x2C}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x2D}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x2E}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x2F}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x30}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x31}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x32}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x33}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x34}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(32~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x35}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(32~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x36}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{i{\scriptstyle32}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x37}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{i{\scriptstyle64}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x38}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{f{\scriptstyle32}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x39}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& \mathsf{f{\scriptstyle64}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x3A}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{store}}{8}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x3B}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{store}}{16}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x3C}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{store}}{8}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x3D}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{store}}{16}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
-\mathtt{0x3E}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memarg}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{store}}{32}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x28}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{i{\scriptstyle32}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x29}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{i{\scriptstyle64}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x2A}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{f{\scriptstyle32}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x2B}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{f{\scriptstyle64}}.\mathsf{load}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x2C}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x2D}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x2E}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x2F}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x30}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x31}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(8~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x32}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x33}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(16~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x34}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(32~\mathsf{\_}~\mathsf{s})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x35}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{load}}{(32~\mathsf{\_}~\mathsf{u})}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x36}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{i{\scriptstyle32}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x37}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{i{\scriptstyle64}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x38}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{f{\scriptstyle32}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x39}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& \mathsf{f{\scriptstyle64}}.\mathsf{store}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x3A}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{store}}{8}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x3B}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle32}}.\mathsf{store}}{16}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x3C}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{store}}{8}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x3D}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{store}}{16}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
+\mathtt{0x3E}~({\mathit{x}},\, {\mathit{mo}}){:}{\mathtt{memop}} &\Rightarrow& {\mathsf{i{\scriptstyle64}}.\mathsf{store}}{32}~{\mathit{x}}~{\mathit{mo}} \\ &&|&
 \mathtt{0x3F}~{\mathit{x}}{:}{\mathtt{memidx}} &\Rightarrow& \mathsf{memory.size}~{\mathit{x}} \\ &&|&
 \mathtt{0x40}~{\mathit{x}}{:}{\mathtt{memidx}} &\Rightarrow& \mathsf{memory.grow}~{\mathit{x}} \\ &&|&
 \mathtt{0xFC}~8{:}{\mathtt{u{\scriptstyle32}}}~{\mathit{y}}{:}{\mathtt{dataidx}}~{\mathit{x}}{:}{\mathtt{memidx}} &\Rightarrow& \mathsf{memory.init}~{\mathit{x}}~{\mathit{y}} \\ &&|&
@@ -6527,7 +6710,7 @@ $$
 $$
 \begin{array}{@{}l@{}rrlll@{}l@{}}
 & {\mathtt{module}} &::=& \mathtt{0x00}~\mathtt{0x61}~\mathtt{0x73}~\mathtt{0x6D}~1{:}{\mathtt{u{\scriptstyle32}}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{type}}^\ast}{:}{\mathtt{typesec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{import}}^\ast}{:}{\mathtt{importsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{typeidx}}^{{\mathit{n}}}}{:}{\mathtt{funcsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{table}}^\ast}{:}{\mathtt{tablesec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{mem}}^\ast}{:}{\mathtt{memsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{global}}^\ast}{:}{\mathtt{globalsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{export}}^\ast}{:}{\mathtt{exportsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{start}}^\ast}{:}{\mathtt{startsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{elem}}^\ast}{:}{\mathtt{elemsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{m}'}^\ast}{:}{\mathtt{datacntsec}}~{{\mathtt{customsec}}^\ast} \\ &&&{({{\mathit{local}}^\ast},\, {\mathit{expr}})^{{\mathit{n}}}}{:}{\mathtt{codesec}}~{{\mathtt{customsec}}^\ast} \\ &&&{{\mathit{data}}^{{\mathit{m}}}}{:}{\mathtt{datasec}}~{{\mathtt{customsec}}^\ast} &\Rightarrow& \mathsf{module}~{{\mathit{type}}^\ast}~{{\mathit{import}}^\ast}~{{\mathit{func}}^{{\mathit{n}}}}~{{\mathit{global}}^\ast}~{{\mathit{table}}^\ast}~{{\mathit{mem}}^\ast}~{{\mathit{elem}}^\ast}~{{\mathit{data}}^{{\mathit{m}}}}~{{\mathit{start}}^\ast}~{{\mathit{export}}^\ast} &\quad
-  \mbox{if}~{{\mathit{m}'}^\ast} = \epsilon \lor {\mathrm{free}}_{{\mathit{dataidx}}_{{\mathit{funcs}}}}({{\mathit{func}}^{{\mathit{n}}}}) = \epsilon \\
+  \mbox{if}~{{\mathit{m}'}^\ast} = \epsilon \lor {\mathrm{free}}_{{\mathit{dataidx}}}({{\mathit{func}}^{{\mathit{n}}}}) = \epsilon \\
  &&&&&&\quad {\land}~{\mathit{m}} = {\mathrm{sum}}({{\mathit{m}'}^\ast}) \\
  &&&&&&\quad {\land}~(({\mathit{func}} = \mathsf{func}~{\mathit{typeidx}}~{{\mathit{local}}^\ast}~{\mathit{expr}}))^\ast \\
 \end{array}

@@ -32,8 +32,8 @@ let replace k v r =
 
 let iter f = iter (fun (k, v) -> f k !v)
 
-let map fv =
-  map (fun (k, v) -> k, !v |> fv |> ref)
+let map fk fv =
+  map (fun (k, v) -> k |> fk, !v |> fv |> ref)
 
 let fold f r acc =
   fold_left (fun acc (k, v) -> f k !v acc) acc r

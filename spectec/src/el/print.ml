@@ -109,9 +109,9 @@ and string_of_typ t =
   | IterT (t1, iter) -> string_of_typ t1 ^ string_of_iter iter
   | StrT tfs ->
     "{" ^ concat ", " (map_filter_nl_list string_of_typfield tfs) ^ "}"
-  | CaseT (dots1, ids, tcases, dots2) ->
+  | CaseT (dots1, ts, tcases, dots2) ->
     "\n  | " ^ concat "\n  | "
-      (strings_of_dots dots1 @ map_filter_nl_list it ids @
+      (strings_of_dots dots1 @ map_filter_nl_list string_of_typ ts @
         map_filter_nl_list string_of_typcase tcases @ strings_of_dots dots2)
   | RangeT tes -> concat " | " (map_filter_nl_list string_of_typenum tes)
   | AtomT atom -> string_of_atom atom
@@ -146,9 +146,9 @@ and string_of_exp e =
   | VarE (id, args) -> id.it ^ string_of_args args
   | AtomE atom -> string_of_atom atom
   | BoolE b -> string_of_bool b
-  | NatE n -> string_of_int n
-  | HexE n -> Printf.sprintf "0x%X" n
-  | CharE n -> Printf.sprintf "U+%X" n
+  | NatE (DecOp, n) -> string_of_int n
+  | NatE (HexOp, n) -> Printf.sprintf "0x%X" n
+  | NatE (CharOp, n) -> Printf.sprintf "U+%X" n
   | TextE t -> "\"" ^ String.escaped t ^ "\""
   | UnE (op, e2) -> string_of_unop op ^ " " ^ string_of_exp e2
   | BinE (e1, op, e2) ->
@@ -182,10 +182,12 @@ and string_of_exp e =
   | CallE (id, args) -> "$" ^ id.it ^ string_of_args args
   | IterE (e1, iter) -> string_of_exp e1 ^ string_of_iter iter
   | TypE (e1, t) -> string_of_exp e1 ^ " : " ^ string_of_typ t
-  | HoleE (`Use, `One) -> "%"
-  | HoleE (`Use, `All) -> "%%"
-  | HoleE (`Skip, `One) -> "!%"
-  | HoleE (`Skip, `All) -> "!%%"
+  | HoleE (`Use, `Num i) -> "%" ^ string_of_int i
+  | HoleE (`Use, `Next) -> "%"
+  | HoleE (`Use, `Rest) -> "%%"
+  | HoleE (`Skip, `Num i) -> "!%" ^ string_of_int i
+  | HoleE (`Skip, `Next) -> "!%"
+  | HoleE (`Skip, `Rest) -> "!%%"
   | FuseE (e1, e2) -> string_of_exp e1 ^ "#" ^ string_of_exp e2
 
 and string_of_exps sep es =
@@ -222,9 +224,9 @@ and string_of_prem prem =
 and string_of_sym g =
   match g.it with
   | VarG (id, args) -> id.it ^ string_of_args args
-  | NatG n -> string_of_int n
-  | HexG n -> Printf.sprintf "0x%X" n
-  | CharG n -> Printf.sprintf "U+%X" n
+  | NatG (DecOp, n) -> string_of_int n
+  | NatG (HexOp, n) -> Printf.sprintf "0x%X" n
+  | NatG (CharOp, n) -> Printf.sprintf "U+%X" n
   | TextG t -> "\"" ^ String.escaped t ^ "\""
   | EpsG -> "eps"
   | SeqG gs -> "{" ^ concat " " (map_filter_nl_list string_of_sym gs) ^ "}"
@@ -235,6 +237,7 @@ and string_of_sym g =
   | IterG (g1, iter) -> string_of_sym g1 ^ string_of_iter iter
   | ArithG e -> string_of_exp e
   | AttrG (e, g1) -> string_of_exp e ^ ":" ^ string_of_sym g1
+  | FuseG (g1, g2) -> string_of_sym g1 ^ "#" ^ string_of_sym g2
 
 and string_of_prod prod =
   let (g, e, prems) = prod.it in

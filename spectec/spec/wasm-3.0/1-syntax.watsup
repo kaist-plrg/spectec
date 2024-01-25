@@ -94,7 +94,6 @@ var x33 : s33 hint(show x)
 ;; Value types
 
 syntax nul = NULL?
-syntax zero = ZERO?
 
 syntax numtype hint(desc "number type") =
   | I32 | I64 | F32 | F64
@@ -223,6 +222,8 @@ var zt : storagetype
 ;; Operators
 ;;
 
+;; Numeric operators
+
 syntax sx hint(desc "signedness") = | U | S
 
 syntax iunop = | CLZ | CTZ | POPCNT
@@ -253,30 +254,7 @@ var testop : testop_numtype
 var relop : relop_numtype
 
 
-syntax memarg hint(desc "memory argument") = {ALIGN u32, OFFSET u32}
-
-var marg : memarg
-
-syntax lanetype hint(desc "lane type") =
-  | packedtype | numtype
-syntax lanesize hint(desc "lane size") = nat
-
-var lnt : lanetype
-var lns : lanesize
-syntax shape hint(desc "shape") = lanetype X lanesize
-
-var psl : nat
-var psr : nat
-
-syntax packshape =
-  | PACKSHAPE nat nat
-
-var psh : packshape
-
-syntax half = | LOW | HIGH
-var hf : half
-
-var sh : shape
+;; Vector operators
 
 syntax unopVVXX = | NOT
 syntax binopVVXX = | AND | ANDNOT | OR | XOR
@@ -318,6 +296,13 @@ var vbinop : binop_vectype
 var vtestop : testop_vectype
 var vrelop : relop_vectype
 var vcvtop : cvtop_vectype
+
+
+;; Memory operators
+
+syntax memop hint(desc "memory operator") = {ALIGN u32, OFFSET u32}
+
+var mo : memop
 
 
 ;;
@@ -370,29 +355,41 @@ syntax instr/numeric hint(desc "numeric instruction") = ...
   | CVTOP numtype cvtop numtype sx?  hint(show %.%#_#%#_#%)
   | ...
 
+syntax lanetype hint(desc "lane type") = | packedtype | numtype
+syntax lanesize hint(desc "lane size") = nat
+syntax shape hint(desc "shape") = lanetype X lanesize
+syntax half = | LOW | HIGH
+syntax zero = ZERO?
+
+var lnt : lanetype
+var lns : lanesize
+var sh : shape
+var hf : half
+
 syntax instr/vector hint(desc "vector instruction") = ...
-  | VVCONST vectype c_vectype                                        hint(show %.CONST %)
-  | VVUNOP vectype unop_vvectype                                     hint(show %.%)
-  | VVBINOP vectype binop_vvectype                                   hint(show %.%)
-  | VVTERNOP vectype ternop_vvectype                                 hint(show %.%)
-  | VVTESTOP vectype testop_vvectype                                 hint(show %.%)
-  | SWIZZLE shape
-  | SHUFFLE shape laneidx*
-  | SPLAT shape                                                     hint(show %.SPLAT)
-  | EXTRACT_LANE shape sx? laneidx                                  hint(show %.EXTRACT#_#LANE#_#% %)
-  | REPLACE_LANE shape laneidx                                      hint(show %.REPLACE#_#LANE %)
-  | VUNOP shape unop_vectype
-  | VBINOP shape binop_vectype
-  | VRELOP shape relop_vectype
-  | VISHIFTOP shape shiftop_vectype
-  | ALL_TRUE shape                                                  hint(show %.ALL_TRUE)
-  | BITMASK shape
-  | NARROW shape shape sx
-  | VCVTOP shape cvtop_vectype half? shape sx? zero
-  | EXTMUL_HALF shape half shape sx
-  | DOT shape shape sx
-  | EXTADD_PAIRWISE shape shape sx
+  | VVCONST vectype c_vectype                                 hint(show %.CONST %)
+  | VVUNOP vectype unop_vvectype                              hint(show %.%)
+  | VVBINOP vectype binop_vvectype                            hint(show %.%)
+  | VVTERNOP vectype ternop_vvectype                          hint(show %.%)
+  | VVTESTOP vectype testop_vvectype                          hint(show %.%)
+  | VSWIZZLE shape                                            hint(show %.VSWIZZLE)
+  | VSHUFFLE shape laneidx*                                   hint(show %.VSHUFFLE %)
+  | VSPLAT shape                                              hint(show %.VSPLAT)
+  | VEXTRACT_LANE shape sx? laneidx                           hint(show %.VEXTRACT#_#LANE#_#% %)
+  | VREPLACE_LANE shape laneidx                               hint(show %.VREPLACE#_#LANE %)
+  | VUNOP shape unop_vectype                                  hint(show %.%)
+  | VBINOP shape binop_vectype                                hint(show %.%)
+  | VRELOP shape relop_vectype                                hint(show %.%)
+  | VISHIFTOP shape shiftop_vectype                           hint(show %.%)
+  | VALL_TRUE shape                                           hint(show %.VALL_TRUE)
+  | VBITMASK shape                                            hint(show %.VBITMASK)
+  | VNARROW shape shape sx                                    hint(show %.VNARROW#_#%#_#%)
+  | VCVTOP shape cvtop_vectype half? shape sx? zero           hint(show %.%#_#%#_#%#_#%) hint(show %.%#_#%#_#%#_#%) hint(show %.%#_#%#_#%#_#%#_#%)
+  | VEXTMUL shape half shape sx                               hint(show %.VEXTMUL#_#%#_#%#_#%)
+  | VDOT shape shape sx                                       hint(show %.VDOT#_#%#_#%)
+  | VEXTADD_PAIRWISE shape shape sx                           hint(show %.VEXTADD_PAIRWISE#_#%#_#%)
   | ...
+
 
 syntax instr/reference hint(desc "reference instruction") = ...
   | REF.NULL heaptype
@@ -449,8 +446,12 @@ syntax instr/table hint(desc "table instruction") = ...
   | ELEM.DROP elemidx
   | ...
 
+
+syntax packshape = nat X nat
 syntax vloadop =
-  | LOAD memarg | SHAPE packshape sx memarg | SPLAT nat memarg | ZERO nat memarg
+  | SHAPE packshape sx  hint(show %#_#%)
+  | SPLAT nat           hint(show %#_#SPLAT)
+  | ZERO nat            hint(show %#_#ZERO)
 
 syntax instr/memory hint(desc "memory instruction") = ...
   | MEMORY.SIZE memidx
@@ -459,12 +460,12 @@ syntax instr/memory hint(desc "memory instruction") = ...
   | MEMORY.COPY memidx memidx
   | MEMORY.INIT memidx dataidx
   | DATA.DROP dataidx
-  | LOAD numtype (n _ sx)? memidx memarg  hint(show %.LOAD % %)  hint(show %.LOAD#% % %)
-  | STORE numtype n? memidx memarg        hint(show %.STORE % %) hint(show %.STORE#% % %)
-  | VLOAD vloadop memidx
-  | VLOAD_LANE n memidx memarg laneidx
-  | VSTORE memidx memarg
-  | VSTORE_LANE n memidx memarg laneidx
+  | LOAD numtype (n _ sx)? memidx memop  hint(show %.LOAD % %)    hint(show %.LOAD#% % %)
+  | STORE numtype n? memidx memop        hint(show %.STORE % %)   hint(show %.STORE#% % %)
+  | VLOAD vloadop? memidx memop          hint(show V128.LOAD % %) hint(show V128.LOAD#% % %)
+  | VLOAD_LANE n memidx memop laneidx    hint(show V128.LOAD#%#_#LANE % % %)
+  | VSTORE memidx memop                  hint(show V128.STORE % %)
+  | VSTORE_LANE n memidx memop laneidx   hint(show V128.STORE#%#_#LANE % % %)
 
 syntax expr hint(desc "expression") =
   instr*
