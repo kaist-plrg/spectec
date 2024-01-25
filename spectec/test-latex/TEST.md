@@ -3019,7 +3019,7 @@ $$
 {|{\mathit{nt}}_{{1}}|} = {|{\mathit{nt}}_{{2}}|}
 }{
 {\mathit{C}} \vdash \mathsf{cvtop}~{\mathit{nt}}_{{1}}~\mathsf{reinterpret}~{\mathit{nt}}_{{2}} : {\mathit{nt}}_{{2}} \rightarrow {\mathit{nt}}_{{1}}
-} \, {[\textsc{\scriptsize T{-}reinterpret}]}
+} \, {[\textsc{\scriptsize T{-}cvtop{-}reinterpret}]}
 \qquad
 \end{array}
 $$
@@ -3032,7 +3032,7 @@ $$
 {{\mathit{sx}}^?} = \epsilon \Leftrightarrow {|{{\mathsf{i}}{{\mathit{n}}}}_{{1}}|} > {|{{\mathsf{i}}{{\mathit{n}}}}_{{2}}|}
 }{
 {\mathit{C}} \vdash {{\mathsf{i}}{{\mathit{n}}}}_{{1}} . {{{{\mathsf{convert}}{\mathsf{\_}}}{{{\mathsf{i}}{{\mathit{n}}}}_{{2}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}} : {{\mathsf{i}}{{\mathit{n}}}}_{{2}} \rightarrow {{\mathsf{i}}{{\mathit{n}}}}_{{1}}
-} \, {[\textsc{\scriptsize T{-}convert{-}i}]}
+} \, {[\textsc{\scriptsize T{-}cvtop{-}convert{-}i}]}
 \qquad
 \end{array}
 $$
@@ -3043,7 +3043,7 @@ $$
 {{\mathsf{f}}{{\mathit{n}}}}_{{1}} \neq {{\mathsf{f}}{{\mathit{n}}}}_{{2}}
 }{
 {\mathit{C}} \vdash \mathsf{cvtop}~{{\mathsf{f}}{{\mathit{n}}}}_{{1}}~\mathsf{convert}~{{\mathsf{f}}{{\mathit{n}}}}_{{2}} : {{\mathsf{f}}{{\mathit{n}}}}_{{2}} \rightarrow {{\mathsf{f}}{{\mathit{n}}}}_{{1}}
-} \, {[\textsc{\scriptsize T{-}convert{-}f}]}
+} \, {[\textsc{\scriptsize T{-}cvtop{-}convert{-}f}]}
 \qquad
 \end{array}
 $$

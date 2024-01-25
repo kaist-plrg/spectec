@@ -272,7 +272,32 @@ $$
 $$
 
 
-
+$$
+\begin{array}{@{}c@{}}\displaystyle
+\frac{
+{\mathit{nt}}_{{1}} \neq {\mathit{nt}}_{{2}}
+ \qquad
+{|{\mathit{nt}}_{{1}}|} = {|{\mathit{nt}}_{{2}}|}
+}{
+{\mathit{C}} \vdash \mathsf{cvtop}~{\mathit{nt}}_{{1}}~\mathsf{reinterpret}~{\mathit{nt}}_{{2}} : {\mathit{nt}}_{{2}} \rightarrow {\mathit{nt}}_{{1}}
+} \, {[\textsc{\scriptsize T{-}cvtop{-}reinterpret}]}
+\\[3ex]\displaystyle
+\frac{
+{{\mathsf{i}}{{\mathit{n}}}}_{{1}} \neq {{\mathsf{i}}{{\mathit{n}}}}_{{2}}
+ \qquad
+{{\mathit{sx}}^?} = \epsilon \Leftrightarrow {|{{\mathsf{i}}{{\mathit{n}}}}_{{1}}|} > {|{{\mathsf{i}}{{\mathit{n}}}}_{{2}}|}
+}{
+{\mathit{C}} \vdash {{\mathsf{i}}{{\mathit{n}}}}_{{1}} . {{{{\mathsf{convert}}{\mathsf{\_}}}{{{\mathsf{i}}{{\mathit{n}}}}_{{2}}}}{\mathsf{\_}}}{{{\mathit{sx}}^?}} : {{\mathsf{i}}{{\mathit{n}}}}_{{2}} \rightarrow {{\mathsf{i}}{{\mathit{n}}}}_{{1}}
+} \, {[\textsc{\scriptsize T{-}cvtop{-}convert{-}i}]}
+\\[3ex]\displaystyle
+\frac{
+{{\mathsf{f}}{{\mathit{n}}}}_{{1}} \neq {{\mathsf{f}}{{\mathit{n}}}}_{{2}}
+}{
+{\mathit{C}} \vdash \mathsf{cvtop}~{{\mathsf{f}}{{\mathit{n}}}}_{{1}}~\mathsf{convert}~{{\mathsf{f}}{{\mathit{n}}}}_{{2}} : {{\mathsf{f}}{{\mathit{n}}}}_{{2}} \rightarrow {{\mathsf{f}}{{\mathit{n}}}}_{{1}}
+} \, {[\textsc{\scriptsize T{-}cvtop{-}convert{-}f}]}
+\qquad
+\end{array}
+$$
 
 
 \subsection*{Runtime}
@@ -703,7 +728,6 @@ warning: rule `Instr_ok/binop` was never spliced
 warning: rule `Instr_ok/testop` was never spliced
 warning: rule `Instr_ok/relop` was never spliced
 warning: rule `Instr_ok/extend` was never spliced
-warning: rule `Instr_ok/reinterpret` was never spliced
 warning: rule `Instr_ok/ref.null` was never spliced
 warning: rule `Instr_ok/ref.func` was never spliced
 warning: rule `Instr_ok/ref.i31` was never spliced

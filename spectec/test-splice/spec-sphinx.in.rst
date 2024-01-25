@@ -40,7 +40,7 @@ $${rule+: Instr_ok/loop}
 $${rule+: Instr_ok/if}
 
 
-$${rule-ignore: Instr_ok/convert-*}
+$${rule+: Instr_ok/cvtop-*}
 
 
 **Runtime**

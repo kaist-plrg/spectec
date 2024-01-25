@@ -66,8 +66,7 @@ $${rule: Instr_ok/extend}
 \
 
 $${rule+: 
-  Instr_ok/reinterpret
-  Instr_ok/convert-*
+  Instr_ok/cvtop-*
 }
 
 Reference Instructions
