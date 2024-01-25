@@ -1,0 +1,1 @@
+1. Some float ops return NaN, which is neither canonical nor arithmetic.
