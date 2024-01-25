@@ -246,10 +246,10 @@ and exp2expr exp =
       | [ Ast.Atom name ] :: ll, el
         when List.for_all (fun l -> l = [] || l = [ Ast.Star ] || l = [ Ast.Quest ]) ll ->
           caseE ((name, String.lowercase_ascii name), List.map exp2expr el) ~at:at
-      | _ -> yetE (Print.string_of_exp exp) ~at:at)
+      | _ -> yetE (Print.structured_string_of_exp exp) ~at:at)
   | Ast.OptE inner_exp -> optE (Option.map exp2expr inner_exp) ~at:at
   (* Yet *)
-  | _ -> yetE (Print.string_of_exp exp) ~at:at
+  | _ -> yetE (Print.structured_string_of_exp exp) ~at:at
 
 (* `Ast.exp` -> `expr list` *)
 and exp2args exp =
