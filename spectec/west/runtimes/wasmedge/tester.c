@@ -17,6 +17,12 @@ typedef struct Expected {
     char* value;
 } Expected;
 
+typedef struct InvokeResult {
+    WasmEdge_Result Res;
+    WasmEdge_Value* Returns;
+    int returnCount;
+} InvokeResult;
+
 void PrintWasmEdgeValue (WasmEdge_Value value) {
     switch (value.Type) {
         case WasmEdge_ValType_I32:
@@ -86,6 +92,15 @@ void ParseValues (WasmEdge_Value* Values, int count) {
             Values[i] = WasmEdge_ValueGenF32(binary.f32);
         if (strcmp(type, "f64") == 0)
             Values[i] = WasmEdge_ValueGenF64(binary.f64);
+        if (strcmp(type, "funcref") == 0) {
+            Values[i] = (strcmp(value, "null") == 0)
+            ? WasmEdge_ValueGenFuncRef(NULL)
+            : WasmEdge_ValueGenFuncRef((void*)binary.i64 + 0x100000000ULL);
+        }
+        if (strcmp(type, "externref") == 0)
+            Values[i] = (strcmp(value, "null") == 0)
+            ? WasmEdge_ValueGenExternRef(NULL)
+            : WasmEdge_ValueGenExternRef((void*)binary.i64 + 0x100000000ULL);
     }
 }
 
@@ -94,9 +109,27 @@ void ParseExpected (Expected* expected, int count) {
         char *type = strtok(NULL, DELIMITER);
         char *value = strtok(NULL, DELIMITER);
 
-        expected[i].type = type;
-        expected[i].value = value;
+        expected[i].type = malloc(strlen(type) + 1);
+        expected[i].value = malloc(strlen(value) + 1);
+
+        strcpy(expected[i].type, type);
+        strcpy(expected[i].value, value);
     }
+}
+
+bool CheckText (WasmEdge_Result Res, char* expected, unsigned int* correct) {
+    if (!WasmEdge_ResultOK(Res)) {
+        if (strcmp(WasmEdge_ResultGetMessage(Res), expected) == 0) {
+            (*correct)++;
+        }
+
+        else {
+            fprintf(stderr, " Fail!\n Expected: %s\n Actual: %s\n\n", expected, WasmEdge_ResultGetMessage(Res));
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count, unsigned int* correct) {
@@ -144,18 +177,67 @@ void CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count
             if (actual[i].Type != WasmEdge_ValType_F64 || binary.i64 != WasmEdge_ValueGetI64(actual[i]))
                 return PrintFailAssertReturn(actual, expected, count);
         }
+
+        if (strcmp(expected[i].type, "funcref") == 0) {
+            if (actual[i].Type == WasmEdge_ValType_FuncRef) {
+                if (strcmp(expected[i].value, "null") == 0 && WasmEdge_ValueGetFuncRef(actual[i]) == NULL) {
+                    continue;
+                }
+            }
+
+            return PrintFailAssertReturn(actual, expected, count);
+        }
+
+        if (strcmp(expected[i].type, "externref") == 0) {
+            if (actual[i].Type == WasmEdge_ValType_ExternRef) {
+                if (strcmp(expected[i].value, "null") == 0 && WasmEdge_ValueGetExternRef(actual[i]) == NULL) {
+                    continue;
+                }
+            }
+
+            return PrintFailAssertReturn(actual, expected, count);
+        }
     }
 
     (*correct)++;
 }
 
+InvokeResult Invoke (WasmEdge_VMContext *VMCtx) {
+    WasmEdge_String modName = WasmEdge_StringCreateByCString(strtok(NULL, DELIMITER));
+
+    char* fieldStr = strtok(NULL, DELIMITER);
+    WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
+
+    const WasmEdge_FunctionTypeContext *FuncType =
+        WasmEdge_VMGetFunctionTypeRegistered(VMCtx, modName, funcName);
+
+    const size_t paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
+    const size_t returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
+
+    WasmEdge_Value Params[paramCount];
+    ParseValues(Params, paramCount);
+
+    PrintInvokeMessage(fieldStr, Params, paramCount);
+
+    WasmEdge_Value Returns[returnCount];
+
+    WasmEdge_Result Res = WasmEdge_VMExecuteRegistered(VMCtx, modName, funcName, Params, paramCount, Returns, returnCount);
+
+    WasmEdge_StringDelete(modName);
+    WasmEdge_StringDelete(funcName);
+
+    InvokeResult result = { Res, malloc(sizeof(WasmEdge_Value) * returnCount), returnCount };
+    memcpy(result.Returns, Returns, sizeof(WasmEdge_Value) * returnCount);
+
+    return result;
+}
+
 int main(int argc, char** argv) {
     WasmEdge_ConfigureContext *ConfCxt = WasmEdge_ConfigureCreate();
-    WasmEdge_VMContext *VMCxt = WasmEdge_VMCreate(ConfCxt, NULL);
+    WasmEdge_VMContext *VMCtx = WasmEdge_VMCreate(ConfCxt, NULL);
 
     FILE *fptr = fopen(argv[1], "r");
 
-    char *ptr;
     char buffer[1024];
 
     unsigned int correct = 0;
@@ -165,118 +247,100 @@ int main(int argc, char** argv) {
 
         char *ty = strtok(buffer, DELIMITER);
 
-        if (strcmp(ty, "mo") == 0) {
+        if (strcmp(ty, "mon") == 0) {
             char *name = strtok(NULL, DELIMITER);
+            char *path = strtok(NULL, DELIMITER);
 
-            WasmEdge_VMLoadWasmFromFile(VMCxt, name);
-            WasmEdge_VMValidate(VMCxt);
-            WasmEdge_VMInstantiate(VMCxt);
+            WasmEdge_VMRegisterModuleFromFile(VMCtx, WasmEdge_StringCreateByCString(name), path);
         }
 
-        if (strcmp(ty, "mon") == 0) {
-            char *name = strtok(NULL, " ");
-            WasmEdge_VMRegisterModuleFromFile(VMCxt, WasmEdge_StringCreateByCString(name), buffer);
+        if (strcmp(ty, "act") == 0) {
+            Invoke(VMCtx);
         }
 
         if (strcmp(ty, "ari") == 0) {
-            char* fieldStr = strtok(NULL, DELIMITER);
-            WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
+            InvokeResult result = Invoke(VMCtx);
 
-            const WasmEdge_FunctionTypeContext *FuncType =
-                WasmEdge_VMGetFunctionType(VMCxt, funcName);
+            if (WasmEdge_ResultOK(result.Res)) {
+                Expected expected[result.returnCount];
+                ParseExpected(expected, result.returnCount);
 
-            const int paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
-            const int returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
-
-            WasmEdge_Value Params[paramCount];
-            ParseValues(Params, paramCount);
-
-            PrintInvokeMessage(fieldStr, Params, paramCount);
-
-            WasmEdge_Value Returns[returnCount];
-
-            WasmEdge_Result Res = WasmEdge_VMExecute(VMCxt, funcName, Params, paramCount, Returns, returnCount);
-
-            if (WasmEdge_ResultOK(Res)) {
-                Expected expected[returnCount];
-                ParseExpected(expected, returnCount);
-
-                CheckValues(Returns, expected, returnCount, &correct);
+                CheckValues(result.Returns, expected, result.returnCount, &correct);
             }
-
-            WasmEdge_StringDelete(funcName);
         }
 
-        if (strcmp(ty, "arim") == 0) {
+        if (strcmp(ty, "art") == 0) {
             WasmEdge_String modName = WasmEdge_StringCreateByCString(strtok(NULL, DELIMITER));
 
             char* fieldStr = strtok(NULL, DELIMITER);
             WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
 
-            const WasmEdge_FunctionTypeContext *FuncType =
-                WasmEdge_VMGetFunctionType(VMCxt, funcName);
+            WasmEdge_StoreContext *StoreCtx = WasmEdge_VMGetStoreContext(VMCtx);
+            const WasmEdge_ModuleInstanceContext *ModCtx = WasmEdge_StoreFindModule(StoreCtx, modName);
+            WasmEdge_GlobalInstanceContext *GlobCtx = WasmEdge_ModuleInstanceFindGlobal(ModCtx, funcName);
 
-            const int paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
-            const int returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
+            fprintf(stderr, "[Getting %s]\n", fieldStr);
 
-            WasmEdge_Value Params[paramCount];
-            ParseValues(Params, paramCount);
+            if (GlobCtx != NULL) {
+                WasmEdge_Value actual[1] = { WasmEdge_GlobalInstanceGetValue(GlobCtx) };
 
-            PrintInvokeMessage(fieldStr, Params, paramCount);
+                Expected expected[1];
+                ParseExpected(expected, 1);
 
-            WasmEdge_Value Returns[returnCount];
-
-            WasmEdge_Result Res = WasmEdge_VMExecuteRegistered(VMCxt, modName, funcName, Params, paramCount, Returns, returnCount);
-
-            if (WasmEdge_ResultOK(Res)) {
-                Expected expected[returnCount];
-                ParseExpected(expected, returnCount);
-
-                CheckValues(Returns, expected, returnCount, &correct);
+                CheckValues(actual, expected, 1, &correct);
             }
-
-            WasmEdge_StringDelete(modName);
-            WasmEdge_StringDelete(funcName);
         }
 
         if (strcmp(ty, "ati") == 0) {
-            char* fieldStr = strtok(NULL, DELIMITER);
-            WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
+            InvokeResult result = Invoke(VMCtx);
 
-            const WasmEdge_FunctionTypeContext *FuncType =
-                WasmEdge_VMGetFunctionType(VMCxt, funcName);
-
-            const int paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
-            const int returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
-
-            WasmEdge_Value Params[paramCount];
-            ParseValues(Params, paramCount);
-
-            PrintInvokeMessage(fieldStr, Params, paramCount);
-
-            WasmEdge_Value Returns[returnCount];
-
-            WasmEdge_Result Res = WasmEdge_VMExecute(VMCxt, funcName, Params, paramCount, Returns, returnCount);
-
-            if (!WasmEdge_ResultOK(Res)) {
+            if (!WasmEdge_ResultOK(result.Res)) {
                 char* expected = strtok(NULL, DELIMITER);
 
-                if (strcmp(WasmEdge_ResultGetMessage(Res), expected) == 0) {
+                if (strcmp(WasmEdge_ResultGetMessage(result.Res), expected) == 0) {
                     correct += 1;
                 }
 
                 else {
-                    fprintf(stderr, " Fail!\n Expected: %s\n Actual: %s\n\n", expected, WasmEdge_ResultGetMessage(Res));
+                    fprintf(stderr, " Fail!\n Expected: %s\n Actual: %s\n\n", expected, WasmEdge_ResultGetMessage(result.Res));
                 }
             }
+        }
 
-            WasmEdge_StringDelete(funcName);
+        if (strcmp(ty, "aiv") == 0) {
+            char* path = strtok(NULL, DELIMITER);
+            char* expected = strtok(NULL, DELIMITER);
+
+            WasmEdge_Result Res = WasmEdge_VMLoadWasmFromFile(VMCtx, path);
+            if (!CheckText (Res, expected, &correct))
+                continue;
+
+            Res = WasmEdge_VMValidate(VMCtx);
+            if (!CheckText (Res, expected, &correct))
+                continue;
+        }
+
+        if (strcmp(ty, "aun") == 0) {
+            char* path = strtok(NULL, DELIMITER);
+            char* expected = strtok(NULL, DELIMITER);
+
+            WasmEdge_Result Res = WasmEdge_VMLoadWasmFromFile(VMCtx, path);
+            if (!CheckText (Res, expected, &correct))
+                continue;
+
+            Res = WasmEdge_VMValidate(VMCtx);
+            if (!CheckText (Res, expected, &correct))
+                continue;
+
+            Res = WasmEdge_VMInstantiate(VMCtx);
+            if (!CheckText (Res, expected, &correct))
+                continue;
         }
     }
 
     fclose(fptr);
 
-    WasmEdge_VMDelete(VMCxt);
+    WasmEdge_VMDelete(VMCtx);
     WasmEdge_ConfigureDelete(ConfCxt);
 
     printf("%d", correct);

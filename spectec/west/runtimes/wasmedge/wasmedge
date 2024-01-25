@@ -10,7 +10,21 @@ from os import listdir
 from os.path import isdir, isfile, join, basename, splitext, abspath, dirname
 from shutil import copyfile
 
+from functools import reduce
 from tempfile import TemporaryDirectory
+
+def parse_value (value: dict) -> list:
+    if value['type'] == 'v128':
+        print(str(reduce(lambda a, x: (a << (128 // len(value['value']))) + int(x), value['value'], 0)))
+        return ['v128', str(reduce(lambda a, x: (a << (128 // len(value['value']))) + int(x), value['value'], 0))]
+
+    return [value['type'], value['value']]
+
+def parse_values (values: list) -> str:
+    return ','.join(sum((parse_value(value) for value in values), []))
+
+def encode_invoke (action: dict, ty: str, moduleName: str) -> str:
+    return ','.join((ty, moduleName, action['field'], parse_values (action['args'])))
 
 def test_wast (path: str) -> tuple[int, int]:
     if (basename(path) in ["imports.wast", "names.wast"]):
@@ -25,67 +39,83 @@ def test_wast (path: str) -> tuple[int, int]:
 
     subprocess.run (["wast2json", dst_path], cwd=temp_dir_path)
 
-    with open(join(temp_dir_path, splitext(basename(path))[0] + ".json")) as f:
+    filename = splitext(basename(path))[0]
+
+    with open(join(temp_dir_path, filename + ".json")) as f:
         commands = json.load(f)['commands']
 
     total = 0
+
+    alias = {}
+    latestModuleName = None
+
+    for command in commands:
+        if (command['type'] == "module"):
+            latestModuleName = command.get('name', str(command['line']))
+
+        if (command['type'] == 'register'):
+            alias[command['name'] if 'name' in command else latestModuleName] = command['as']
 
     text = ""
 
     for command in commands:
         if (command['type'] == "module"):
-            ty = 'mon' if 'name' in command else 'mo'
-            na = command.get('name', False)
+            na = command.get('name', str(command['line']))
+            na = alias.get(na, na)
 
-            text += ','.join(filter(lambda x: x, [ty, command['filename'], na]))
+            latestModuleName = na
+
+            text += ','.join(['mon', na, command['filename']])
             text += '\n'
 
-        if (command['type'] == 'register'):
-            pass
+        if (command['type'] == 'action'):
+            action = command['action']
+
+            if (action['type'] == 'invoke'):
+                text += encode_invoke (action, 'act', latestModuleName)
+                text += '\n'
 
         if (command['type'] == 'assert_return'):
             action = command['action']
 
             if (action['type'] == 'invoke'):
-                args = ','.join(sum(([arg['type'], arg['value']] for arg in action['args']), []))
-                exps = ','.join(sum(([exp['type'], exp['value']] for exp in command['expected']), []))
+                text += encode_invoke (action, 'ari', action.get('module', latestModuleName))
+                text += f',{parse_values (command["expected"])}\n'
 
-                if "funcref" in args or "externref" in args:
-                    continue
+            if (action['type'] == 'get'):
+                text += ','.join(('art', action.get('module', latestModuleName), action['field']))
+                text += f',{parse_values (command["expected"])}\n'
 
-                ty = 'arim' if 'module' in action else 'ari'
-                mod = action.get('module', False)
+            total += 1
 
-                text += ','.join(filter(lambda x: x, (ty, mod, action['field'], args, exps)))
-                text += '\n'
-
-                total += 1
-
-        if (command['type'] == 'assert_trap'):
+        if (command['type'] in 'assert_trap'):
             action = command['action']
 
             if (action['type'] == 'invoke'):
-                args = ','.join(sum(([arg['type'], arg['value']] for arg in action['args']), []))
-
-                if "funcref" in args or "externref" in args:
-                    continue
-
-                ty = 'ati'
-
-                text += ','.join(filter(lambda x: x, (ty, action['field'], args, command['text'])))
-                text += '\n'
+                text += encode_invoke (action, 'ati', latestModuleName)
+                text += f',{command["text"]}\n'
 
                 total += 1
 
-        if (command['type'] == 'register'):
-            pass
+        if (command['type'] == 'assert_invalid'):
+            text += ','.join(('aiv', command['filename'], command['text']))
+            text += '\n'
 
-    with open(join(temp_dir_path, "wasmedge.txt"), "w", encoding="utf-8") as f:
+            total += 1
+
+        if (command['type'] in ['assert_unlinkable', 'assert_uninstantiable']):
+            text += ','.join(('aun', command['filename'], command['text']))
+            text += '\n'
+
+            total += 1
+
+    with open(join(temp_dir_path, f"{filename}.txt"), "w", encoding="utf-8") as f:
         f.write(text)
 
     print(f'==== {basename(path)} ====')
 
-    ps = subprocess.run ([join(abspath(dirname(__file__)), "tester"), "wasmedge.txt"], cwd=temp_dir_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ps = subprocess.run ([join(abspath(dirname(__file__)), "tester"), f"{filename}.txt"], cwd=temp_dir_path,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     print(ps.stderr.decode("utf-8"), end='', file=sys.stderr)
 
