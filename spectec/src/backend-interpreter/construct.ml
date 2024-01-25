@@ -11,7 +11,7 @@ open Util
 
 let default_table_max = 4294967295L
 let default_memory_max = 65536L
-let version = ref 3
+let version = ref 2
 
 
 (* Failure *)
