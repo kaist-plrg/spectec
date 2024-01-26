@@ -15,8 +15,8 @@ from tempfile import TemporaryDirectory
 
 def parse_arg (arg: dict) -> list:
     if arg['type'] == 'v128':
-        v128 = reduce(lambda a, x: (a << (128 // len(arg['value']))) + int(x), arg['value'], 0)
-        return ['v128', str(v128 >> 64), str(v128 & 0xFFFF_FFFF_FFFF_FFFF)]
+        v128 = reduce(lambda a, x: (a << (128 // len(arg['value']))) + int(x), reversed(arg['value']), 0)
+        return ['v128', str(v128 & 0xFFFF_FFFF_FFFF_FFFF), str(v128 >> 64)]
 
     return [arg['type'], arg['value']]
 

@@ -118,7 +118,7 @@ void ParseValues (WasmEdge_Value* Values, int count) {
             : WasmEdge_ValueGenExternRef((void*)binary.i64 + 0x100000000ULL);
         if (strcmp(type, "v128") == 0) {
             value = strtok(NULL, DELIMITER);
-            int128_t v128 = ((int128_t)binary.i64 << 64) + strtoull(value, NULL, 10);
+            int128_t v128 = (binary.i64 + ((int128_t)strtoull(value, NULL, 10) << 64));
             Values[i] = WasmEdge_ValueGenV128(v128);
         }
     }
