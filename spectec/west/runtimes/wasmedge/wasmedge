@@ -13,18 +13,26 @@ from shutil import copyfile
 from functools import reduce
 from tempfile import TemporaryDirectory
 
-def parse_value (value: dict) -> list:
-    if value['type'] == 'v128':
-        print(str(reduce(lambda a, x: (a << (128 // len(value['value']))) + int(x), value['value'], 0)))
-        return ['v128', str(reduce(lambda a, x: (a << (128 // len(value['value']))) + int(x), value['value'], 0))]
+def parse_arg (arg: dict) -> list:
+    if arg['type'] == 'v128':
+        v128 = reduce(lambda a, x: (a << (128 // len(arg['value']))) + int(x), arg['value'], 0)
+        return ['v128', str(v128 >> 64), str(v128 & 0xFFFF_FFFF_FFFF_FFFF)]
 
-    return [value['type'], value['value']]
+    return [arg['type'], arg['value']]
 
-def parse_values (values: list) -> str:
-    return ','.join(sum((parse_value(value) for value in values), []))
+def parse_expected (expected: dict) -> list:
+    if expected['type'] == 'v128':
+        return ['v128', f'{len(expected["value"])}!' +\
+                 '!'.join(sum(([expected['lane_type'], value] for value in expected['value']), []))]
+
+    return [expected['type'], expected['value']]
+
+def parse_expected_list (expected_list: list) -> str:
+    return ','.join(sum((parse_expected(expected) for expected in expected_list), []))
 
 def encode_invoke (action: dict, ty: str, moduleName: str) -> str:
-    return ','.join((ty, moduleName, action['field'], parse_values (action['args'])))
+    args = ','.join(sum((parse_arg(arg) for arg in action['args']), []))
+    return ','.join((ty, moduleName, action['field'], args))
 
 def test_wast (path: str) -> tuple[int, int]:
     if (basename(path) in ["imports.wast", "names.wast"]):
@@ -77,34 +85,47 @@ def test_wast (path: str) -> tuple[int, int]:
 
         if (command['type'] == 'assert_return'):
             action = command['action']
+            module = action.get('module', latestModuleName)
+            module = alias.get(module, module)
 
             if (action['type'] == 'invoke'):
-                text += encode_invoke (action, 'ari', action.get('module', latestModuleName))
-                text += f',{parse_values (command["expected"])}\n'
+                text += encode_invoke (action, 'ari', module)
+                text += f',{parse_expected_list (command["expected"])}\n'
 
             if (action['type'] == 'get'):
-                text += ','.join(('art', action.get('module', latestModuleName), action['field']))
-                text += f',{parse_values (command["expected"])}\n'
+                text += ','.join(('art', module, action['field']))
+                text += f',{parse_expected_list (command["expected"])}\n'
 
             total += 1
 
         if (command['type'] in 'assert_trap'):
             action = command['action']
+            module = action.get('module', latestModuleName)
+            module = alias.get(module, module)
 
             if (action['type'] == 'invoke'):
-                text += encode_invoke (action, 'ati', latestModuleName)
-                text += f',{command["text"]}\n'
+                text += encode_invoke (action, 'ati', module)
+                text += '\n'
 
                 total += 1
 
         if (command['type'] == 'assert_invalid'):
-            text += ','.join(('aiv', command['filename'], command['text']))
+            text += ','.join(('aiv', command['filename']))
+            text += '\n'
+
+            total += 1
+
+        if (command['type'] == 'assert_malformed'):
+            if (splitext(command['filename'])[-1] == '.wat'):
+                continue
+
+            text += ','.join(('ama', command['filename']))
             text += '\n'
 
             total += 1
 
         if (command['type'] in ['assert_unlinkable', 'assert_uninstantiable']):
-            text += ','.join(('aun', command['filename'], command['text']))
+            text += ','.join(('aun', command['filename']))
             text += '\n'
 
             total += 1
