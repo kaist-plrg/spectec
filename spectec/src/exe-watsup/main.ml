@@ -167,15 +167,10 @@ let () =
     Il.Validation.valid il;
 
     (match !target with
-<<<<<<< HEAD
-    | Prose | Interpreter _ | Test -> enable_pass Sideconditions; enable_pass Animate
-    | _ -> ());
-=======
-    | Prose | Splice _ | Interpreter _ ->
+    | Prose | Splice _ | Interpreter _ | Test ->
       enable_pass Sideconditions; enable_pass Animate
     | _ -> ()
     );
->>>>>>> main
 
     let il =
       List.fold_left (fun il pass ->
