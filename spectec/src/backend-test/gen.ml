@@ -61,29 +61,35 @@ let string_of_stack s = String.concat "," !s
 
 let rts = ref Record.empty
 
-let rec string_of_vt = function
-| T v -> Al.Print.string_of_value v
-| SubT (x, sub) -> x ^ "<:" ^ sub
-| TopT -> "_"
-| BotT -> "⊥"
-| SeqT t -> (string_of_vt t) ^ "*"
-let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 let print_rts () =
   Record.iter (fun k v ->
     let (rt1, rt2, _) = v in
     Printf.sprintf "%s : %s -> %s" k (string_of_rt rt1) (string_of_rt rt2) |> print_endline
   ) !rts
 
-let estimate_rt () =
+
+let get_typing_rules =
+  List.concat_map (fun def ->
+    match def.it with
+    | Il.Ast.RelD (id, _, _, rules) when id.it = "Instr_ok" || id.it = "Instrf_ok" -> rules
+    | _ -> []
+  )
+
+let get_rt rule =
   let open Il.Ast in
-  let rec get_rt e =
+  let rec estimate_rt e =
     match e.it with
     | CaseE (atom, { it = TupE []; _}) -> [ T (nullary (string_of_atom atom)) ]
-    | ListE es -> List.concat_map get_rt es
+    | ListE es -> List.concat_map estimate_rt es
     | VarE id -> [ SubT (id.it, Il.Print.string_of_typ e.note) ]
     | SubE ({ it = VarE id; _ }, { it = VarT id'; _ }, _)  -> [ SubT (id.it, id'.it) ]
-    | IterE (e', (List, _)) -> [ SeqT (List.hd (get_rt e')) ]
-    | CatE (e1, e2) -> get_rt e1 @ get_rt e2
+    | SubE (
+      { it = CallE (name, _); _},
+      { it = VarT id; _ },
+      _
+    ) when name.it = "unpacked" -> [ SubT (id.it, id.it) ]
+    | IterE (e', (List, _)) -> [ SeqT (List.hd (estimate_rt e')) ]
+    | CatE (e1, e2) -> estimate_rt e1 @ estimate_rt e2
     | _ -> [ TopT ]
   in
 
@@ -91,7 +97,7 @@ let estimate_rt () =
     match case.it with
     | CaseE (_, args) ->
       List.mapi (fun i arg ->
-        match get_rt arg with
+        match estimate_rt arg with
         | [ SubT (x, _) as t ] -> if List.mem t ts then Some (i, x) else None
         | _ -> None
       ) (flatten_args args)
@@ -103,36 +109,23 @@ let estimate_rt () =
     Printf.sprintf "Expected %s to be %s" (Il.Print.string_of_exp e) kind |> failwith
   in
 
-  let instr_typing_rules =
-    List.concat_map (fun def ->
-      match def.it with
-      | RelD (id, _, _, rules) when id.it = "Instr_ok" || id.it = "Instrf_ok" -> rules
-      | _ -> []
-    ) !il
-  in
-
-  (* TODO: remove mutation *)
-  List.iter (fun rule ->
-    match rule.it with
-    | RuleD (id, _, _, exp, _) ->
-      (match exp.it with
-      | TupE [_c; lhs; rhs] ->
-        (match rhs.it with
-        | MixE (_, args) ->
-          (match args.it with
-          | TupE [t1; t2] | TupE [t1; _; t2] ->
-            let name = id.it |> String.split_on_char '-' |> List.hd |> String.uppercase_ascii in
-            let rt1 = get_rt t1 in
-            let rt2 = get_rt t2 in
-            let entangles = get_entangles lhs (rt1 @ rt2) in
-            rts := Record.add name (rt1, rt2, entangles) !rts;
-          | _ -> expected args "t1, t2 or t1, x*, t2"
-          )
-        | _ -> expected rhs "e1 -> e2"
-        )
-      | _ -> expected exp "C |- lhs : rhs"
+  let RuleD (id, _, _, exp, _) = rule.it in
+  match exp.it with
+  | TupE [_c; lhs; rhs] ->
+    (match rhs.it with
+    | MixE (_, args) ->
+      (match args.it with
+      | TupE [t1; t2] | TupE [t1; _; t2] ->
+        let name = id.it |> String.split_on_char '-' |> List.hd |> String.uppercase_ascii in
+        let rt1 = estimate_rt t1 in
+        let rt2 = estimate_rt t2 in
+        let entangles = get_entangles lhs (rt1 @ rt2) in
+        name, ref (rt1, rt2, entangles)
+      | _ -> expected args "t1, t2 or t1, x*, t2"
       )
-  ) instr_typing_rules
+    | _ -> expected rhs "e1 -> e2"
+    )
+  | _ -> expected exp "C |- lhs : rhs"
 
 let expr_info_stack = ref []
 let updated_stack rt1 rt2 (st, target, label, n) =
@@ -890,7 +883,7 @@ let gen_test el' il' al' =
   (* Initialize *)
   Random.init !seed;
   Ds.init !al;
-  estimate_rt ();
+  rts := List.map get_rt (get_typing_rules !il);
   estimate_const ();
 
   (* Generate tests *)

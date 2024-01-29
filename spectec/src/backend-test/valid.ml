@@ -18,6 +18,17 @@ let f32T = nullary "F32"
 let f64T = nullary "F64"
 
 (* Helper *)
+let make_ishape i = tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]
+let make_fshape i = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ]
+
+let rec string_of_vt = function
+| T v -> Al.Print.string_of_value v
+| SubT (x, sub) -> x ^ "<:" ^ sub
+| TopT -> "_"
+| BotT -> "⊥"
+| SeqT t -> (string_of_vt t) ^ "*"
+let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
+
 let nt_matches_op nt op = match nt, op with
 | CaseV ("I32", []), CaseV ("_I", _)
 | CaseV ("I64", []), CaseV ("_I", _)
@@ -68,7 +79,7 @@ let validate_shape = function
 
 (* Estimate if given instruction is valid with expected type, rt1* -> rt2* *)
 (* TODO: Perhaps some of these can be automated? *)
-let validate_instr case args const (_rt1, rt2) =
+let validate_instr case args const (rt1, rt2) =
   match case with
   | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
@@ -140,90 +151,98 @@ let validate_instr case args const (_rt1, rt2) =
     | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t then Some args else None
     | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
+  (* dynamic typing *)
+  | "VSPLAT" ->
+    (match List.hd rt1 with
+    | T (CaseV ("I32", [])) ->
+      let i = choose [8; 16; 32] in
+      Some [ make_ishape i ]
+    | T (CaseV ("I64", [])) ->
+      Some [ make_ishape 64 ]
+    | T (CaseV ("F32", [])) ->
+      Some [ make_fshape 32 ]
+    | T (CaseV ("F64", [])) ->
+      Some [ make_fshape 64 ]
+    | _ -> None
+    )
   | "VEXTRACT_LANE" ->
     let ext = choose [nullary "S"; nullary "U"] in
-    (match args with
-    | [ TupV [ CaseV ("I8", []); NumV n ]; _; _ ] ->
-      Some [ TupV [ CaseV ("I8", []); NumV n ]; OptV (Some ext); numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("I16", []); NumV n ]; _; _ ] ->
-      Some [ TupV [ CaseV ("I16", []); NumV n ]; OptV (Some ext); numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("I32", []); NumV n ]; _; _ ] ->
-      Some [ TupV [ CaseV ("I32", []); NumV n ]; OptV None; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("I64", []); NumV n ]; _; _ ] ->
-      Some [ TupV [ CaseV ("I64", []); NumV n ]; OptV None; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("F32", []); NumV n ]; _; _ ] ->
-      Some [ TupV [ CaseV ("F32", []); NumV n ]; OptV None; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("F64", []); NumV n ]; _; _ ] ->
-      Some [ TupV [ CaseV ("F64", []); NumV n ]; OptV None; numV (Random.int64 n) ]
-    | v -> failwith ("Invalid vec extract lane op: " ^ Print.string_of_value (listV_of_list v))
+    (match List.hd rt2 with
+    | T (CaseV ("I32", [])) ->
+      let i = choose [8; 16; 32] in
+      if i = 32 then
+        Some [ make_ishape 32; optV None; numV_of_int (Random.int (128/32)) ]
+      else
+        Some [ make_ishape i; OptV (Some ext); numV_of_int (Random.int (128/i)) ]
+    | T (CaseV ("I64", [])) ->
+      Some [ make_ishape 64; OptV None; numV_of_int (Random.int (128/64)) ]
+    | T (CaseV ("F32", [])) ->
+      Some [ make_fshape 32; OptV None; numV_of_int (Random.int (128/32)) ]
+    | T (CaseV ("F64", [])) ->
+      Some [ make_fshape 64; OptV None; numV_of_int (Random.int (128/64)) ]
+    | _ -> None
     )
   | "VREPLACE_LANE" ->
-    (match args with
-    | [ TupV [ CaseV ("I8", []); NumV n ]; _ ] ->
-      Some [ TupV [ CaseV ("I8", []); NumV n ]; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("I16", []); NumV n ]; _ ] ->
-      Some [ TupV [ CaseV ("I16", []); NumV n ]; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("I32", []); NumV n ]; _ ] ->
-      Some [ TupV [ CaseV ("I32", []); NumV n ]; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("I64", []); NumV n ]; _ ] ->
-      Some [ TupV [ CaseV ("I64", []); NumV n ]; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("F32", []); NumV n ]; _ ] ->
-      Some [ TupV [ CaseV ("F32", []); NumV n ]; numV (Random.int64 n) ]
-    | [ TupV [ CaseV ("F64", []); NumV n ]; _ ] ->
-      Some [ TupV [ CaseV ("F64", []); NumV n ]; numV (Random.int64 n) ]
-    | v -> failwith ("Invalid vec replace lane op: " ^ Print.string_of_value (listV_of_list v))
+    (match List.hd (List.tl rt1) with
+    | T (CaseV ("I32", [])) ->
+      let i = choose [8; 16; 32] in
+      Some [ make_ishape i; numV_of_int (Random.int (128/i)) ]
+    | T (CaseV ("I64", [])) ->
+      Some [ make_ishape 64; numV_of_int (Random.int (128/64)) ]
+    | T (CaseV ("F32", [])) ->
+      Some [ make_fshape 32; numV_of_int (Random.int (128/32)) ]
+    | T (CaseV ("F64", [])) ->
+      Some [ make_fshape 64; numV_of_int (Random.int (128/64)) ]
+    | _ -> None
     )
   (* cvtop *)
   | "VCVTOP" ->
     (match casev_of_case (List.hd (List.tl args)) with
     | "EXTEND" ->
       let i = choose [16; 32; 64] in
-      let i2 = i/2 in
-      let arg1 = tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ] in
-      let arg2 = tupV [ nullary ("I"^(string_of_int i2)); numV_of_int (128/i2) ] in
+      let arg1 = make_ishape i in
+      let arg2 = make_ishape (i/2) in
       let half = choose [nullary "HIGH"; nullary "LOW"] in
       let ext = choose [nullary "S"; nullary "U"] in
       Some ([arg1; nullary "EXTEND"; optV (Some half); arg2; optV (Some ext); none "ZERO"])
     | "TRUNC_SAT" ->
       let i = choose [32; 64] in
-      let arg1 = tupV [ nullary "I32"; numV_of_int (128/32) ] in
-      let arg2 = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ] in
+      let arg1 = make_ishape 32 in
+      let arg2 = make_fshape i in
       let ext = choose [nullary "S"; nullary "U"] in
       let zero = if i = 32 then none "ZERO" else some "ZERO" in
       Some ([arg1; nullary "TRUNC_SAT"; optV None; arg2; optV (Some ext); zero])
     | "CONVERT" ->
       let i = choose [32; 64] in
-      let arg1 = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ] in
-      let arg2 = tupV [ nullary "I32"; numV_of_int (128/32) ] in
+      let arg1 = make_fshape i in
+      let arg2 = make_ishape 32 in
       let half = choose [None; Some (nullary "LOW")] in
       let ext = choose [nullary "S"; nullary "U"] in
       Some ([arg1; nullary "CONVERT"; optV half; arg2; optV (Some ext); none "ZERO"])
     | "DEMOTE" ->
-      let arg1 = tupV [ nullary "F32"; numV_of_int (128/32) ] in
-      let arg2 = tupV [ nullary "F64"; numV_of_int (128/64) ] in
+      let arg1 = make_fshape 32 in
+      let arg2 = make_fshape 64 in
       Some ([arg1; nullary "DEMOTE"; optV None; arg2; optV None; some "ZERO"])
     | "PROMOTE" ->
-      let arg1 = tupV [ nullary "F64"; numV_of_int (128/64) ] in
-      let arg2 = tupV [ nullary "F32"; numV_of_int (128/32) ] in
+      let arg1 = make_fshape 64 in
+      let arg2 = make_fshape 32 in
       Some ([arg1; nullary "PROMOTE"; optV (Some (nullary "LOW")); arg2; optV None; none "ZERO"])
     | _ -> Some args
     )
   (* special vbinop *)
   | "VSWIZZLE" -> Some [ TupV [ CaseV ("I8", []); NumV 16L ]; ]
   | "VSHUFFLE" ->
-    Some [ TupV [ CaseV ("I8", []); NumV 16L ]; List.hd (List.rev args) ]
+    Some [ make_ishape 8; List.hd (List.rev args) ]
   | "VNARROW" ->
     let i = choose [8; 16] in
-    let i2 = i*2 in
-    let arg1 = tupV [ caseV ("I"^(string_of_int i), []); numV_of_int (128/i) ] in
-    let arg2 = tupV [ caseV ("I"^(string_of_int i2), []); numV_of_int (128/i2) ] in
+    let arg1 = make_ishape i in
+    let arg2 = make_ishape (i*2) in
     let ext = choose [nullary "S"; nullary "U"] in
     Some [ arg1; arg2; ext ]
   | "VEXTMUL" ->
     let i = choose [16; 32; 64] in
-    let i2 = i/2 in
-    let arg1 = tupV [ caseV ("I"^(string_of_int i), []); numV_of_int (128/i) ] in
-    let arg2 = tupV [ caseV ("I"^(string_of_int i2), []); numV_of_int (128/i2) ] in
+    let arg1 = make_ishape i in
+    let arg2 = make_ishape (i/2) in
     let hl = choose [nullary "HIGH"; nullary "LOW"] in
     let ext = choose [nullary "S"; nullary "U"] in
     Some [ arg1; hl; arg2; ext ]
@@ -237,16 +256,15 @@ let validate_instr case args const (_rt1, rt2) =
   (* special vcvtop *)
   | "VEXTADD_PAIRWISE" ->
     let i = choose [16; 32] in
-    let i2 = i/2 in
-    let arg1 = tupV [ caseV ("I"^(string_of_int i), []); numV_of_int (128/i) ] in
-    let arg2 = tupV [ caseV ("I"^(string_of_int i2), []); numV_of_int (128/i2) ] in
+    let arg1 = make_ishape i in
+    let arg2 = make_ishape (i/2) in
     let ext = choose [nullary "S"; nullary "U"] in
     Some [ arg1; arg2; ext ]
   (* only ishape *)
   | "VISHIFTOP" ->
     let i = choose [8; 16; 32; 64] in
-    Some [ tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]; List.hd (List.rev args) ]
+    Some [ make_ishape i; List.hd (List.rev args) ]
   | "VBITMASK" | "VALL_TRUE" ->
     let i = choose [8; 16; 32; 64] in
-    Some [ tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ] ]
+    Some [ make_ishape i ]
   | _ -> Some args
