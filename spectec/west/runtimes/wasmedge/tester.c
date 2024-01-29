@@ -17,6 +17,12 @@ typedef struct Expected {
     char* value;
 } Expected;
 
+typedef struct InvokeResult {
+    WasmEdge_Result Res;
+    WasmEdge_Value* Returns;
+    int returnCount;
+} InvokeResult;
+
 void PrintWasmEdgeValue (WasmEdge_Value value) {
     switch (value.Type) {
         case WasmEdge_ValType_I32:
@@ -31,13 +37,25 @@ void PrintWasmEdgeValue (WasmEdge_Value value) {
         case WasmEdge_ValType_F64:
             fprintf(stderr, "(F64.CONST 0x%lx)", WasmEdge_ValueGetI64(value));
             break;
+        case WasmEdge_ValType_ExternRef:
+            if (WasmEdge_ValueGetExternRef(value) == NULL)
+                fprintf(stderr, "(EXTERNREF NULL)");
+            else
+                fprintf(stderr, "(EXTERNREF %p)", WasmEdge_ValueGetExternRef(value));
+            break;
+        case WasmEdge_ValType_V128:
+            int128_t v128 = WasmEdge_ValueGetV128(value);
+            uint64_t low = (uint64_t)v128;
+            uint64_t high = (uint64_t)(v128 >> 64);
+            fprintf(stderr, "(V128.CONST 0x%lx 0x%lx)", low, high);
+            break;
         default:
             break;
     }
 }
 
-void PrintInvokeMessage (const char* funcName, WasmEdge_Value* Params, int paramCount) {
-    fprintf(stderr, "[Invoking %s", funcName);
+void PrintInvokeMessage (char* modName, const char* funcName, WasmEdge_Value* Params, int paramCount) {
+    fprintf(stderr, "[Invoking %s %s", modName, funcName);
 
     for (int i=0; i<paramCount; ++i) {
         PrintWasmEdgeValue(Params[i]);
@@ -71,6 +89,10 @@ void PrintFailAssertReturn (WasmEdge_Value* actual, Expected* expected, const si
     fprintf(stderr, "\n\n");
 }
 
+void PrintCheckErrorFailed () {
+    fprintf(stderr, " Fail!\n Expected: Error\n Actual: Returned with no error\n\n");
+}
+
 void ParseValues (WasmEdge_Value* Values, int count) {
     for (int i=0; i<count; ++i) {
         char *type = strtok(NULL, DELIMITER);
@@ -86,6 +108,19 @@ void ParseValues (WasmEdge_Value* Values, int count) {
             Values[i] = WasmEdge_ValueGenF32(binary.f32);
         if (strcmp(type, "f64") == 0)
             Values[i] = WasmEdge_ValueGenF64(binary.f64);
+        if (strcmp(type, "funcref") == 0)
+            Values[i] = (strcmp(value, "null") == 0)
+            ? WasmEdge_ValueGenFuncRef(NULL)
+            : WasmEdge_ValueGenFuncRef((void*)binary.i64 + 0x100000000ULL);
+        if (strcmp(type, "externref") == 0)
+            Values[i] = (strcmp(value, "null") == 0)
+            ? WasmEdge_ValueGenExternRef(NULL)
+            : WasmEdge_ValueGenExternRef((void*)binary.i64 + 0x100000000ULL);
+        if (strcmp(type, "v128") == 0) {
+            value = strtok(NULL, DELIMITER);
+            int128_t v128 = (binary.i64 + ((int128_t)strtoull(value, NULL, 10) << 64));
+            Values[i] = WasmEdge_ValueGenV128(v128);
+        }
     }
 }
 
@@ -94,21 +129,24 @@ void ParseExpected (Expected* expected, int count) {
         char *type = strtok(NULL, DELIMITER);
         char *value = strtok(NULL, DELIMITER);
 
-        expected[i].type = type;
-        expected[i].value = value;
+        expected[i].type = malloc(strlen(type) + 1);
+        expected[i].value = malloc(strlen(value) + 1);
+
+        strcpy(expected[i].type, type);
+        strcpy(expected[i].value, value);
     }
 }
 
-void CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count, unsigned int* correct) {
+bool CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count) {
     for (int i=0; i<count; ++i) {
         union Input binary = { strtoull(expected[i].value, NULL, 10) };
 
         if (strcmp(expected[i].type, "i32") == 0 && (actual[i].Type != WasmEdge_ValType_I32 || binary.i32 != WasmEdge_ValueGetI32(actual[i]))) {
-            return PrintFailAssertReturn(actual, expected, count);
+            return false;
         }
 
         if (strcmp(expected[i].type, "i64") == 0 && (actual[i].Type != WasmEdge_ValType_I64 || binary.i64 != WasmEdge_ValueGetI64(actual[i]))) {
-            return PrintFailAssertReturn(actual, expected, count);
+            return false;
         }
 
         if (strcmp(expected[i].type, "f32") == 0) {
@@ -125,7 +163,7 @@ void CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count
             }
 
             if (actual[i].Type != WasmEdge_ValType_F32 || binary.i32 != WasmEdge_ValueGetI32(actual[i]))
-                return PrintFailAssertReturn(actual, expected, count);
+                return false;
         }
 
         if (strcmp(expected[i].type, "f64") == 0) {
@@ -142,20 +180,145 @@ void CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count
             }
 
             if (actual[i].Type != WasmEdge_ValType_F64 || binary.i64 != WasmEdge_ValueGetI64(actual[i]))
-                return PrintFailAssertReturn(actual, expected, count);
+                return false;
+        }
+
+        if (strcmp(expected[i].type, "funcref") == 0) {
+            if (actual[i].Type == WasmEdge_ValType_FuncRef) {
+                if (strcmp(expected[i].value, "null") == 0 && WasmEdge_ValueGetFuncRef(actual[i]) == NULL)
+                    continue;
+            }
+
+            return false;
+        }
+
+        if (strcmp(expected[i].type, "externref") == 0) {
+            if (actual[i].Type == WasmEdge_ValType_ExternRef) {
+                if (strcmp(expected[i].value, "null") == 0) {
+                    if (WasmEdge_ValueGetExternRef(actual[i]) == NULL)
+                        continue;
+                }
+                else {
+                    if (binary.i64 + 0x100000000ULL == (unsigned long long)WasmEdge_ValueGetExternRef(actual[i]))
+                        continue;
+                }
+            }
+
+            return false;
+        }
+
+        if (strcmp(expected[i].type, "v128") == 0) {
+            if (actual[i].Type != WasmEdge_ValType_V128)
+                continue;
+
+            char* lane = expected[i].value;
+            size_t n = strlen(lane);
+
+            for (int i=0; i<n; ++i) {
+                if (*lane == '!')
+                    *lane = ',';
+                lane++;
+            }
+
+            size_t numLanes = strtoul (strtok(expected[i].value, DELIMITER), NULL, 10);
+
+            WasmEdge_Value actualLanes[numLanes];
+            Expected expectedLanes[numLanes];
+
+            ParseExpected (expectedLanes, numLanes);
+            char* laneType = expectedLanes[0].type;
+
+            lane = expected[i].value;
+
+            for (int i=0; i<n; ++i) {
+                if (*lane == 0)
+                    *lane = ',';
+                lane++;
+            }
+
+            int128_t v128 = WasmEdge_ValueGetV128(actual[i]);
+
+            if (strcmp(laneType, "i64") == 0) {
+                actualLanes[0] = WasmEdge_ValueGenI64((int64_t)v128);
+                actualLanes[1] = WasmEdge_ValueGenI64((int64_t)(v128 >> 64));
+            }
+
+            else if (laneType[0] == 'i') {
+                size_t bitCount = 128 / numLanes;
+
+                for (int i=0; i<numLanes; ++i) {
+                    actualLanes[i] = WasmEdge_ValueGenI32((int32_t)v128 & ((0x1LL << bitCount) - 1));
+                    v128 >>= bitCount;
+                }
+            }
+
+            union Input binary;
+
+            if (strcmp(laneType, "f32") == 0) {
+                binary.i32 = (int32_t)v128;
+                actualLanes[0] = WasmEdge_ValueGenF32(binary.f32);
+                binary.i32 = (int32_t)(v128 >> 32);
+                actualLanes[1] = WasmEdge_ValueGenF32(binary.f32);
+                binary.i32 = (int32_t)(v128 >> 64);
+                actualLanes[2] = WasmEdge_ValueGenF32(binary.f32);
+                binary.i32 = (int32_t)(v128 >> 96);
+                actualLanes[3] = WasmEdge_ValueGenF32(binary.f32);
+            }
+
+            if (strcmp(laneType, "f64") == 0) {
+                binary.i64 = (int64_t)v128;
+                actualLanes[0] = WasmEdge_ValueGenF64(binary.f64);
+                binary.i64 = (int64_t)(v128 >> 64);
+                actualLanes[1] = WasmEdge_ValueGenF64(binary.f64);
+            }
+
+            if (!CheckValues (actualLanes, expectedLanes, numLanes))
+                return false;
+
+            continue;
         }
     }
 
-    (*correct)++;
+    return true;
+}
+
+InvokeResult Invoke (WasmEdge_VMContext *VMCtx) {
+    char* modStr = strtok(NULL, DELIMITER);
+    WasmEdge_String modName = WasmEdge_StringCreateByCString(modStr);
+
+    char* fieldStr = strtok(NULL, DELIMITER);
+    WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
+
+    const WasmEdge_FunctionTypeContext *FuncType =
+        WasmEdge_VMGetFunctionTypeRegistered(VMCtx, modName, funcName);
+
+    const size_t paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
+    const size_t returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
+
+    WasmEdge_Value Params[paramCount];
+    ParseValues(Params, paramCount);
+
+    PrintInvokeMessage(modStr, fieldStr, Params, paramCount);
+
+    WasmEdge_Value Returns[returnCount];
+
+    WasmEdge_Result Res = WasmEdge_VMExecuteRegistered(VMCtx, modName, funcName, Params, paramCount, Returns, returnCount);
+
+    WasmEdge_StringDelete(modName);
+    WasmEdge_StringDelete(funcName);
+
+    InvokeResult result = { Res, malloc(sizeof(WasmEdge_Value) * returnCount), returnCount };
+    memcpy(result.Returns, Returns, sizeof(WasmEdge_Value) * returnCount);
+
+    return result;
 }
 
 int main(int argc, char** argv) {
     WasmEdge_ConfigureContext *ConfCxt = WasmEdge_ConfigureCreate();
-    WasmEdge_VMContext *VMCxt = WasmEdge_VMCreate(ConfCxt, NULL);
+    WasmEdge_VMContext *VMCtx = WasmEdge_VMCreate(ConfCxt, NULL);
 
     FILE *fptr = fopen(argv[1], "r");
 
-    char *ptr;
     char buffer[1024];
 
     unsigned int correct = 0;
@@ -165,118 +328,125 @@ int main(int argc, char** argv) {
 
         char *ty = strtok(buffer, DELIMITER);
 
-        if (strcmp(ty, "mo") == 0) {
+        if (strcmp(ty, "mon") == 0) {
             char *name = strtok(NULL, DELIMITER);
+            char *path = strtok(NULL, DELIMITER);
 
-            WasmEdge_VMLoadWasmFromFile(VMCxt, name);
-            WasmEdge_VMValidate(VMCxt);
-            WasmEdge_VMInstantiate(VMCxt);
+            WasmEdge_VMRegisterModuleFromFile(VMCtx, WasmEdge_StringCreateByCString(name), path);
         }
 
-        if (strcmp(ty, "mon") == 0) {
-            char *name = strtok(NULL, " ");
-            WasmEdge_VMRegisterModuleFromFile(VMCxt, WasmEdge_StringCreateByCString(name), buffer);
+        if (strcmp(ty, "act") == 0) {
+            Invoke(VMCtx);
         }
 
         if (strcmp(ty, "ari") == 0) {
-            char* fieldStr = strtok(NULL, DELIMITER);
-            WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
+            InvokeResult result = Invoke(VMCtx);
 
-            const WasmEdge_FunctionTypeContext *FuncType =
-                WasmEdge_VMGetFunctionType(VMCxt, funcName);
+            if (WasmEdge_ResultOK(result.Res)) {
+                Expected expected[result.returnCount];
+                ParseExpected(expected, result.returnCount);
 
-            const int paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
-            const int returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
-
-            WasmEdge_Value Params[paramCount];
-            ParseValues(Params, paramCount);
-
-            PrintInvokeMessage(fieldStr, Params, paramCount);
-
-            WasmEdge_Value Returns[returnCount];
-
-            WasmEdge_Result Res = WasmEdge_VMExecute(VMCxt, funcName, Params, paramCount, Returns, returnCount);
-
-            if (WasmEdge_ResultOK(Res)) {
-                Expected expected[returnCount];
-                ParseExpected(expected, returnCount);
-
-                CheckValues(Returns, expected, returnCount, &correct);
+                if (CheckValues(result.Returns, expected, result.returnCount))
+                    correct++;
+                else
+                    PrintFailAssertReturn(result.Returns, expected, result.returnCount);
             }
-
-            WasmEdge_StringDelete(funcName);
         }
 
-        if (strcmp(ty, "arim") == 0) {
+        if (strcmp(ty, "art") == 0) {
             WasmEdge_String modName = WasmEdge_StringCreateByCString(strtok(NULL, DELIMITER));
 
             char* fieldStr = strtok(NULL, DELIMITER);
             WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
 
-            const WasmEdge_FunctionTypeContext *FuncType =
-                WasmEdge_VMGetFunctionType(VMCxt, funcName);
+            WasmEdge_StoreContext *StoreCtx = WasmEdge_VMGetStoreContext(VMCtx);
+            const WasmEdge_ModuleInstanceContext *ModCtx = WasmEdge_StoreFindModule(StoreCtx, modName);
+            WasmEdge_GlobalInstanceContext *GlobCtx = WasmEdge_ModuleInstanceFindGlobal(ModCtx, funcName);
 
-            const int paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
-            const int returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
+            fprintf(stderr, "[Getting %s]\n", fieldStr);
 
-            WasmEdge_Value Params[paramCount];
-            ParseValues(Params, paramCount);
+            if (GlobCtx != NULL) {
+                WasmEdge_Value actual[1] = { WasmEdge_GlobalInstanceGetValue(GlobCtx) };
 
-            PrintInvokeMessage(fieldStr, Params, paramCount);
+                Expected expected[1];
+                ParseExpected(expected, 1);
 
-            WasmEdge_Value Returns[returnCount];
-
-            WasmEdge_Result Res = WasmEdge_VMExecuteRegistered(VMCxt, modName, funcName, Params, paramCount, Returns, returnCount);
-
-            if (WasmEdge_ResultOK(Res)) {
-                Expected expected[returnCount];
-                ParseExpected(expected, returnCount);
-
-                CheckValues(Returns, expected, returnCount, &correct);
+                if (CheckValues(actual, expected, 1))
+                    correct++;
+                else
+                    PrintFailAssertReturn(actual, expected, 1);
             }
-
-            WasmEdge_StringDelete(modName);
-            WasmEdge_StringDelete(funcName);
         }
 
         if (strcmp(ty, "ati") == 0) {
-            char* fieldStr = strtok(NULL, DELIMITER);
-            WasmEdge_String funcName = WasmEdge_StringCreateByCString(fieldStr);
+            InvokeResult result = Invoke(VMCtx);
 
-            const WasmEdge_FunctionTypeContext *FuncType =
-                WasmEdge_VMGetFunctionType(VMCxt, funcName);
-
-            const int paramCount = WasmEdge_FunctionTypeGetParametersLength(FuncType);
-            const int returnCount = WasmEdge_FunctionTypeGetReturnsLength(FuncType);
-
-            WasmEdge_Value Params[paramCount];
-            ParseValues(Params, paramCount);
-
-            PrintInvokeMessage(fieldStr, Params, paramCount);
-
-            WasmEdge_Value Returns[returnCount];
-
-            WasmEdge_Result Res = WasmEdge_VMExecute(VMCxt, funcName, Params, paramCount, Returns, returnCount);
-
-            if (!WasmEdge_ResultOK(Res)) {
-                char* expected = strtok(NULL, DELIMITER);
-
-                if (strcmp(WasmEdge_ResultGetMessage(Res), expected) == 0) {
-                    correct += 1;
-                }
-
-                else {
-                    fprintf(stderr, " Fail!\n Expected: %s\n Actual: %s\n\n", expected, WasmEdge_ResultGetMessage(Res));
-                }
+            if (!WasmEdge_ResultOK(result.Res)) {
+                correct++;
+                continue;
             }
 
-            WasmEdge_StringDelete(funcName);
+            PrintCheckErrorFailed();
+        }
+
+        if (strcmp(ty, "aiv") == 0) {
+            char* path = strtok(NULL, DELIMITER);
+
+            WasmEdge_Result Res = WasmEdge_VMLoadWasmFromFile(VMCtx, path);
+            if (!WasmEdge_ResultOK(Res)) {
+                correct++;
+                continue;
+            }
+
+            Res = WasmEdge_VMValidate(VMCtx);
+            if (!WasmEdge_ResultOK(Res)) {
+                correct++;
+                continue;
+            }
+
+            PrintCheckErrorFailed();
+        }
+
+        if (strcmp(ty, "ama") == 0) {
+            char* path = strtok(NULL, DELIMITER);
+
+            WasmEdge_Result Res = WasmEdge_VMLoadWasmFromFile(VMCtx, path);
+            if (!WasmEdge_ResultOK(Res)) {
+                correct++;
+                continue;
+            }
+
+            PrintCheckErrorFailed();
+        }
+
+        if (strcmp(ty, "aun") == 0) {
+            char* path = strtok(NULL, DELIMITER);
+
+            WasmEdge_Result Res = WasmEdge_VMLoadWasmFromFile(VMCtx, path);
+            if (!WasmEdge_ResultOK(Res)) {
+                correct++;
+                continue;
+            }
+
+            Res = WasmEdge_VMValidate(VMCtx);
+            if (!WasmEdge_ResultOK(Res)) {
+                correct++;
+                continue;
+            }
+
+            Res = WasmEdge_VMInstantiate(VMCtx);
+            if (!WasmEdge_ResultOK(Res)) {
+                correct++;
+                continue;
+            }
+
+            PrintCheckErrorFailed();
         }
     }
 
     fclose(fptr);
 
-    WasmEdge_VMDelete(VMCxt);
+    WasmEdge_VMDelete(VMCtx);
     WasmEdge_ConfigureDelete(ConfCxt);
 
     printf("%d", correct);
