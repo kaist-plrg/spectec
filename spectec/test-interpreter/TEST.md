@@ -2,7 +2,7 @@
 
 ```sh
 $ cd ../spec/wasm-3.0 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --interpreter ../../test-interpreter/sample.wat addTwo 30 12 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 3 --interpreter ../../test-interpreter/sample.wat addTwo 30 12 2> /dev/null
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -183,7 +183,7 @@ watsup 0.4 generator
 42
 == Complete.
 $ cd ../spec/wasm-3.0 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --interpreter ../../test-interpreter/sample.wasm addTwo 40 2 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 3 --interpreter ../../test-interpreter/sample.wasm addTwo 40 2 2> /dev/null
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -364,7 +364,7 @@ watsup 0.4 generator
 42
 == Complete.
 $ cd ../spec/wasm-3.0 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --interpreter ../../test-interpreter/sample.wast 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 3 --interpreter ../../test-interpreter/sample.wast 2> /dev/null
 watsup 0.4 generator
 == Parsing...
 == Elaboration...

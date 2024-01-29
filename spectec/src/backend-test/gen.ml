@@ -289,6 +289,10 @@ let is_func_table = function
 
 exception OutOfLife
 
+let gen_vector () =
+  let gen_byte _ = string_of_int (Random.int 256) in
+  gen_byte |> List.init 16 |> List.fold_left (^) "" |> vecV
+
 (* Generate specific syntax from input IL *)
 let rec gen c name =
   let c' = { c with parent_name = name } in
@@ -311,8 +315,13 @@ let rec gen c name =
   (* HARCODE: typeidx of function is already cached *)
   | "typeidx" when c.parent_case = "FUNC" ->
     List.nth !tids_cache c.i |> numV_of_int |> do_cache type_cache
+  (* HARDCODE: c_vectype to be string *)
+  | "c_vectype" ->
+    gen_vector ()
   (* HARDCODE: pack_size to be 8/16/32 *)
-  | "n" when List.mem c.parent_case [ "LOAD"; "STORE"; "EXTEND" ] -> numV_of_int (choose [8; 16; 32])
+  | "n" when List.mem c.parent_case
+    [ "LOAD"; "STORE"; "EXTEND"; "VLOAD_LANE"; "VSTORE_LANE" ] ->
+      numV_of_int (choose [8; 16; 32])
   | _ ->
     let syn = find_syn name in
     let result =
@@ -327,11 +336,15 @@ let rec gen c name =
         let snd = List.hd (List.tl pair) in
         let new_snd = map2 unwrap_numv numV Int64.add fst snd in
         Al.Ast.TupV [ fst; new_snd ]
-      (* ArrowV *)
-      | NotationT ([[]; [Arrow]; []], typs)
-      | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
-        let pair = gen_typs c' typs in
-        Al.Ast.TupV pair
+      (* Shape *)
+      | NotationT ([[]; [Atom "X"]; []], typs) when name = "shape" ->
+        let shape = Al.Ast.TupV (gen_typs c' typs) in
+        validate_shape shape
+      (* packshape *)
+      | NotationT ([[]; [Atom "X"]; []], _) when name = "packshape" ->
+        (* TODO: Hardcode packshape *)
+        let packshape = choose [ [32L; 2L]; [16L; 4L]; [8L; 8L] ] in
+        tupV (List.map numV packshape)
       (* CaseV *)
       | NotationT ((Atom atomid :: _) :: _, typs)
       | NotationT ([[]; [Atom atomid]], typs) (* Hack for I8 *) ->
@@ -343,6 +356,11 @@ let rec gen c name =
           |> List.map (gen_wasm_funcs c'')
         in
         Al.Ast.CaseV (atomid, args)
+      (* InfixE *)
+      | NotationT ([[]; [Arrow]; []], typs)
+      | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
+        let pair = gen_typs c' typs in
+        Al.Ast.TupV pair
       (* StrV *)
       | StructT typfields ->
         let rec_ =
@@ -408,8 +426,6 @@ let rec gen c name =
         in
         try_instr 100
       | VariantT typcases ->
-        (* HARDCODE: Remove V128 *)
-        let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "V128") typcases in
         let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "BOT") typcases in
         (* let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "EXTERNREF") typcases in *)
         let typcase = choose typcases in
@@ -419,8 +435,8 @@ let rec gen c name =
         Al.Ast.CaseV (case, args)
       | _ ->
         failwith (
-          Printf.sprintf "TODO: gen of %s%s"
-            (Il.Print.string_of_deftyp syn) (Il.Print.string_of_deftyp syn)
+          Printf.sprintf "TODO: gen of %s: %s"
+            (Il.Print.string_of_deftyp syn) (Il.Print.structured_string_of_deftyp syn)
         )
     in
 
@@ -484,6 +500,8 @@ and gen_typ c typ =
     listV_of_list l
   (* General types *)
   | VarT id -> gen c id.it
+  | NumT NatT when c.parent_case = "SPLAT" || c.parent_case = "ZERO" ->
+    numV (choose [8L; 16L; 32L])
   | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
     let name = match typ'.it with VarT id -> id.it | _ -> "" in
@@ -509,7 +527,7 @@ and gen_typ c typ =
   | IterT (typ', Opt) ->
     if Random.bool() then optV None
     else optV (Some (gen_typ c typ'))
-  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
+  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.structured_string_of_typ typ)
 
 and gen_typs c typs =
   match typs.it with
@@ -705,7 +723,8 @@ let mk_assertion funcinst =
       | Al.Ast.CaseV ("I64", [])
       | Al.Ast.CaseV ("F32", [])
       | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; numV_of_int (Random.full_int 0x7fffffff)])
-    | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
+      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VVCONST", [t; gen_vector ()])
+      | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
     ) arg_types
   in
   let invoke = name, args in
@@ -769,16 +788,50 @@ let print_test (m, result) =
 
 let to_phrase x = Reference_interpreter2.Source.(x @@ no_region)
 
-
 let value_to_wast v =
-  let open Reference_interpreter2.Script in
+  let open Reference_interpreter2 in
+  let open Script in
+  let open Values in
+
+  let f32_pos_nan = F32.to_bits F32.pos_nan in
+  let f32_neg_nan = F32.to_bits F32.neg_nan |> Int32.logand 0x0000_0000_ffff_ffffl in
+  let f64_pos_nan = F64.to_bits F64.pos_nan in
+  let f64_neg_nan = F64.to_bits F64.neg_nan in
+
   match v with
   | Al.Ast.CaseV ("REF.FUNC_ADDR", _) -> RefResult (RefTypePat FuncRefType) |> to_phrase
   | _ ->
     match Construct2.al_to_value v with
     | Num n -> NumResult (NumPat (n |> to_phrase)) |> to_phrase
     | Ref r -> RefResult (RefPat (r |> to_phrase)) |> to_phrase
-    | _ -> failwith "vector value not supported"
+    (* TODO: Check implementattion *)
+    | Vec (V128 i) ->
+      let i32 i = NumPat (to_phrase (I32 i)) in
+      let i64 i = NumPat (to_phrase (I64 i)) in
+      let f32 f =
+        if f32_pos_nan = (F32.to_bits f) || f32_neg_nan = (F32.to_bits f) then
+          NanPat (to_phrase (F32 CanonicalNan))
+        else if Int32.logand (F32.to_bits f) f32_pos_nan = f32_pos_nan then
+          NanPat (to_phrase (F32 ArithmeticNan))
+        else
+          NumPat (to_phrase (F32 f))
+      in
+      let f64 f =
+        if f64_pos_nan = (F64.to_bits f) || f64_neg_nan = (F64.to_bits f) then
+          NanPat (to_phrase (F64 CanonicalNan))
+        else if Int64.logand (F64.to_bits f) f64_pos_nan = f64_pos_nan then
+          NanPat (to_phrase (F64 ArithmeticNan))
+        else
+          NumPat (to_phrase (F64 f))
+      in
+      match choose [ "I8"; "I16"; "I32"; "I64"; "F32"; "F64" ] with
+      | "I8" ->  to_phrase (VecResult (VecPat (V128 (V128.I8x16 (), List.map i32 (V128.I8x16.to_lanes i)))))
+      | "I16" -> to_phrase (VecResult (VecPat (V128 (V128.I16x8 (), List.map i32 (V128.I16x8.to_lanes i)))))
+      | "I32" -> to_phrase (VecResult (VecPat (V128 (V128.I32x4 (), List.map i32 (V128.I32x4.to_lanes i)))))
+      | "I64" -> to_phrase (VecResult (VecPat (V128 (V128.I64x2 (), List.map i64 (V128.I64x2.to_lanes i)))))
+      | "F32" -> to_phrase (VecResult (VecPat (V128 (V128.F32x4 (), List.map f32 (V128.F32x4.to_lanes i)))))
+      | "F64" -> to_phrase (VecResult (VecPat (V128 (V128.F64x2 (), List.map f64 (V128.F64x2.to_lanes i)))))
+      | _ -> failwith "hi"
 
 let invoke_to_wast ((f, args), result) =
   let open Reference_interpreter2.Script in

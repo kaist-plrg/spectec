@@ -57,6 +57,15 @@ let correct_cvtop = function
   | _ -> false )
 | _ -> false
 
+let validate_shape = function
+  | TupV [ CaseV ("I8", []); NumV _ ] -> tupV [ caseV ("I8", []); numV 16L ]
+  | TupV [ CaseV ("I16", []); NumV _ ] -> tupV [ caseV ("I16", []); numV 8L ]
+  | TupV [ CaseV ("I32", []); NumV _ ] -> tupV [ caseV ("I32", []); numV 4L ]
+  | TupV [ CaseV ("I64", []); NumV _ ] -> tupV [ caseV ("I64", []); numV 2L ]
+  | TupV [ CaseV ("F32", []); NumV _ ] -> tupV [ caseV ("F32", []); numV 4L ]
+  | TupV [ CaseV ("F64", []); NumV _ ] -> tupV [ caseV ("F64", []); numV 2L ]
+  | v -> failwith ("Invalid shape: " ^ Print.string_of_value v)
+
 (* Estimate if given instruction is valid with expected type, rt1* -> rt2* *)
 (* TODO: Perhaps some of these can be automated? *)
 let validate_instr case args const (_rt1, rt2) =
@@ -64,6 +73,16 @@ let validate_instr case args const (_rt1, rt2) =
   | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )
+  | "VUNOP" | "VBINOP" | "VRELOP" ->
+    (match List.hd (List.tl args) with
+    | CaseV ("_VI", _) ->
+      let i = choose [8; 16; 32; 64] in
+      Some [ tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]; List.hd (List.rev args) ]
+    | CaseV ("_VF", _) ->
+      let i = choose [32; 64] in
+      Some [ tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ]; List.hd (List.rev args) ]
+    | _ -> failwith "invalid op"
+    )
   | "EXTEND" -> ( match args with
     | [ CaseV ("I32", []) as nt; NumV 32L ] -> Some [ nt; choose [ numV 8L; numV 16L ] ]
     | nt :: _ when is_inn nt -> Some args
@@ -121,4 +140,113 @@ let validate_instr case args const (_rt1, rt2) =
     | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t then Some args else None
     | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
+  | "VEXTRACT_LANE" ->
+    let ext = choose [nullary "S"; nullary "U"] in
+    (match args with
+    | [ TupV [ CaseV ("I8", []); NumV n ]; _; _ ] ->
+      Some [ TupV [ CaseV ("I8", []); NumV n ]; OptV (Some ext); numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("I16", []); NumV n ]; _; _ ] ->
+      Some [ TupV [ CaseV ("I16", []); NumV n ]; OptV (Some ext); numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("I32", []); NumV n ]; _; _ ] ->
+      Some [ TupV [ CaseV ("I32", []); NumV n ]; OptV None; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("I64", []); NumV n ]; _; _ ] ->
+      Some [ TupV [ CaseV ("I64", []); NumV n ]; OptV None; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("F32", []); NumV n ]; _; _ ] ->
+      Some [ TupV [ CaseV ("F32", []); NumV n ]; OptV None; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("F64", []); NumV n ]; _; _ ] ->
+      Some [ TupV [ CaseV ("F64", []); NumV n ]; OptV None; numV (Random.int64 n) ]
+    | v -> failwith ("Invalid vec extract lane op: " ^ Print.string_of_value (listV_of_list v))
+    )
+  | "VREPLACE_LANE" ->
+    (match args with
+    | [ TupV [ CaseV ("I8", []); NumV n ]; _ ] ->
+      Some [ TupV [ CaseV ("I8", []); NumV n ]; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("I16", []); NumV n ]; _ ] ->
+      Some [ TupV [ CaseV ("I16", []); NumV n ]; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("I32", []); NumV n ]; _ ] ->
+      Some [ TupV [ CaseV ("I32", []); NumV n ]; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("I64", []); NumV n ]; _ ] ->
+      Some [ TupV [ CaseV ("I64", []); NumV n ]; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("F32", []); NumV n ]; _ ] ->
+      Some [ TupV [ CaseV ("F32", []); NumV n ]; numV (Random.int64 n) ]
+    | [ TupV [ CaseV ("F64", []); NumV n ]; _ ] ->
+      Some [ TupV [ CaseV ("F64", []); NumV n ]; numV (Random.int64 n) ]
+    | v -> failwith ("Invalid vec replace lane op: " ^ Print.string_of_value (listV_of_list v))
+    )
+  (* cvtop *)
+  | "VCVTOP" ->
+    (match casev_of_case (List.hd (List.tl args)) with
+    | "EXTEND" ->
+      let i = choose [16; 32; 64] in
+      let i2 = i/2 in
+      let arg1 = tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ] in
+      let arg2 = tupV [ nullary ("I"^(string_of_int i2)); numV_of_int (128/i2) ] in
+      let half = choose [nullary "HIGH"; nullary "LOW"] in
+      let ext = choose [nullary "S"; nullary "U"] in
+      Some ([arg1; nullary "EXTEND"; optV (Some half); arg2; optV (Some ext); none "ZERO"])
+    | "TRUNC_SAT" ->
+      let i = choose [32; 64] in
+      let arg1 = tupV [ nullary "I32"; numV_of_int (128/32) ] in
+      let arg2 = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ] in
+      let ext = choose [nullary "S"; nullary "U"] in
+      let zero = if i = 32 then none "ZERO" else some "ZERO" in
+      Some ([arg1; nullary "TRUNC_SAT"; optV None; arg2; optV (Some ext); zero])
+    | "CONVERT" ->
+      let i = choose [32; 64] in
+      let arg1 = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ] in
+      let arg2 = tupV [ nullary "I32"; numV_of_int (128/32) ] in
+      let half = choose [None; Some (nullary "LOW")] in
+      let ext = choose [nullary "S"; nullary "U"] in
+      Some ([arg1; nullary "CONVERT"; optV half; arg2; optV (Some ext); none "ZERO"])
+    | "DEMOTE" ->
+      let arg1 = tupV [ nullary "F32"; numV_of_int (128/32) ] in
+      let arg2 = tupV [ nullary "F64"; numV_of_int (128/64) ] in
+      Some ([arg1; nullary "DEMOTE"; optV None; arg2; optV None; some "ZERO"])
+    | "PROMOTE" ->
+      let arg1 = tupV [ nullary "F64"; numV_of_int (128/64) ] in
+      let arg2 = tupV [ nullary "F32"; numV_of_int (128/32) ] in
+      Some ([arg1; nullary "PROMOTE"; optV (Some (nullary "LOW")); arg2; optV None; none "ZERO"])
+    | _ -> Some args
+    )
+  (* special vbinop *)
+  | "VSWIZZLE" -> Some [ TupV [ CaseV ("I8", []); NumV 16L ]; ]
+  | "VSHUFFLE" ->
+    Some [ TupV [ CaseV ("I8", []); NumV 16L ]; List.hd (List.rev args) ]
+  | "VNARROW" ->
+    let i = choose [8; 16] in
+    let i2 = i*2 in
+    let arg1 = tupV [ caseV ("I"^(string_of_int i), []); numV_of_int (128/i) ] in
+    let arg2 = tupV [ caseV ("I"^(string_of_int i2), []); numV_of_int (128/i2) ] in
+    let ext = choose [nullary "S"; nullary "U"] in
+    Some [ arg1; arg2; ext ]
+  | "VEXTMUL" ->
+    let i = choose [16; 32; 64] in
+    let i2 = i/2 in
+    let arg1 = tupV [ caseV ("I"^(string_of_int i), []); numV_of_int (128/i) ] in
+    let arg2 = tupV [ caseV ("I"^(string_of_int i2), []); numV_of_int (128/i2) ] in
+    let hl = choose [nullary "HIGH"; nullary "LOW"] in
+    let ext = choose [nullary "S"; nullary "U"] in
+    Some [ arg1; hl; arg2; ext ]
+  | "VDOT" ->
+    Some [ TupV [ CaseV ("I32", []); NumV 4L]; TupV [ CaseV ("I16", []); NumV 8L ]; CaseV ("S", []) ]
+  | "VLOAD_LANE" | "VSTORE_LANE" ->
+    (match args with
+    | [ NumV n; memop; _ ] -> Some [ NumV n; memop; numV (Int64.div 128L n) ]
+    | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
+    )
+  (* special vcvtop *)
+  | "VEXTADD_PAIRWISE" ->
+    let i = choose [16; 32] in
+    let i2 = i/2 in
+    let arg1 = tupV [ caseV ("I"^(string_of_int i), []); numV_of_int (128/i) ] in
+    let arg2 = tupV [ caseV ("I"^(string_of_int i2), []); numV_of_int (128/i2) ] in
+    let ext = choose [nullary "S"; nullary "U"] in
+    Some [ arg1; arg2; ext ]
+  (* only ishape *)
+  | "VISHIFTOP" ->
+    let i = choose [8; 16; 32; 64] in
+    Some [ tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]; List.hd (List.rev args) ]
+  | "VBITMASK" | "VALL_TRUE" ->
+    let i = choose [8; 16; 32; 64] in
+    Some [ tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ] ]
   | _ -> Some args
