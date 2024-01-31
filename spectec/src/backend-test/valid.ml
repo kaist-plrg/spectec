@@ -172,7 +172,7 @@ let validate_instr case args const (rt1, rt2) =
     )
   (* special vbinop *)
   | "VSWIZZLE" -> Some [ make_ishape 8; ]
-  | "VSHUFFLE" -> Some [ make_ishape 8; List.hd (List.rev args) ]
+  | "VSHUFFLE" -> Some [ make_ishape 8; numV (Random.int64 (128/8*2)) ]
   (* dynamic typing *)
   | "VSPLAT" ->
     (match List.hd rt1 with
