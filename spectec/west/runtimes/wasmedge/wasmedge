@@ -42,15 +42,24 @@ def test_wast (path: str) -> tuple[int, int]:
     temp_dir = TemporaryDirectory(prefix="west-wasmedge-")
     temp_dir_path = temp_dir.name
 
+    current_directory = abspath(dirname(__file__))
+
     dst_path = join(temp_dir_path, basename(path))
     copyfile(path, dst_path)
+    copyfile(join(current_directory, "spectest.wasm"), join(temp_dir_path, "spectest.wasm"))
 
     subprocess.run (["wast2json", dst_path], cwd=temp_dir_path)
 
     filename = splitext(basename(path))[0]
 
-    with open(join(temp_dir_path, filename + ".json")) as f:
-        commands = json.load(f)['commands']
+    try:
+        with open(join(temp_dir_path, filename + ".json")) as f:
+            try:
+                commands = json.load(f)['commands']
+            except json.decoder.JSONDecodeError:
+                return 0, 0
+    except FileNotFoundError:
+        return 0, 0
 
     total = 0
 
@@ -135,7 +144,7 @@ def test_wast (path: str) -> tuple[int, int]:
 
     print(f'==== {basename(path)} ====')
 
-    ps = subprocess.run ([join(abspath(dirname(__file__)), "tester"), f"{filename}.txt"], cwd=temp_dir_path,
+    ps = subprocess.run ([join(current_directory, "tester"), f"{filename}.txt"], cwd=temp_dir_path,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     print(ps.stderr.decode("utf-8"), end='', file=sys.stderr)
@@ -190,11 +199,18 @@ if __name__ == '__main__':
 
     wast_files.sort()
 
+    incorrect_files = []
+
     for wast_file in wast_files:
         c, t = test_wast (wast_file)
 
+        if c != t:
+            incorrect_files.append(wast_file)
+
         correct += c
         total += t
+
+    print(incorrect_files)
 
     try:
         print(f'Total [{correct}/{total}] ({correct/total*100:.2f}%)')

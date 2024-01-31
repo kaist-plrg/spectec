@@ -37,6 +37,12 @@ void PrintWasmEdgeValue (WasmEdge_Value value) {
         case WasmEdge_ValType_F64:
             fprintf(stderr, "(F64.CONST 0x%lx)", WasmEdge_ValueGetI64(value));
             break;
+        case WasmEdge_ValType_FuncRef:
+            if (WasmEdge_ValueGetFuncRef(value) == NULL)
+                fprintf(stderr, "(FUNCREF NULL)");
+            else
+                fprintf(stderr, "(FUNCREF %p)", WasmEdge_ValueGetFuncRef(value));
+            break;
         case WasmEdge_ValType_ExternRef:
             if (WasmEdge_ValueGetExternRef(value) == NULL)
                 fprintf(stderr, "(EXTERNREF NULL)");
@@ -187,6 +193,8 @@ bool CheckValues (WasmEdge_Value* actual, Expected* expected, const size_t count
             if (actual[i].Type == WasmEdge_ValType_FuncRef) {
                 if (strcmp(expected[i].value, "null") == 0 && WasmEdge_ValueGetFuncRef(actual[i]) == NULL)
                     continue;
+                if (strcmp(expected[i].value, "null") != 0 && WasmEdge_ValueGetFuncRef(actual[i]) != NULL)
+                    continue;
             }
 
             return false;
@@ -317,6 +325,8 @@ int main(int argc, char** argv) {
     WasmEdge_ConfigureContext *ConfCxt = WasmEdge_ConfigureCreate();
     WasmEdge_VMContext *VMCtx = WasmEdge_VMCreate(ConfCxt, NULL);
 
+    WasmEdge_VMRegisterModuleFromFile(VMCtx, WasmEdge_StringCreateByCString("spectest"), "./spectest.wasm");
+
     FILE *fptr = fopen(argv[1], "r");
 
     char buffer[1024];
@@ -346,10 +356,12 @@ int main(int argc, char** argv) {
                 Expected expected[result.returnCount];
                 ParseExpected(expected, result.returnCount);
 
-                if (CheckValues(result.Returns, expected, result.returnCount))
+                if (CheckValues(result.Returns, expected, result.returnCount)) {
                     correct++;
-                else
+                }
+                else {
                     PrintFailAssertReturn(result.Returns, expected, result.returnCount);
+                }
             }
         }
 

@@ -2,3 +2,5 @@ wasmedge/**
 !wasmedge/Makefile
 !wasmedge/tester.c
 !wasmedge/wasmedge
+!wasmedge/spectest.wat
+!wasmedge/spectest.wasm
