@@ -1164,8 +1164,8 @@ let al_of_vbinop = function
   )
 
 let al_of_special_vbinop = function
-  | V128 (V128.I8x16 (V128Op.Swizzle)) -> CaseV ("SWIZZLE", [ TupV [ nullary "I8"; numV 16L ]; ])
-  | V128 (V128.I8x16 (V128Op.Shuffle l)) -> CaseV ("SHUFFLE", [ TupV [ nullary "I8"; numV 16L ]; al_of_list al_of_int l ])
+  | V128 (V128.I8x16 (V128Op.Swizzle)) -> CaseV ("VSWIZZLE", [ TupV [ nullary "I8"; numV 16L ]; ])
+  | V128 (V128.I8x16 (V128Op.Shuffle l)) -> CaseV ("VSHUFFLE", [ TupV [ nullary "I8"; numV 16L ]; al_of_list al_of_int l ])
   | V128 (V128.I8x16 (V128Op.NarrowS)) -> CaseV ("VNARROW", [ TupV [ nullary "I8"; numV 16L ]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Types.SX ])
   | V128 (V128.I16x8 (V128Op.NarrowS)) -> CaseV ("VNARROW", [ TupV [ nullary "I16"; numV 8L ]; TupV [ nullary "I32"; numV 4L ]; al_of_extension Types.SX ])
   | V128 (V128.I8x16 (V128Op.NarrowU)) -> CaseV ("VNARROW", [ TupV [ nullary "I8"; numV 16L ]; TupV [ nullary "I16"; numV 8L ]; al_of_extension Types.ZX ])
