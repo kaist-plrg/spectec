@@ -143,7 +143,21 @@ let validate_instr case args const (rt1, rt2) =
     | _ -> None )
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
-    | [ NumV n; memop; _ ] -> Some [ NumV n; memop; numV (Int64.div 128L n) ]
+    | [ NumV n; memop; _ ] ->
+      let decompose_memop s = (
+          s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
+          s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_numv_to_int
+        )in
+      let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV_of_int a) |> Record.add "OFFSET" (numV_of_int o)) in
+      let (a, o) = decompose_memop memop in
+
+      let rec dec_align a =
+        if 1 lsl a <= Int64.to_int n / 8 then a else
+        dec_align (a-1)
+      in
+      let a' = dec_align a in
+
+      Some [ NumV n; compose_memop a' o; numV (Random.int64 (Int64.div 128L n)) ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VUNOP" | "VBINOP" | "VRELOP"->
@@ -172,7 +186,7 @@ let validate_instr case args const (rt1, rt2) =
     )
   (* special vbinop *)
   | "VSWIZZLE" -> Some [ make_ishape 8; ]
-  | "VSHUFFLE" -> Some [ make_ishape 8; numV_of_int (Random.int (128/8*2)) ]
+  | "VSHUFFLE" -> Some [ make_ishape 8; listV_of_list (List.init 16 (fun _ -> numV_of_int (Random.int 32))) ]
   (* dynamic typing *)
   | "VSPLAT" ->
     (match List.hd rt1 with
