@@ -127,6 +127,7 @@ let argspec = Arg.align
   "--interpreter", Arg.Rest_all (fun args -> target := Interpreter args),
     " Generate interpreter";
   "--test", Arg.Unit (fun () -> target := Test), " Generate test suite";
+  "--test-seed", Arg.Int (fun i -> Backend_test.Flag.seed := i), " Generate test suite";
 
   "--print-el", Arg.Set print_el, " Print EL";
   "--print-il", Arg.Set print_elab_il, " Print IL (after elaboration)";
@@ -138,7 +139,6 @@ let argspec = Arg.align
 
   "--test-version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " The version of wasm, default to 3";
 
-  "--test:n", Arg.Int (fun n -> Backend_test.Flag.test_num := n), " Set the number of test to generate, default to 10,000";
   "--test:out", Arg.String (fun s -> Backend_test.Flag.out := s), " Set the output directory of test generation, default to `out`";
 
   "-help", Arg.Unit ignore, "";

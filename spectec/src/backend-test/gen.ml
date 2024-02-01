@@ -681,13 +681,11 @@ and fix_rts case const_required rt1 rt2 entangles =
     rt1', rt2', induced_args
 
 (** Mutation **)
-let mutate modules =
-  let aux i m = try
-    prerr_endline ("Patching " ^ string_of_int i ^ "th module..");
+let patch m =
+  try
     Patch.patch_module m
-  with e -> prerr_endline (Printexc.to_string e); m
-  in
-  List.mapi aux modules
+  with e ->
+    prerr_endline (Printexc.to_string e); m
   (* TODO *)
 
 (** Injection **)
@@ -757,9 +755,8 @@ let get_instant_result m : instant_result =
     in
     Ok (List.map mk_assertion exported_funcs)
   with e -> Error e
-let inject i m =
-  prerr_endline ("Injecting " ^ string_of_int i ^ "th module..");
-  m, get_instant_result m
+let inject m =
+  get_instant_result m
 
 type module_ = Al.Ast.value
 type test = module_ * instant_result
@@ -841,7 +838,7 @@ let invoke_to_wast ((f, args), result) =
 
   ) |> Option.map (fun a -> Assertion (to_phrase a) |> to_phrase)
 
-let to_wast i (m, result) =
+let to_wast m result =
   let open Reference_interpreter2.Script in
   let m_r = Construct2.al_to_module m in
 
@@ -855,13 +852,12 @@ let to_wast i (m, result) =
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
     | Error Exception.Exhaustion -> []
     | _ ->
-      Printf.sprintf "Unexpected error in instantiating %sth module" (string_of_int i) |> prerr_endline;
+      Printf.sprintf "Unexpected error in instantiating module" |> prerr_endline;
       []
   in
 
-  let file = Filename.concat !Flag.out (string_of_int i ^ ".wast") in
+  let file = Filename.concat !Flag.out (string_of_int !seed ^ ".wast") in
   let oc = open_out file in
-  "Writing " ^ (string_of_int i) ^ "th module..." |> prerr_endline;
   (* Print.module_ oc 80 m_r; *)
   Reference_interpreter2.Print.script oc 80 `Textual script;
   close_out oc
@@ -888,28 +884,20 @@ let gen_test el' il' al' =
   estimate_const ();
 
   (* Generate tests *)
-  let seeds =
-    List.init !test_num (fun i ->
-      prerr_endline ("Generatring " ^ string_of_int i ^ "th module...");
-      init_cache ();
-      gen default_context "module"
-    )
-  in
+  init_cache ();
+  let module_ = gen default_context "module" in
 
   (* Mutatiion *)
-  let modules = mutate seeds in
+  let module_ = patch module_ in
 
   (* TODO *)
   Builtin.builtin () |> ignore;
 
   (* Injection *)
-  let tests = List.mapi inject modules in
-
-  (* Print result *)
-  List.iter print_test tests;
+  let result = inject module_ in
 
   (* Convert to Wast *)
-  List.iteri to_wast tests;
+  to_wast module_ result
 
 
   (* Print Coverage *)
