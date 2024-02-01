@@ -1,4 +1,7 @@
 make && (
+  if [ ! -d out ]; then
+    mkdir out
+  fi
   for (( i=0; ; i++ ))
   do  
     echo gen $i th module
