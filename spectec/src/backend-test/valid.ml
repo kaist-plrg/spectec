@@ -29,6 +29,23 @@ let rec string_of_vt = function
 | SeqT t -> (string_of_vt t) ^ "*"
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 
+let decompose_vloadop = function
+| OptV (Some (CaseV ("ZERO", [ NumV n ])))
+| OptV (Some (CaseV ("SPLAT", [ NumV n ]))) -> n
+| OptV (Some (CaseV ("SHAPE", [ TupV [NumV m; NumV n]; _ ]))) -> Int64.mul m n
+| OptV (None) -> 128L
+| v -> failwith ("Invalid vloadop: " ^ Print.string_of_value v)
+
+let decompose_memop s = (
+    s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
+    s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_numv_to_int
+  )
+let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV_of_int a) |> Record.add "OFFSET" (numV_of_int o))
+
+let rec dec_align a n =
+  if 1 lsl a <= n then a else
+  dec_align (a-1) n
+
 let nt_matches_op nt op = match nt, op with
 | CaseV ("I32", []), CaseV ("_I", _)
 | CaseV ("I64", []), CaseV ("_I", _)
@@ -113,11 +130,6 @@ let validate_instr case args const (rt1, rt2) =
       | false, _ -> OptV None in
       let (is_some, m, s) = decompose_opt opt in
 
-      let decompose_memop s = (
-          s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
-          s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_numv_to_int
-        )in
-      let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV_of_int a) |> Record.add "OFFSET" (numV_of_int o)) in
       let (a, o) = decompose_memop memop in
 
       let is_some' = if x = "F" then false else is_some in
@@ -129,11 +141,7 @@ let validate_instr case args const (rt1, rt2) =
       in
       let m' = dec_m m in
 
-      let rec dec_align a =
-        if 1 lsl a <= m'/8 then a else
-        dec_align (a-1)
-      in
-      let a' = dec_align a in
+      let a' = dec_align a (m'/8) in
 
       Some [ nt; compose_opt is_some' m' s; compose_memop a' o ]
     | _ -> None)
@@ -141,21 +149,30 @@ let validate_instr case args const (rt1, rt2) =
     | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t then Some args else None
     | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
+  | "VLOAD" ->
+  (match args with
+    | [ vloadop; memop; ] ->
+      let n = decompose_vloadop vloadop in
+      let (a, o) = decompose_memop memop in
+      let a' = dec_align a (Int64.to_int n / 8) in
+
+      Some [ vloadop; compose_memop a' o; ]
+    | v -> failwith ("Invalid vec load op: " ^ Print.string_of_value (listV_of_list v))
+    )
+| "VSTORE" ->
+  (match args with
+    | [ memop; ] ->
+      let (a, o) = decompose_memop memop in
+      let a' = dec_align a (128 / 8) in
+
+      Some [ compose_memop a' o; ]
+    | v -> failwith ("Invalid vec store op: " ^ Print.string_of_value (listV_of_list v))
+    )
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
     | [ NumV n; memop; _ ] ->
-      let decompose_memop s = (
-          s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
-          s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_numv_to_int
-        )in
-      let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV_of_int a) |> Record.add "OFFSET" (numV_of_int o)) in
       let (a, o) = decompose_memop memop in
-
-      let rec dec_align a =
-        if 1 lsl a <= Int64.to_int n / 8 then a else
-        dec_align (a-1)
-      in
-      let a' = dec_align a in
+      let a' = dec_align a (Int64.to_int n / 8) in
 
       Some [ NumV n; compose_memop a' o; numV (Random.int64 (Int64.div 128L n)) ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
