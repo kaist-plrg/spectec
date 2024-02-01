@@ -493,8 +493,8 @@ and gen_typ c typ =
     listV_of_list l
   (* General types *)
   | VarT id -> gen c id.it
-  | NumT NatT when c.parent_case = "SPLAT" || c.parent_case = "ZERO" ->
-    numV (choose [8L; 16L; 32L])
+  | NumT NatT when c.parent_case = "SPLAT" -> numV (choose [8L; 16L; 32L])
+  | NumT NatT when c.parent_case = "ZERO" -> numV (choose [32L; 64L])
   | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
     let name = match typ'.it with VarT id -> id.it | _ -> "" in
