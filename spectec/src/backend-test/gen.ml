@@ -772,8 +772,8 @@ let print_test (m, result) =
   | Ok assertions ->
     print_endline "Instantiation success";
     List.iter print_assertion assertions
-  | Error Exception.Trap ->
-    print_endline ("Instantiation failed")
+  | Error Exception.Trap -> print_endline ("Instantiation failed")
+  | Error Exception.Exhaustion -> print_endline ("Infinite loop in instantiation")
   | Error e ->
     Printf.printf "Unexpected error during instantiation: %s" (Printexc.to_string e)
   );
@@ -853,6 +853,7 @@ let to_wast i (m, result) =
       :: List.filter_map invoke_to_wast assertions
     | Error Exception.Trap ->
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
+    | Error Exception.Exhaustion -> []
     | _ ->
       Printf.sprintf "Unexpected error in instantiating %sth module" (string_of_int i) |> prerr_endline;
       []
