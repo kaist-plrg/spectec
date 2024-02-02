@@ -24,7 +24,7 @@ make && (
     # Gen test
     printf "\n"
     printf "${ORANGE}Generating $i.wast..${NC}\r"
-    # ./watsup spec/wasm-2.0/*.watsup --test --test-seed $i
+    ./watsup spec/wasm-2.0/*.watsup --test --test-seed $i
     printf "${CYAN}[$i.wast]           ${NC}\n"
 
     # Run
