@@ -24,7 +24,9 @@ function run {
   # print result
   printf "${NC}"
   if [[ $res = 0 ]]; then
-    printf " - $1: ${GREEN}Success${NC}  \n"
+    printf " - $1: ${GREEN}Success${NC}  \n\n"
+  else
+    printf " - $1: ${RED}Fail${NC}  \n\n"
   fi
 
 }
@@ -38,14 +40,15 @@ make && (
   fi
   for (( i=0; ; i++ ))
   do  
-    # Gen test
-    printf "\n"
-    printf "${ORANGE}Generating $i.wast..${NC}\r"
-    ./watsup spec/wasm-2.0/*.watsup --test --test-seed $i
+    if [ ! -f "out/$i.wast" ]; then
+      # Gen test
+      printf "${ORANGE}Generating $i.wast..${NC}\r"
+      ./watsup spec/wasm-2.0/*.watsup --test --test-seed $i
+    fi
     printf "${CYAN}[$i.wast]           ${NC}\n"
 
     # Run
-    run "Reference Interpreter" "../interpreter/wasm" "out/${i}.wast"
+    run "Reference Interpreter" "../interpreter/wasm" "out/$i.wast"
   done
 
 )
