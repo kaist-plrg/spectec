@@ -19,6 +19,8 @@ let positions_to_region position1 position2 =
 
 let at (l, r) = positions_to_region l r
 
+let ($$) it at = {it; at; note = ref ""}
+
 
 (* Conversions *)
 
@@ -41,14 +43,6 @@ let as_alt_sym sym =
   match sym.it with
   | AltG (_::_::_ as syms) -> syms
   | _ -> [Elem sym]
-
-
-(* Identifier Status *)
-
-module VarSet = Set.Make(String)
-
-let atom_vars = ref VarSet.empty
-let scopes = ref []
 
 
 (* Parentheses Role etc *)
@@ -126,9 +120,10 @@ let is_post_exp e =
 %left PLUS MINUS COMPOSE
 %left STAR SLASH BACKSLASH
 
-%start script expression check_atom
+%start script typ_eof exp_eof check_atom
 %type<El.Ast.script> script
-%type<El.Ast.exp> expression
+%type<El.Ast.typ> typ_eof
+%type<El.Ast.exp> exp_eof
 %type<bool> check_atom
 
 %%
@@ -196,8 +191,8 @@ defid : id { $1 $ at $sloc } | IF { "if" $ at $sloc }
 relid : id { $1 $ at $sloc }
 gramid : id { $1 $ at $sloc }
 hintid : id { $1 }
-fieldid : atomid_ { Atom $1 }
-dotid : DOTID { Atom $1 }
+fieldid : atomid_ { Atom $1 $$ at $sloc }
+dotid : DOTID { Atom $1 $$ at $sloc }
 
 atomid_lparen : UPID_LPAREN { $1 }
 varid_lparen : LOID_LPAREN { $1 $ at $sloc }
@@ -216,6 +211,8 @@ ruleid_ :
 atomid : atomid_ { $1 } | atomid DOTID { $1 ^ "." ^ $2 }
 
 atom :
+  | atom_ { $1 $$ at $sloc }
+atom_ :
   | atomid { Atom $1 }
   | TICK QUEST { Quest }
   | TICK PLUS { Plus }
@@ -226,18 +223,18 @@ atom :
 
 varid_bind :
   | varid { $1 }
-  | atomid_ { atom_vars := VarSet.add $1 !atom_vars; $1 $ at $sloc }
+  | atomid_ { Atom.make_var $1; $1 $ at $sloc }
 varid_bind_lparen :
   | varid_lparen { $1 }
-  | atomid_lparen { atom_vars := VarSet.add $1 !atom_vars; $1 $ at $sloc }
+  | atomid_lparen { Atom.make_var $1; $1 $ at $sloc }
 
 enter_scope :
-  | (* empty *) { scopes := !atom_vars :: !scopes }
+  | (* empty *) { Atom.enter_scope () }
 exit_scope :
-  | (* empty *) { atom_vars := List.hd !scopes; scopes := List.tl !scopes }
+  | (* empty *) { Atom.exit_scope () }
 
 check_atom :
-  | UPID EOF { VarSet.mem (El.Convert.strip_var_suffix ($1 $ at $sloc)).it !atom_vars }
+  | UPID EOF { Atom.is_var (El.Convert.strip_var_suffix ($1 $ at $sloc)).it }
 
 
 (* Operators *)
@@ -268,6 +265,8 @@ check_atom :
   | DARROW2 { EquivOp }
 
 %inline infixop :
+  | infixop_ { $1 $$ at $sloc }
+%inline infixop_ :
   | DOT { Dot }
   | DOTDOT { Dot2 }
   | DOTDOTDOT { Dot3 }
@@ -276,6 +275,8 @@ check_atom :
   | ARROW { Arrow }
 
 %inline relop :
+  | relop_ { $1 $$ at $sloc }
+%inline relop_ :
   | COLON { Colon }
   | SUB { Sub }
   | SUP { Sup }
@@ -361,10 +362,16 @@ nottyp_prim_ :
   | typ_prim { $1.it }
   | atom { AtomT $1 }
   | atomid_lparen nottyp RPAREN
-    { SeqT [AtomT (Atom $1) $ at $loc($1); ParenT $2 $ at $loc($2)] }
-  | TICK LPAREN nottyp RPAREN { BrackT (LParen, $3, RParen) }
-  | TICK LBRACK nottyp RBRACK { BrackT (LBrack, $3, RBrack) }
-  | TICK LBRACE nottyp RBRACE { BrackT (LBrace, $3, RBrace) }
+    { SeqT [
+        AtomT (Atom $1 $$ at $loc($1)) $ at $loc($1);
+        ParenT $2 $ at $loc($2)
+      ] }
+  | TICK LPAREN nottyp RPAREN
+    { BrackT (LParen $$ at $loc($2), $3, RParen $$ at $loc($4)) }
+  | TICK LBRACK nottyp RBRACK
+    { BrackT (LBrack $$ at $loc($2), $3, RBrack $$ at $loc($4)) }
+  | TICK LBRACE nottyp RBRACE
+    { BrackT (LBrace $$ at $loc($2), $3, RBrace $$ at $loc($4)) }
   | LPAREN tup_list(nottyp) RPAREN
     { match $2 with [t], false -> ParenT t | ts, _ -> TupT ts }
 
@@ -410,6 +417,7 @@ casetyp :
   | exp_lit { $1 }
   | PLUS arith_un { UnE (PlusOp, $2) $ at $sloc }
   | MINUS arith_un { UnE (MinusOp, $2) $ at $sloc }
+  | DOLLAR LPAREN exp RPAREN { $3 }
 
 
 (* Expressions *)
@@ -454,9 +462,12 @@ exp_prim_ :
   | LBRACE comma_nl_list(fieldexp) RBRACE { StrE $2 }
   | LPAREN tup_list(exp_bin) RPAREN
     { match $2 with [e], false -> ParenE (e, false) | es, _ -> TupE es }
-  | TICK LPAREN exp RPAREN { BrackE (LParen, $3, RParen) }
-  | TICK LBRACK exp RBRACK { BrackE (LBrack, $3, RBrack) }
-  | TICK LBRACE exp RBRACE { BrackE (LBrace, $3, RBrace) }
+  | TICK LPAREN exp RPAREN
+    { BrackE (LParen $$ at $loc($2), $3, RParen $$ at $loc($4)) }
+  | TICK LBRACK exp RBRACK
+    { BrackE (LBrack $$ at $loc($2), $3, RBrack $$ at $loc($4)) }
+  | TICK LBRACE exp RBRACE
+    { BrackE (LBrace $$ at $loc($2), $3, RBrace $$ at $loc($4)) }
   | DOLLAR LPAREN arith RPAREN { $3.it }
 
 exp_post : exp_post_ { $1 $ at $sloc }
@@ -474,7 +485,10 @@ exp_atom_ :
   | exp_post_ { $1 }
   | atom { AtomE $1 }
   | atomid_lparen exp RPAREN
-    { SeqE [AtomE (Atom $1) $ at $loc($1); ParenE ($2, false) $ at $loc($2)] }
+    { SeqE [
+        AtomE (Atom $1 $$ at $loc($1)) $ at $loc($1);
+        ParenE ($2, false) $ at $loc($2)
+      ] }
 
 exp_seq : exp_seq_ { $1 $ at $sloc }
 exp_seq_ :
@@ -739,7 +753,10 @@ hint :
 script :
   | def* EOF { $1 }
 
-expression :
+typ_eof :
+  | typ EOF { $1 }
+
+exp_eof :
   | exp EOF { $1 }
 
 %%

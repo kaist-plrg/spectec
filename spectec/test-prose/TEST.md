@@ -1390,11 +1390,7 @@ default valty_u0
 4. If (valty_u0 is F64), then:
   a. Return (F64.CONST 0).
 5. If (valty_u0 is V128), then:
-<<<<<<< HEAD
-  a. Return (VVCONST V128 0).
-=======
   a. Return (VVCONST V128 $vzero()).
->>>>>>> main
 6. If (valty_u0 is FUNCREF), then:
   a. Return (REF.NULL FUNCREF).
 7. Assert: Due to validation, (valty_u0 is EXTERNREF).

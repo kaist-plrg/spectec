@@ -63,11 +63,13 @@ let env_hints name map id hints =
   ) hints
 
 let env_typfield env = function
-  | Elem (Atom id, _, hints) -> env_hints "show" env.show_field id hints
+  | Elem ({it = Atom id; _}, _, hints) ->
+    env_hints "show" env.show_field id hints
   | _ -> ()
 
 let env_typcase env = function
-  | Elem (Atom id, _, hints) -> env_hints "show" env.show_case id hints
+  | Elem ({it = Atom id; _}, _, hints) ->
+    env_hints "show" env.show_case id hints
   | _ -> ()
 
 let env_typ env t =
@@ -115,6 +117,12 @@ let env config script : env =
   let env = new_env config in
   List.iter (env_def env) script;
   env
+
+let config env : Config.t =
+  env.config
+
+let env_with_config env config : env =
+  {env with config}
 
 
 (* Helpers *)
@@ -331,8 +339,9 @@ let rec chop_tick id =
 let rec chop_sub_exp e =
   match e.it with
   | VarE (id, []) when ends_sub id.it -> Some (VarE (chop_sub id.it $ id.at, []) $ e.at)
-  | AtomE (Atom "_") -> Some (SeqE [] $ e.at)
-  | AtomE (Atom id) when ends_sub id -> Some (AtomE (Atom (chop_sub id)) $ e.at)
+  | AtomE {it = Atom "_"; _} -> Some (SeqE [] $ e.at)
+  | AtomE {it = Atom id; at; note} when ends_sub id ->
+    Some (AtomE {it = Atom (chop_sub id); at; note} $ e.at)
   | FuseE (e1, e2) ->
     (match chop_sub_exp e2 with
     | Some e2' -> Some (FuseE (e1, e2') $ e.at)
@@ -350,9 +359,9 @@ let id_style = function
   | `Atom -> "\\mathsf"
   | `Token -> "\\mathtt"
 
-let render_id' env style id =
+let render_id' env style id note =
   if env.config.macros_for_ids then
-    "\\" ^ id
+    "\\" ^ id ^ note
   else
     id_style style ^ "{" ^ shrink_id id ^ "}"
 
@@ -374,7 +383,7 @@ let rec render_id_sub env style show at = function
     let s'' =
       if String.for_all is_digit s' then s' else
       render_expand !render_exp_fwd env show
-        (s' $ at) [] (fun () -> render_id' env style s')
+        (s' $ at) [] (fun () -> render_id' env style s' "")
     in
     "{" ^ (if i = n then s'' else s'' ^ String.sub s i (n - i)) ^ "}" ^
     (if ss = [] then "" else "_{" ^ render_id_sub env `Var env.show_var at ss ^ "}")
@@ -390,8 +399,8 @@ let render_gramid env id = render_id env `Token env.show_gram
   (let len = String.length id.it in
   if len > 1 && is_upper id.it.[0] then String.sub id.it 1 (len - 1) $ id.at else id)
 
-let render_atomid env id =
-  render_id' env `Atom (quote_id (lower id))
+let render_atomid env id note =
+  render_id' env `Atom (quote_id (lower id)) note
 
 let render_ruleid env id1 id2 =
   let id1' =
@@ -412,47 +421,56 @@ let render_rule_deco env pre id1 id2 post =
 
 (* Operators *)
 
-let render_atom env = function
-  | Atom id when id.[0] = '_' && id <> "_" -> ""
-  | Atom id -> render_atomid env id
-  | Infinity -> "\\infty"
-  | Bot -> "\\bot"
-  | Top -> "\\top"
-  | Dot -> "."
-  | Dot2 -> ".."
-  | Dot3 -> "\\dots"
-  | Semicolon -> ";"
-  | Backslash -> "\\setminus"
-  | In -> "\\in"
-  | Arrow -> "\\rightarrow"
-  | Arrow2 -> "\\Rightarrow"
-  | Colon -> ":"
-  | Sub -> "\\leq"
-  | Sup -> "\\geq"
-  | Assign -> ":="
-  | Equiv -> "\\equiv"
-  | Approx -> "\\approx"
-  | SqArrow -> "\\hookrightarrow"
-  | SqArrowStar -> "\\hookrightarrow^\\ast"
-  | Prec -> "\\prec"
-  | Succ -> "\\succ"
-  | Tilesturn -> "\\dashv"
-  | Turnstile ->
-    if env.config.macros_for_vdash then
-      "\\vdash" ^ env.current_rel
+let render_atom env atom =
+  let macros = env.config.macros_for_atoms in
+  let tid =
+    if not macros then
+      ""
+    else if !(atom.note) <> "" then
+      !(atom.note)
     else
-      "\\vdash"
-  | Quest -> "{}^?"
-  | Plus -> "{}^+"
-  | Star -> "{}^\\ast"
-  | Comma -> ","
-  | Bar -> "\\mid"
-  | LParen -> "("
-  | RParen -> ")"
-  | LBrack -> "["
-  | RBrack -> "]"
-  | LBrace -> "\\{"
-  | RBrace -> "\\}"
+      error atom.at
+        ("cannot infer type of notation `" ^ El.Print.string_of_atom atom ^ "`")
+  in
+  let s =
+    match atom.it with
+    | Atom id when id.[0] = '_' && id <> "_" -> ""
+    | Atom id -> render_atomid env id tid
+    | Infinity -> "\\infty"
+    | Bot -> "\\bot"
+    | Top -> "\\top"
+    | Dot -> if macros then "\\dot" else "."
+    | Dot2 -> if macros then "\\dotdot" else ".."
+    | Dot3 -> "\\dots"
+    | Semicolon -> if macros then "\\semicolon" else ";"
+    | Backslash -> "\\setminus"
+    | In -> "\\in"
+    | Arrow -> "\\rightarrow"
+    | Arrow2 -> "\\Rightarrow"
+    | Colon -> if macros then "\\colon" else ":"
+    | Sub -> "\\leq"
+    | Sup -> "\\geq"
+    | Assign -> if macros then "\\assign" else ":="
+    | Equiv -> "\\equiv"
+    | Approx -> "\\approx"
+    | SqArrow -> "\\hookrightarrow"
+    | SqArrowStar -> "\\hookrightarrow^\\ast"
+    | Prec -> "\\prec"
+    | Succ -> "\\succ"
+    | Tilesturn -> "\\dashv"
+    | Turnstile -> "\\vdash"
+    | Quest -> if macros then "\\quest" else "{}^?"
+    | Plus -> if macros then "\\plus" else "{}^+"
+    | Star -> if macros then "\\ast" else "{}^\\ast"
+    | Comma -> if macros then "\\comma" else ","
+    | Bar -> "\\mid"
+    | LParen -> if macros then "\\lparen" else "("
+    | RParen -> if macros then "\\rparen" else ")"
+    | LBrack -> if macros then "\\lbrack" else "["
+    | RBrack -> if macros then "\\rbrack" else "]"
+    | LBrace -> if macros then "\\lbrace" else "\\{"
+    | RBrace -> if macros then "\\rbrace" else "\\}"
+  in s ^ tid
 
 let render_unop = function
   | NotOp -> "\\neg"
@@ -498,6 +516,10 @@ let rec render_iter env = function
 (* Types *)
 
 and render_typ env t =
+  (*
+  Printf.eprintf "[render_typ %s] %s\n%!"
+    (string_of_region t.at) (El.Print.string_of_typ t);
+  *)
   match t.it with
   | StrT tfs ->
     "\\{\\; " ^
@@ -533,13 +555,13 @@ and render_typenum env (e, eo) =
 
 and render_exp env e =
   (*
-  Printf.printf "[render %s] %s\n%!"
+  Printf.eprintf "[render_exp %s] %s\n%!"
     (string_of_region e.at) (El.Print.string_of_exp e);
   *)
   match e.it with
   | VarE (id, args) ->
     render_apply render_varid render_exp env env.show_syn id args
-  | BoolE b -> render_atom env (Atom (string_of_bool b))
+  | BoolE b -> render_atom env (Atom (string_of_bool b) $$ e.at % ref "bool")
   | NatE (DecOp, n) -> string_of_int n
   | NatE (HexOp, n) ->
     let fmt : (_, _, _) format =
@@ -569,10 +591,10 @@ and render_exp env e =
     let args = List.map arg_of_exp es in
     render_expand render_exp env env.show_case (El.Print.string_of_atom atom $ at) args
       (fun () ->
-        match atom, es with
+        match atom.it, es with
         | Atom id, e1::es2 when ends_sub id ->
           (* Handle subscripting *)
-          "{" ^ render_atomid env (chop_sub id) ^
+          "{" ^ render_atomid env (chop_sub id) !(atom.note) ^
           "}_{" ^ render_exps "," env (as_tup_exp e1) ^ "}" ^
           (if es2 = [] then "" else "\\," ^ render_exps "~" env es2)
         | _ ->
@@ -861,8 +883,8 @@ let rec render_sep_defs ?(sep = " \\\\\n") ?(br = " \\\\[0.8ex]\n") f = function
 
 let rec classify_rel e : rel_sort option =
   match e.it with
-  | InfixE (_, Turnstile, _) -> Some TypingRel
-  | InfixE (_, (SqArrow | SqArrowStar | Approx), _) -> Some ReductionRel
+  | InfixE (_, {it = Turnstile; _}, _) -> Some TypingRel
+  | InfixE (_, {it = SqArrow | SqArrowStar | Approx; _}, _) -> Some ReductionRel
   | InfixE (e1, _, e2) ->
     (match classify_rel e1 with
     | None -> classify_rel e2
@@ -874,16 +896,17 @@ let rec classify_rel e : rel_sort option =
 let rec render_defs env = function
   | [] -> ""
   | d::ds' as ds ->
+    let sp = if env.config.display then "" else "@{~}" in
     match d.it with
     | SynD _ ->
       let ds' = merge_syndefs ds in
       let deco = if env.deco_syn then "l" else "l@{}" in
-      "\\begin{array}{@{}" ^ deco ^ "rrl@{}l@{}}\n" ^
+      "\\begin{array}{@{}" ^ deco ^ "r" ^ sp ^ "r" ^ sp ^ "l@{}l@{}}\n" ^
         render_sep_defs (render_syndef env) ds' ^
       "\\end{array}"
     | GramD _ ->
       let ds' = merge_gramdefs ds in
-      "\\begin{array}{@{}l@{}rrlll@{}l@{}}\n" ^
+      "\\begin{array}{@{}l@{}r" ^ sp ^ "r" ^ sp ^ "lll@{}l@{}}\n" ^
         render_sep_defs (render_gramdef env) ds' ^
       "\\end{array}"
     | RelD (id, t, _hints) ->
@@ -899,13 +922,13 @@ let rec render_defs env = function
             (render_ruledef env) ds ^
         "\\end{array}"
       | Some ReductionRel ->
-        "\\begin{array}{@{}l@{}lcl@{}l@{}}\n" ^
+        "\\begin{array}{@{}l@{}l" ^ sp ^ "c" ^ sp ^ "l@{}l@{}}\n" ^
           render_sep_defs (render_reddef env) ds ^
         "\\end{array}"
       | None -> error d.at "unrecognized form of relation"
       )
     | DefD _ ->
-      "\\begin{array}{@{}lcl@{}l@{}}\n" ^
+      "\\begin{array}{@{}l" ^ sp ^ "c" ^ sp ^ "l@{}l@{}}\n" ^
         render_sep_defs (render_funcdef env) ds ^
       "\\end{array}"
     | SepD ->
