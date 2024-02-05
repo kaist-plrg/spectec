@@ -43,7 +43,7 @@ function run {
   if [[ $res = 0 ]]; then
     printf " - $1: ${GREEN}Success${NC}  \n"
   else
-    printf " - $1: ${RED}Fail${NC}  \n"
+    printf " - $1: ${RED}Fail${NC}     \n"
   fi
 
   backup $1 $3
@@ -59,7 +59,8 @@ make && (
   fi
   for (( i=0; ; i++ ))
   do  
-    if [ ! -f "out/$i.wast" ]; then
+    filename="out/$i.wast"
+    if [ ! -f $filename ]; then
       # Gen test
       printf "${ORANGE}Generating $i.wast..${NC}\r"
       ./watsup spec/wasm-2.0/*.watsup --test --test-seed $i
@@ -67,8 +68,9 @@ make && (
     printf "${CYAN}[$i.wast]           ${NC}\n"
 
     # Run
-    run "reference interpreter" "../interpreter/wasm" "out/$i.wast"
-    run "wasmer" "wasmer wast" "out/$i.wast"
+    run "reference interpreter" "../interpreter/wasm" $filename
+    run "wasmer" "wasmer wast" $filename
+    run "wasmtime" "wasmtime wast" $filename
 
     printf "\n"
   done
