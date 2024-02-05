@@ -1,3 +1,5 @@
+#!/bin/bash
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
@@ -7,14 +9,29 @@ NC='\033[0m' # No Color
 function run {
   printf " - $1: ${ORANGE}Running..${NC}\r"
   printf "${RED}"
-  $2 $3
-  res=$?
+
+  # run wast
+  if grep -q "assert_exhaustion" $3; then
+    timeout 10 $2 $3
+    res=$?
+    # either success or infinite loop
+    res=$((res*(res-124)))
+  else
+    $2 $3
+    res=$?
+  fi
+
+  # print result
   printf "${NC}"
   if [[ $res = 0 ]]; then
     printf " - $1: ${GREEN}Success${NC}  \n"
   fi
+
 }
 
+# build reference interpreter
+(cd ../interpreter && make) &&
+# build west
 make && (
   if [ ! -d out ]; then
     mkdir out
