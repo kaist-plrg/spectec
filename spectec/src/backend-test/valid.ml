@@ -277,7 +277,7 @@ let validate_instr case args const (rt1, rt2) =
       let i = choose [32; 64] in
       let arg1 = make_fshape i in
       let arg2 = make_ishape 32 in
-      let half = if i = 32 then None else Some (nullary "LOW") in
+      let half = choose [None; Some (nullary "LOW")] in
       let ext = choose [nullary "S"; nullary "U"] in
       Some ([arg1; nullary "CONVERT"; optV half; arg2; optV (Some ext); none "ZERO"])
     | "DEMOTE" ->

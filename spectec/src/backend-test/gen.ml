@@ -471,7 +471,7 @@ and gen_typ c typ =
     let import name kind t =
       Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; caseV (kind, [t])])
     in
-    let const = some "MUT" in
+    let const = none "MUT" in
     listV_of_list [
       (* import "print" "FUNC" zero; *)
       import "global_i32" "GLOBAL" (TupV [const; nullary "I32"]);
@@ -559,7 +559,7 @@ and fix_rts case const_required rt1 rt2 entangles =
       List.map subst rt1, List.map subst rt2, [ 0, numV_of_int lid ]
 
   else if List.mem case [ "GLOBAL.GET"; "GLOBAL.SET" ] then (*TODO: Perhaps automate this? *)
-    let no_mut = none "MUT" in
+    let no_mut = caseV ("MUT", [OptV None]) in
     let gs =
       List.map (function
         | CaseV ("GLOBAL", [ TupV [ m; t ]; _ ]) -> m <> no_mut, t
@@ -723,7 +723,7 @@ let mk_assertion funcinst =
   try
     let returns = Interpreter.invoke [ addr; listV_of_list args ] in
     invoke, Ok (unwrap_listv_to_list returns)
-  with Exception.Trap as e -> invoke, Error e
+  with e -> invoke, Error e
 
 let print_assertion ((f, args), result) =
   print_endline (match result with
@@ -739,6 +739,7 @@ let print_assertion ((f, args), result) =
     (Printexc.to_string e))
 
 let get_instant_result m : instant_result =
+  try
     let externvals = listV_of_list (
       (* List.init 1 (fun i -> Al.Ast.CaseV ("FUNC", [numV_of_int i])) *)
       List.init 4 (fun i -> Al.Ast.CaseV ("GLOBAL", [numV_of_int i]))
@@ -753,6 +754,7 @@ let get_instant_result m : instant_result =
       |> List.filter (fun inst -> inst |> strv_access "VALUE" |> casev_of_case = "FUNC")
     in
     Ok (List.map mk_assertion exported_funcs)
+  with e -> Error e
 let inject m =
   get_instant_result m
 
