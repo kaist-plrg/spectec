@@ -6,28 +6,47 @@ ORANGE='\033[0;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+function transform {
+  # TODO: check bug
+  if [ $1 = "wasmer" ]; then
+    cp $2 "$2-tmp"
+    # sed -i '' 's/extern/func/g' $2
+  fi
+}
+
+function backup {
+  if [ $1 = "wasmer" ]; then
+    mv "$2-tmp" $2
+  fi
+}
+
 function run {
   printf " - $1: ${ORANGE}Running..${NC}\r"
   printf "${RED}"
 
+  # transform wast
+  transform $1 $3
+
   # run wast
   if grep -q "assert_exhaustion" $3; then
-    timeout 10 $2 $3
+    timeout 10 $2 $3 &> /dev/null
     res=$?
     # either success or infinite loop
     res=$((res*(res-124)))
   else
-    $2 $3
+    $2 $3 &> /dev/null
     res=$?
   fi
 
   # print result
   printf "${NC}"
   if [[ $res = 0 ]]; then
-    printf " - $1: ${GREEN}Success${NC}  \n\n"
+    printf " - $1: ${GREEN}Success${NC}  \n"
   else
-    printf " - $1: ${RED}Fail${NC}  \n\n"
+    printf " - $1: ${RED}Fail${NC}  \n"
   fi
+
+  backup $1 $3
 
 }
 
@@ -48,7 +67,10 @@ make && (
     printf "${CYAN}[$i.wast]           ${NC}\n"
 
     # Run
-    run "Reference Interpreter" "../interpreter/wasm" "out/$i.wast"
+    run "reference interpreter" "../interpreter/wasm" "out/$i.wast"
+    run "wasmer" "wasmer wast" "out/$i.wast"
+
+    printf "\n"
   done
 
 )
