@@ -17,6 +17,10 @@ while getopts "ow:v" option; do
 done
 shift $[ $OPTIND - 1 ]
 TEST_PATH=$1
+if [ $# -ne 1 ] ; then
+    echo "Error: 1 argument expected, got $#"
+    exit 0
+fi
 
 JSON_PATH=./temp/test
 OUTPUT_PATH=./temp/output
@@ -28,9 +32,9 @@ J=0
 
 run_test() {
    let I=I+1
-   echo "==== $I.$FILE ====="
    filename=${FILE/%.wast/}
-   ./wast2json $TEST_PATH/$FILE -o $JSON_PATH/$filename.json
+   echo "==== $I.$FILE ====="
+   wast2json $TEST_PATH/$FILE -o $JSON_PATH/$filename.json
 
    # print in file
    ./run-spec-test.py $JSON_PATH/$filename.json >$OUTPUT_PATH/$filename.txt
@@ -42,13 +46,13 @@ run_test() {
 }
 
 if [[ "$TEST_PATH" =~ ".wast" ]]; then
-   FILE=$TEST_PATH
+   FILE=${TEST_PATH##*/}
+   TEST_PATH=${TEST_PATH%/*.wast}
    run_test
 else
    if [[ $w == false ]]; then
       for FILE in `ls $TEST_PATH`
       do
-         echo "$FILE"
          if [[ "$FILE" =~ ".wast" ]]; then
             run_test
          fi
@@ -61,7 +65,7 @@ else
          fi
       done
    fi
-   echo "$J/$I tests failed."
+   echo "$(($I-$J))/$I tests passed."
 fi
 
 
