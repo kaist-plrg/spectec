@@ -49,12 +49,13 @@ void PrintWasmEdgeValue (WasmEdge_Value value) {
             else
                 fprintf(stderr, "(EXTERNREF %p)", WasmEdge_ValueGetExternRef(value));
             break;
-        case WasmEdge_ValType_V128:
+        case WasmEdge_ValType_V128: {
             int128_t v128 = WasmEdge_ValueGetV128(value);
             uint64_t low = (uint64_t)v128;
             uint64_t high = (uint64_t)(v128 >> 64);
             fprintf(stderr, "(V128.CONST 0x%lx 0x%lx)", low, high);
             break;
+        }
         default:
             break;
     }

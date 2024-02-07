@@ -8,6 +8,7 @@ import subprocess
 
 from os import listdir
 from os.path import isdir, isfile, join, basename, splitext, abspath, dirname
+from pathlib import Path
 from shutil import copyfile
 
 from functools import reduce
@@ -176,6 +177,15 @@ def get_wast_files (path: str) -> list[str]:
 
     return []
 
+def pad_zeros (path: str) -> str:
+    pathObj = Path(path)
+
+    try:
+        newFileName = int(pathObj.stem)
+        return f'{str(pathObj.parent)}/{newFileName:09}.wast'
+    except ValueError:
+        return path
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Test WasmEdge with .wast files"
@@ -197,7 +207,7 @@ if __name__ == '__main__':
     correct = 0
     total = 0
 
-    wast_files.sort()
+    wast_files.sort(key=pad_zeros)
 
     incorrect_files = []
 
@@ -216,4 +226,3 @@ if __name__ == '__main__':
         print(f'Total [{correct}/{total}] ({correct/total*100:.2f}%)')
     except ZeroDivisionError:
         print(f'Total [{correct}/{total}] (nan%)')
-

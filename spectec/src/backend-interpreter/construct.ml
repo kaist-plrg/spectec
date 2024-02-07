@@ -1265,14 +1265,14 @@ let al_of_vtestop = function
 let al_of_int_vrelop : V128Op.irelop -> value = function
   | V128Op.Eq -> CaseV ("_VI", [ nullary "EQ" ])
   | V128Op.Ne -> CaseV ("_VI", [ nullary "NE" ])
-  | V128Op.LtS -> CaseV ("_VI", [ nullary "LTS" ])
-  | V128Op.LtU -> CaseV ("_VI", [ nullary "LTU" ])
-  | V128Op.LeS -> CaseV ("_VI", [ nullary "LES" ])
-  | V128Op.LeU -> CaseV ("_VI", [ nullary "LEU" ])
-  | V128Op.GtS -> CaseV ("_VI", [ nullary "GTS" ])
-  | V128Op.GtU -> CaseV ("_VI", [ nullary "GTU" ])
-  | V128Op.GeS -> CaseV ("_VI", [ nullary "GES" ])
-  | V128Op.GeU -> CaseV ("_VI", [ nullary "GEU" ])
+  | V128Op.LtS -> CaseV ("_VI", [ CaseV ("LT", [ nullary "S" ]) ])
+  | V128Op.LtU -> CaseV ("_VI", [ CaseV ("LT", [ nullary "U" ]) ])
+  | V128Op.LeS -> CaseV ("_VI", [ CaseV ("LE", [ nullary "S" ]) ])
+  | V128Op.LeU -> CaseV ("_VI", [ CaseV ("LE", [ nullary "U" ]) ])
+  | V128Op.GtS -> CaseV ("_VI", [ CaseV ("GT", [ nullary "S" ]) ])
+  | V128Op.GtU -> CaseV ("_VI", [ CaseV ("GT", [ nullary "U" ]) ])
+  | V128Op.GeS -> CaseV ("_VI", [ CaseV ("GE", [ nullary "S" ]) ])
+  | V128Op.GeU -> CaseV ("_VI", [ CaseV ("GE", [ nullary "U" ]) ])
 
 let al_of_float_vrelop : V128Op.frelop -> value = function
   | V128Op.Eq -> CaseV ("_VF", [ nullary "EQ" ])
