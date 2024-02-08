@@ -1,2 +1,2 @@
 tester: tester.c
-	gcc -o tester -lwasmedge tester.c
+	gcc -o tester tester.c -lwasmedge
