@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import sys
@@ -14,28 +14,30 @@ from shutil import copyfile
 from functools import reduce
 from tempfile import TemporaryDirectory
 
-def parse_arg (arg: dict) -> list:
+from typing import Tuple, List
+
+def parse_arg (arg: dict) -> List[str]:
     if arg['type'] == 'v128':
         v128 = reduce(lambda a, x: (a << (128 // len(arg['value']))) + int(x), reversed(arg['value']), 0)
         return ['v128', str(v128 & 0xFFFF_FFFF_FFFF_FFFF), str(v128 >> 64)]
 
     return [arg['type'], arg['value']]
 
-def parse_expected (expected: dict) -> list:
+def parse_expected (expected: dict) -> List[str]:
     if expected['type'] == 'v128':
         return ['v128', f'{len(expected["value"])}!' +\
                  '!'.join(sum(([expected['lane_type'], value] for value in expected['value']), []))]
 
     return [expected['type'], expected['value']]
 
-def parse_expected_list (expected_list: list) -> str:
+def parse_expected_list (expected_list: List[str]) -> str:
     return ','.join(sum((parse_expected(expected) for expected in expected_list), []))
 
 def encode_invoke (action: dict, ty: str, moduleName: str) -> str:
     args = ','.join(sum((parse_arg(arg) for arg in action['args']), []))
     return ','.join((ty, moduleName, action['field'], args))
 
-def test_wast (path: str) -> tuple[int, int]:
+def test_wast (path: str) -> Tuple[int, int]:
     if (basename(path) in ["imports.wast", "names.wast"]):
         """ Not supported """
         return 0, 0
@@ -168,7 +170,7 @@ def test_wast (path: str) -> tuple[int, int]:
 
     return correct, total
 
-def get_wast_files (path: str) -> list[str]:
+def get_wast_files (path: str) -> List[str]:
     if isfile(path) and path.endswith(".wast"):
         return [path]
 

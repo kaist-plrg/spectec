@@ -58,7 +58,7 @@ make && (
     mkdir out
   fi
   for (( i=0; ; i++ ))
-  do  
+  do
     filename="out/$i.wast"
     if [ ! -f $filename ]; then
       # Gen test
@@ -71,6 +71,7 @@ make && (
     run "reference interpreter" "../interpreter/wasm" $filename
     run "wasmer" "wasmer wast" $filename
     run "wasmtime" "wasmtime wast" $filename
+    run "wasmedge" "./runtimes/wasmedge/wasmedge" $filename
 
     printf "\n"
   done
