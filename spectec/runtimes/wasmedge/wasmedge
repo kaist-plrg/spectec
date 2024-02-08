@@ -49,7 +49,6 @@ def test_wast (path: str) -> Tuple[int, int]:
 
     dst_path = join(temp_dir_path, basename(path))
     copyfile(path, dst_path)
-    copyfile(join(current_directory, "spectest.wasm"), join(temp_dir_path, "spectest.wasm"))
 
     subprocess.run (["wast2json", dst_path], cwd=temp_dir_path)
 

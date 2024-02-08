@@ -326,8 +326,6 @@ int main(int argc, char** argv) {
     WasmEdge_ConfigureContext *ConfCxt = WasmEdge_ConfigureCreate();
     WasmEdge_VMContext *VMCtx = WasmEdge_VMCreate(ConfCxt, NULL);
 
-    WasmEdge_VMRegisterModuleFromFile(VMCtx, WasmEdge_StringCreateByCString("spectest"), "./spectest.wasm");
-
     FILE *fptr = fopen(argv[1], "r");
 
     char buffer[1024];

@@ -840,13 +840,43 @@ let invoke_to_wast ((f, args), result) =
 
 let to_wast m result =
   let open Reference_interpreter2.Script in
+
+  let global ty value =
+    caseV ("GLOBAL", [ TupV ([ CaseV ("MUT", [ OptV None ]); nullary ty]);
+      listV_of_list [CaseV ("CONST", [ nullary ty; value])]])
+  in
+
+  let export name var =
+    caseV ("EXPORT", [ TextV name; CaseV ("GLOBAL", [ Construct2.al_of_int32 var ])])
+  in
+
+  let m_spectest = ("MODULE", [
+    empty_list; empty_list; empty_list;
+    listV_of_list [
+      global "I32" (Construct2.al_of_int32 666l);
+      global "I64" (Construct2.al_of_int64 666L);
+      global "F32" (0x4426a666l |> Construct2.al_of_int32);
+      global "F64" (0x4084d4cccccccccdL |> Construct2.al_of_int64);
+    ];
+    empty_list; empty_list; empty_list; empty_list; OptV None;
+    listV_of_list [
+      export "global_i32" 0l;
+      export "global_i64" 1l;
+      export "global_f32" 2l;
+      export "global_f64" 3l;
+    ];
+  ]) |> caseV |> Construct2.al_to_module in
+
   let m_r = Construct2.al_to_module m in
 
+  let spectest = Textual m_spectest |> to_phrase in
   let def = Textual m_r |> to_phrase in
   let script =
     match result with
     | Ok assertions ->
-      (Module (None, def) |> to_phrase)
+      (Module (Some ("$spectest" |> to_phrase), spectest) |> to_phrase)
+      :: (Register ("spectest" |> Utf8.decode, Some ("$spectest" |> to_phrase)) |> to_phrase)
+      :: (Module (None, def) |> to_phrase)
       :: List.filter_map invoke_to_wast assertions
     | Error Exception.Trap ->
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
