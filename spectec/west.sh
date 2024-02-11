@@ -50,6 +50,19 @@ function run {
 
 }
 
+function run_all {
+  if [ -f "out/$1.wast" ]; then
+    printf "${CYAN}[$1.wast]           ${NC}\n"
+
+    run "reference interpreter" "../interpreter/wasm" "out/$1.wast"
+    run "wasmer" "wasmer wast" "out/$1.wast"
+    run "wasmtime" "wasmtime wast" "out/$1.wast"
+    run "wasmedge" "./runtimes/wasmedge/wasmedge" "out/$1.wast"
+
+    printf "\n"
+  fi
+}
+
 # build reference interpreter
 (cd ../interpreter && make) &&
 # build west
@@ -59,22 +72,17 @@ make && (
   fi
   for (( i=0; ; i++ ))
   do
-    filename="out/$i.wast"
-    if [ ! -f $filename ]; then
+    if [ ! -f "out/$i.wast" ] || [ ! -f "out/$i-e.wast" ] || [ ! -f "out/$i-r.wast" ]
+    then
       # Gen test
       printf "${ORANGE}Generating $i.wast..${NC}\r"
       ./watsup spec/wasm-2.0/*.watsup --test --test-seed $i
     fi
-    printf "${CYAN}[$i.wast]           ${NC}\n"
 
     # Run
-    run "reference interpreter" "../interpreter/wasm" $filename
-    run "wasmer" "wasmer wast" $filename
-    run "wasmtime" "wasmtime wast" $filename
-    run "wasmedge" "./runtimes/wasmedge/wasmedge" $filename
-
-    printf "\n"
+    run_all "$i"
+    run_all "$i-e"
+    run_all "$i-r"
   done
 
 )
-

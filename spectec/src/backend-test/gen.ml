@@ -828,15 +828,13 @@ let invoke_to_wast ((f, args), result) =
   let f' = Reference_interpreter.Utf8.decode f in
   let args' = List.map (Construct2.al_to_value %> to_phrase) args in
   let action = Invoke (None, f', args') |> to_phrase in
-  (match result with
+  match result with
   | Ok returns -> Some (AssertReturn (action, List.map value_to_wast returns))
   | Error Exception.Exhaustion -> Some (AssertExhaustion (action, ""))
   | Error Exception.Trap -> Some (AssertTrap (action, ""))
   | _ ->
     Printf.sprintf "Unexpected error in invoking %s" f |> prerr_endline;
     None
-
-  ) |> Option.map (fun a -> Assertion (to_phrase a) |> to_phrase)
 
 let to_wast m result =
   let open Reference_interpreter2.Script in
@@ -873,11 +871,10 @@ let to_wast m result =
   let def = Textual m_r |> to_phrase in
   let script =
     match result with
-    | Ok assertions ->
-      (Module (Some ("$spectest" |> to_phrase), spectest) |> to_phrase)
-      :: (Register ("spectest" |> Utf8.decode, Some ("$spectest" |> to_phrase)) |> to_phrase)
-      :: (Module (None, def) |> to_phrase)
-      :: List.filter_map invoke_to_wast assertions
+    | Ok _ -> [
+      (Module (Some (to_phrase "$spectest"), spectest) |> to_phrase);
+      (Register (Utf8.decode "spectest", Some (to_phrase "$spectest")) |> to_phrase);
+      (Module (None, def) |> to_phrase)]
     | Error Exception.Trap ->
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
     | Error Exception.Exhaustion -> []
@@ -886,11 +883,32 @@ let to_wast m result =
       []
   in
 
-  let file = Filename.concat !Flag.out (string_of_int !seed ^ ".wast") in
-  let oc = open_out file in
-  (* Print.module_ oc 80 m_r; *)
-  Reference_interpreter2.Print.script oc 80 `Textual script;
-  close_out oc
+  let is_exhaustion = function
+    | AssertExhaustion (_, _) -> true
+    | _ -> false
+  in
+
+  let to_file name script =
+    let file = Filename.concat !Flag.out (name ^ ".wast") in
+    let oc = open_out file in
+    Reference_interpreter2.Print.script oc 80 `Textual script;
+    close_out oc
+  in
+
+  match result with
+  | Ok assertions ->
+    let assertions = List.filter_map invoke_to_wast assertions in
+
+    if List.exists is_exhaustion assertions then
+      let assertions_returns = List.filter (is_exhaustion %> not) assertions in
+      let assertions_exhaustion = List.filter is_exhaustion assertions in
+
+      to_file (string_of_int !seed ^ "-r") (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
+      to_file (string_of_int !seed ^ "-e") (script  @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_exhaustion)
+    else
+      to_file (string_of_int !seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
+  | Error _ ->
+      to_file (string_of_int !seed) script
   (*
   try
     Reference_interpreter.Valid.check_module m_r;
