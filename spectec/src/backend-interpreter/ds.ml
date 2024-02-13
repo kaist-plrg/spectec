@@ -45,6 +45,7 @@ let lookup_algo name =
 
 let _store : store ref = ref Record.empty
 let get_store () = !_store
+let set_store store = _store := store
 
 
 (* Environment *)

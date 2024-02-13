@@ -720,10 +720,14 @@ let mk_assertion funcinst =
   in
   let invoke = name, args in
 
+  let store = Ds.get_store () in
   try
     let returns = Interpreter.invoke [ addr; listV_of_list args ] in
     invoke, Ok (unwrap_listv_to_list returns)
-  with e -> invoke, Error e
+  with e ->
+    if e = Exception.Exhaustion then
+      Ds.set_store store;
+    invoke, Error e
 
 let print_assertion ((f, args), result) =
   print_endline (match result with
@@ -901,10 +905,18 @@ let to_wast m result =
 
     if List.exists is_exhaustion assertions then
       let assertions_returns = List.filter (is_exhaustion %> not) assertions in
-      let assertions_exhaustion = List.filter is_exhaustion assertions in
 
       to_file (string_of_int !seed ^ "-r") (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
-      to_file (string_of_int !seed ^ "-e") (script  @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_exhaustion)
+
+      let _ = List.fold_left (fun (i, s) a ->
+        if is_exhaustion a then
+          let () = to_file (string_of_int !seed ^ "-e" ^ string_of_int i) (script @ [Assertion (to_phrase a) |> to_phrase]) in
+          (i + 1, s)
+        else
+          (i, s @ [Assertion (to_phrase a) |> to_phrase])
+      ) (0, script) assertions in
+
+      ()
     else
       to_file (string_of_int !seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
   | Error _ ->
