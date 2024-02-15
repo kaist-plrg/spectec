@@ -469,7 +469,7 @@ and gen_typ c typ =
   (* HARDCODE: imported builtins *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
     let import name kind t =
-      Al.Ast.CaseV ("IMPORT", [ TextV "spectest"; TextV name; caseV (kind, [t])])
+      Al.Ast.CaseV ("IMPORT", [ TextV "spectest_values"; TextV name; caseV (kind, [t])])
     in
     let const = none "MUT" in
     listV_of_list [
@@ -876,12 +876,13 @@ let to_wast m result =
   let script =
     match result with
     | Ok _ -> [
-      (Module (Some (to_phrase "$spectest"), spectest) |> to_phrase);
-      (Register (Utf8.decode "spectest", Some (to_phrase "$spectest")) |> to_phrase);
+      (Module (Some (to_phrase "$spectest_values"), spectest) |> to_phrase);
+      (Register (Utf8.decode "spectest_values", Some (to_phrase "$spectest_values")) |> to_phrase);
       (Module (None, def) |> to_phrase)]
     | Error Exception.Trap ->
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
-    | Error Exception.Exhaustion -> []
+    | Error Exception.Exhaustion ->
+      [ Module (None, def) |> to_phrase ]
     | _ ->
       Printf.sprintf "Unexpected error in instantiating module" |> prerr_endline;
       []
@@ -919,6 +920,8 @@ let to_wast m result =
       ()
     else
       to_file (string_of_int !seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
+  | Error Exception.Exhaustion ->
+      to_file (string_of_int !seed ^ "-e") script
   | Error _ ->
       to_file (string_of_int !seed) script
   (*

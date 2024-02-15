@@ -100,7 +100,7 @@ syntax vectype hint(desc "vector type") =
   | V128
 
 syntax reftype hint(desc "reference type") =
-  | FUNCREF | EXTERNREF
+  | FUNCREF
 
 syntax valtype hint(desc "value type") =
   | numtype | vectype | reftype | BOT

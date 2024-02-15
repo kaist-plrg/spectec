@@ -24,7 +24,7 @@ let patch_types types =
 
 (* import *)
 let patch_imports _imports =
-  let mk_import name kind t = caseV ("IMPORT", [ TextV "spectest"; TextV name; caseV (kind, [t])]) in
+  let mk_import name kind t = caseV ("IMPORT", [ TextV "spectest_values"; TextV name; caseV (kind, [t])]) in
   listV [|
     (* mk_import "print" "FUNC" zero; *)
     mk_import "global_i32" "GLOBAL" (TupV [none "MUT"; nullary "I32"]);

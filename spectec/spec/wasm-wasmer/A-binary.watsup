@@ -91,7 +91,6 @@ grammar Bvectype : vectype =
 
 grammar Breftype : reftype =
   | 0x70 => FUNCREF
-  | 0x6F => EXTERNREF
 
 grammar Bvaltype : valtype =
   | nt:Bnumtype => nt
