@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import glob
+import shutil
+import subprocess
+
+from tempfile import TemporaryDirectory
+
+from typing import List, Tuple
+
+TIMEOUT = 10
+
+# Supported engines and how to run them
+supported_engines: List[Tuple[str, str]] = [
+    ("wasmer", "wasmer wast"),
+    ("wasmtime", "wasmtime wast"),
+    ("wasmedge", "./runtimes/wasmedge/wasmedge"),
+]
+
+def run (cmd: str, wast: str, is_exhaustion: bool) -> bool:
+    try:
+        ps = subprocess.run ([cmd, wast], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=TIMEOUT)
+        return ps.returncode == 0
+    except TimeoutError:
+        return is_exhaustion
+    except FileNotFoundError:
+        return True
+
+def test_engine_seed (engine: str, cmd: str, seed: int) -> None:
+    temp_dir = TemporaryDirectory(prefix=f"west-{engine}-")
+    temp_dir_path = temp_dir.name
+
+    subprocess.run (["./watsup", *sorted(glob.glob(f"spec/wasm-{engine}/*.watsup")), "--test", "--test-seed", f"{seed}", "--test:out", temp_dir_path])
+
+    files = os.listdir(temp_dir_path)
+
+    for file in files:
+        if not run (cmd, os.path.join(temp_dir_path, file), 'e' in file):
+            shutil.move(os.path.join(temp_dir_path, file), "out")
+
+    temp_dir.cleanup()
+
+if __name__ == '__main__':
+    seed = 0
+
+    while True:
+        print(f'\rTesting Seed: {seed}', end='')
+
+        for engine, cmd in supported_engines:
+            test_engine_seed (engine, cmd, seed)
+
+        seed += 1
