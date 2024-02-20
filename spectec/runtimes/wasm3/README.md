@@ -9,7 +9,7 @@ Make sure executable ``wast2json`` file is built. If its name is different, chan
 Add the directory ``bin`` (or anywhere with executable ``wast2json`` file inside) to the environment variable $PATH.
 
 ### wasm3
-Download [executable wasm3](https://github.com/wasm3/wasm3/releases/tag/v0.5.0) according to the architecture.  
+Clone and build [Wasm3](https://github.com/wasm3/wasm3), referring to [Wasm3 development notes](https://github.com/wasm3/wasm3/blob/main/docs/Development.md).
 Change the file name to ``wasm3`` and locate it into this directory.
 
 ## Running

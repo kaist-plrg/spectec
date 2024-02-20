@@ -64,9 +64,16 @@ RUN curl https://wasmtime.dev/install.sh -sSf | bash
 
 # Install wasm3
 
+WORKDIR /home
+RUN git clone https://github.com/wasm3/wasm3.git
+RUN mkdir -p /home/wasm3/build
+WORKDIR /home/wasm3/build
+RUN cmake ..
+RUN make -j8
+RUN cp /home/wasm3/build/wasm3 /home/spectec/spectec/runtimes/wasm3
 WORKDIR /home/spectec/spectec/runtimes/wasm3
-RUN wget https://github.com/wasm3/wasm3/releases/download/v0.5.0/wasm3-linux-x64.elf
-RUN mv wasm3-linux-x64.elf wasm3
+# RUN wget https://github.com/wasm3/wasm3/releases/download/v0.5.0/wasm3-linux-x64.elf
+# RUN mv wasm3-linux-x64.elf wasm3
 RUN chmod +x wasm3
 # TODO
 
