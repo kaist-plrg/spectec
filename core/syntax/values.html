@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Values &#8212; WebAssembly 3.0 (Draft 2024-02-21)</title>
+    <title>Values &#8212; WebAssembly 3.0 (Draft 2024-02-23)</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
     <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
@@ -94,44 +94,40 @@ Moreover, in the definition of programs, immutable sequences of values occur to 
 <p>The simplest form of value are raw uninterpreted <em>bytes</em>.
 In the abstract syntax they are represented as hexadecimal literals.</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}\begin{array}{llll}
-\def\mathdef2922#1{{}}\mathdef2922{byte} &amp; \href{../syntax/values.html#syntax-byte}{\mathit{byte}} &amp;::=&amp;
-  \def\mathdef2961#1{\mathtt{0x#1}}\mathdef2961{00} ~|~ \dots ~|~ \def\mathdef2962#1{\mathtt{0x#1}}\mathdef2962{FF} \\
+\[\begin{split}\begin{array}{&#64;{}l&#64;{}rrl&#64;{}l&#64;{}}
+&amp; {\mathit{byte}} &amp;::=&amp; \mathtt{0x00} ~|~ \dots ~|~ \mathtt{0xFF} \\
 \end{array}\end{split}\]</div>
 <section id="conventions">
 <h3>Conventions<a class="headerlink" href="#conventions" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>The meta variable <span class="math notranslate nohighlight">\(b\)</span> ranges over bytes.</p></li>
-<li><p>Bytes are sometimes interpreted as natural numbers <span class="math notranslate nohighlight">\(n &lt; 256\)</span>.</p></li>
+<li><p>The meta variable <span class="math notranslate nohighlight">\({\mathit{b}}\)</span> ranges over bytes.</p></li>
+<li><p>Bytes are sometimes interpreted as natural numbers <span class="math notranslate nohighlight">\({\mathit{n}} &lt; 256\)</span>.</p></li>
 </ul>
 </section>
 </section>
 <section id="integers">
 <span id="syntax-int"></span><span id="syntax-uint"></span><span id="syntax-sint"></span><span id="index-2"></span><h2>Integers<a class="headerlink" href="#integers" title="Permalink to this heading">¶</a></h2>
-<p>Different classes of <em>integers</em> with different value ranges are distinguished by their <em>bit width</em> <span class="math notranslate nohighlight">\(N\)</span> and by whether they are <em>unsigned</em> or <em>signed</em>.</p>
+<p>Different classes of <em>integers</em> with different value ranges are distinguished by their <em>bit width</em> <span class="math notranslate nohighlight">\({\mathit{N}}\)</span> and by whether they are <em>unsigned</em> or <em>signed</em>.</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}\begin{array}{llll}
-\def\mathdef2922#1{{}}\mathdef2922{unsigned integer} &amp; \href{../syntax/values.html#syntax-int}{\mathit{u}N} &amp;::=&amp;
-  0 ~|~ 1 ~|~ \dots ~|~ 2^N{-}1 \\
-\def\mathdef2922#1{{}}\mathdef2922{signed integer} &amp; \href{../syntax/values.html#syntax-int}{\mathit{s}N} &amp;::=&amp;
-  -2^{N-1} ~|~ \dots ~|~ {-}1 ~|~ 0 ~|~ 1 ~|~ \dots ~|~ 2^{N-1}{-}1 \\
-\def\mathdef2922#1{{}}\mathdef2922{uninterpreted integer} &amp; \href{../syntax/values.html#syntax-int}{\mathit{i}N} &amp;::=&amp;
-  \href{../syntax/values.html#syntax-int}{\mathit{u}N} \\
+\[\begin{split}\begin{array}{&#64;{}l&#64;{}rrl&#64;{}l&#64;{}}
+&amp; {{\mathit{u}}}{{\mathit{N}}} &amp;::=&amp; 0 ~|~ \dots ~|~ {2^{{\mathit{N}}}} - 1 \\
+&amp; {{\mathit{s}}}{{\mathit{N}}} &amp;::=&amp; {-{2^{{\mathit{N}} - 1}}} ~|~ \dots ~|~ {-1} ~|~ 0 ~|~ {+1} ~|~ \dots ~|~ {2^{{\mathit{N}} - 1}} - 1 \\
+&amp; {{\mathit{i}}}{{\mathit{N}}} &amp;::=&amp; {{\mathit{u}}}{{\mathit{N}}} \\
 \end{array}\end{split}\]</div>
-<p>The class <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{i}N}\)</span> defines <em>uninterpreted</em> integers, whose signedness interpretation can vary depending on context.
+<p>The class <span class="math notranslate nohighlight">\({\mathit{iN}}\)</span> defines <em>uninterpreted</em> integers, whose signedness interpretation can vary depending on context.
 In the abstract syntax, they are represented as unsigned values.
 However, some operations <a class="reference internal" href="../exec/numerics.html#aux-signed"><span class="std std-ref">convert</span></a> them to signed based on a two’s complement interpretation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The main integer types occurring in this specification are <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{u32}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{u64}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{s32}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{s64}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{i8}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{i16}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{i32}}\)</span>, <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-int}{\mathit{i64}}\)</span>.
+<p>The main integer types occurring in this specification are <span class="math notranslate nohighlight">\({\mathit{u{\scriptstyle32}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{u{\scriptstyle64}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{s{\scriptstyle32}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{s{\scriptstyle64}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{i{\scriptstyle8}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{i{\scriptstyle16}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{i{\scriptstyle32}}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{i{\scriptstyle64}}}\)</span>.
 However, other sizes occur as auxiliary constructions, e.g., in the definition of <a class="reference internal" href="#syntax-float"><span class="std std-ref">floating-point</span></a> numbers.</p>
 </div>
 <section id="id1">
 <h3>Conventions<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>The meta variables <span class="math notranslate nohighlight">\(m, n, i\)</span> range over integers.</p></li>
+<li><p>The meta variables <span class="math notranslate nohighlight">\({\mathit{m}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{n}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{i}}\)</span>, <span class="math notranslate nohighlight">\({\mathit{j}}\)</span> range over integers.</p></li>
 <li><p>Numbers may be denoted by simple arithmetics, as in the grammar above.
-In order to distinguish arithmetics like <span class="math notranslate nohighlight">\(2^N\)</span> from sequences like <span class="math notranslate nohighlight">\((1)^N\)</span>, the latter is distinguished with parentheses.</p></li>
+In order to distinguish arithmetics like <span class="math notranslate nohighlight">\({2^{{\mathit{N}}}}\)</span> from sequences like <span class="math notranslate nohighlight">\({(1)^{{\mathit{N}}}}\)</span>, the latter is distinguished with parentheses.</p></li>
 </ul>
 </section>
 </section>
@@ -139,43 +135,46 @@ In order to distinguish arithmetics like <span class="math notranslate nohighlig
 <span id="syntax-float"></span><span id="syntax-payload"></span><span id="syntax-nan"></span><span id="index-3"></span><h2>Floating-Point<a class="headerlink" href="#floating-point" title="Permalink to this heading">¶</a></h2>
 <p><em>Floating-point</em> data represents 32 or 64 bit values that correspond to the respective binary formats of the <a class="reference external" href="https://ieeexplore.ieee.org/document/8766229">IEEE 754</a> standard (Section 3.3).</p>
 <p>Every value has a <em>sign</em> and a <em>magnitude</em>.
-Magnitudes can either be expressed as <em>normal</em> numbers of the form <span class="math notranslate nohighlight">\(m_0.m_1m_2\dots m_M \cdot2^e\)</span>, where <span class="math notranslate nohighlight">\(e\)</span> is the exponent and <span class="math notranslate nohighlight">\(m\)</span> is the <em>significand</em> whose most significant bit <span class="math notranslate nohighlight">\(m_0\)</span> is <span class="math notranslate nohighlight">\(1\)</span>,
-or as a <em>subnormal</em> number where the exponent is fixed to the smallest possible value and <span class="math notranslate nohighlight">\(m_0\)</span> is <span class="math notranslate nohighlight">\(0\)</span>; among the subnormals are positive and negative zero values.
-Since the significands are binary values, normals are represented in the form <span class="math notranslate nohighlight">\((1 + m\cdot 2^{-M}) \cdot 2^e\)</span>, where <span class="math notranslate nohighlight">\(M\)</span> is the bit width of <span class="math notranslate nohighlight">\(m\)</span>; similarly for subnormals.</p>
-<p>Possible magnitudes also include the special values <span class="math notranslate nohighlight">\(\infty\)</span> (infinity) and <span class="math notranslate nohighlight">\(\href{../syntax/values.html#syntax-float}{\mathsf{nan}}\)</span> (<em>NaN</em>, not a number).
+Magnitudes can either be expressed as <em>normal</em> numbers of the form <span class="math notranslate nohighlight">\({\mathit{m}}_{{0}}~.~{\mathit{m}}_{{1}}~{\mathit{m}}_{{2}}~\dots~{\mathit{m}}_{{\mathit{M}}} \cdot {2^{{\mathit{e}}}}\)</span>, where <span class="math notranslate nohighlight">\({\mathit{e}}\)</span> is the exponent and <span class="math notranslate nohighlight">\({\mathit{m}}\)</span> is the <em>significand</em> whose most significant bit <span class="math notranslate nohighlight">\({\mathit{m}}_{{0}}\)</span> is <span class="math notranslate nohighlight">\(1\)</span>,
+or as a <em>subnormal</em> number where the exponent is fixed to the smallest possible value and <span class="math notranslate nohighlight">\({\mathit{m}}_{{0}}\)</span> is <span class="math notranslate nohighlight">\(0\)</span>; among the subnormals are positive and negative zero values.
+Since the significands are binary values, normals are represented in the form <span class="math notranslate nohighlight">\((1 + {\mathit{m}} \cdot {2^{{-{\mathit{M}}}}}) \cdot {2^{{\mathit{e}}}}\)</span>, where <span class="math notranslate nohighlight">\({\mathit{M}}\)</span> is the bit width of <span class="math notranslate nohighlight">\({\mathit{m}}\)</span>; similarly for subnormals.</p>
+<p>Possible magnitudes also include the special values <span class="math notranslate nohighlight">\(\infty\)</span> (infinity) and <span class="math notranslate nohighlight">\(\mathsf{nan}\)</span> (<em>NaN</em>, not a number).
 NaN values have a <em>payload</em> that describes the mantissa bits in the underlying <a class="reference internal" href="../exec/numerics.html#aux-fbits"><span class="std std-ref">binary representation</span></a>.
 No distinction is made between signalling and quiet NaNs.</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}\begin{array}{llrll}
-\def\mathdef2922#1{{}}\mathdef2922{floating-point value} &amp; \href{../syntax/values.html#syntax-float}{\mathit{f}N} &amp;::=&amp;
-  {+} \href{../syntax/values.html#syntax-float}{\mathit{f}\mathit{Nmag}} ~|~ {-} \href{../syntax/values.html#syntax-float}{\mathit{f}\mathit{Nmag}} \\
-\def\mathdef2922#1{{}}\mathdef2922{floating-point magnitude} &amp; \href{../syntax/values.html#syntax-float}{\mathit{f}\mathit{Nmag}} &amp;::=&amp;
-  (1 + \href{../syntax/values.html#syntax-int}{\mathit{u}M}\cdot 2^{-M}) \cdot 2^e &amp; (\mathrel{\mbox{if}} -2^{E-1}+2 \leq e \leq 2^{E-1}-1) \\ &amp;&amp;|&amp;
-  (0 + \href{../syntax/values.html#syntax-int}{\mathit{u}M}\cdot 2^{-M}) \cdot 2^e &amp; (\mathrel{\mbox{if}} e = -2^{E-1}+2) \\ &amp;&amp;|&amp;
-  \infty \\ &amp;&amp;|&amp;
-  \href{../syntax/values.html#syntax-float}{\mathsf{nan}}(n) &amp; (\mathrel{\mbox{if}} 1 \leq n &lt; 2^M) \\
+\[\begin{split}\begin{array}{&#64;{}l&#64;{}rrl&#64;{}l&#64;{}}
+&amp; {{\mathit{f}}}{{\mathit{N}}} &amp;::=&amp; {+{{{\mathit{f}}}{{\mathit{N}}}}{{\mathit{mag}}}} ~|~ {-{{{\mathit{f}}}{{\mathit{N}}}}{{\mathit{mag}}}} \\
+&amp; {{{\mathit{f}}}{{\mathit{N}}}}{{\mathit{mag}}} &amp;::=&amp; (1 + {\mathit{m}} \cdot {2^{{-{\mathit{M}}}}}) \cdot {2^{{\mathit{n}}}} &amp;\quad
+  \mbox{if}~{\mathit{m}} &lt; {2^{{\mathit{M}}}} \land 2 - {2^{{\mathit{E}} - 1}} \leq {\mathit{n}} \leq {2^{{\mathit{E}} - 1}} - 1 \\ &amp;&amp;|&amp;
+(0 + {\mathit{m}} \cdot {2^{{-{\mathit{M}}}}}) \cdot {2^{{\mathit{n}}}} &amp;\quad
+  \mbox{if}~{\mathit{m}} &lt; {2^{{\mathit{M}}}} \land 2 - {2^{{\mathit{E}} - 1}} = {\mathit{n}} \\ &amp;&amp;|&amp;
+\infty \\ &amp;&amp;|&amp;
+{\mathsf{nan}}{({\mathit{m}})} &amp;\quad
+  \mbox{if}~1 \leq {\mathit{m}} &lt; {2^{{\mathit{M}}}} \\
 \end{array}\end{split}\]</div>
-<p>where <span class="math notranslate nohighlight">\(M = \href{../syntax/values.html#aux-significand}{\mathrm{signif}}(N)\)</span> and <span class="math notranslate nohighlight">\(E = \href{../syntax/values.html#aux-exponent}{\mathrm{expon}}(N)\)</span> with</p>
-<div class="math notranslate nohighlight" id="aux-exponent">
-<span id="aux-significand"></span>\[\begin{split}\begin{array}{lclllllcl}
-\href{../syntax/values.html#aux-significand}{\mathrm{signif}}(32) &amp;=&amp; 23 &amp;&amp;&amp;&amp;
-\href{../syntax/values.html#aux-exponent}{\mathrm{expon}}(32) &amp;=&amp; 8 \\
-\href{../syntax/values.html#aux-significand}{\mathrm{signif}}(64) &amp;=&amp; 52 &amp;&amp;&amp;&amp;
-\href{../syntax/values.html#aux-exponent}{\mathrm{expon}}(64) &amp;=&amp; 11 \\
-\end{array}\end{split}\]</div>
-<p id="aux-canon"><span id="arithmetic-nan"></span><span id="canonical-nan"></span>A <em>canonical NaN</em> is a floating-point value <span class="math notranslate nohighlight">\(\pm\href{../syntax/values.html#syntax-float}{\mathsf{nan}}(\href{../syntax/values.html#aux-canon}{\mathrm{canon}}_N)\)</span> where <span class="math notranslate nohighlight">\(\href{../syntax/values.html#aux-canon}{\mathrm{canon}}_N\)</span> is a payload whose most significant bit is <span class="math notranslate nohighlight">\(1\)</span> while all others are <span class="math notranslate nohighlight">\(0\)</span>:</p>
+<p id="aux-exponent"><span id="aux-significand"></span>where <span class="math notranslate nohighlight">\(\begin{array}{&#64;{}l&#64;{~}c&#64;{~}l&#64;{}l&#64;{}} {\mathit{M}} &amp;=&amp; {\mathrm{signif}}({\mathit{N}}) &amp;  \\ \end{array}\)</span> and <span class="math notranslate nohighlight">\(\begin{array}{&#64;{}l&#64;{~}c&#64;{~}l&#64;{}l&#64;{}} {\mathit{E}} &amp;=&amp; {\mathrm{expon}}({\mathit{N}}) &amp;  \\ \end{array}\)</span> with</p>
 <div class="math notranslate nohighlight">
-\[\href{../syntax/values.html#aux-canon}{\mathrm{canon}}_N = 2^{\href{../syntax/values.html#aux-significand}{\mathrm{signif}}(N)-1}\]</div>
-<p>An <em>arithmetic NaN</em>  is a floating-point value <span class="math notranslate nohighlight">\(\pm\href{../syntax/values.html#syntax-float}{\mathsf{nan}}(n)\)</span> with <span class="math notranslate nohighlight">\(n \geq \href{../syntax/values.html#aux-canon}{\mathrm{canon}}_N\)</span>, such that the most significant bit is <span class="math notranslate nohighlight">\(1\)</span> while all others are arbitrary.</p>
+\[\begin{split}\begin{array}{&#64;{}lcl&#64;{}l&#64;{}}
+{\mathrm{signif}}(32) &amp;=&amp; 23 &amp;  \\
+{\mathrm{signif}}(64) &amp;=&amp; 52 &amp;  \\[0.8ex]
+{\mathrm{expon}}(32) &amp;=&amp; 8 &amp;  \\
+{\mathrm{expon}}(64) &amp;=&amp; 11 &amp;  \\
+\end{array}\end{split}\]</div>
+<p id="aux-canon"><span id="arithmetic-nan"></span><span id="canonical-nan"></span>A <em>canonical NaN</em> is a floating-point value <span class="math notranslate nohighlight">\({\pm{\mathsf{nan}}{({{\mathrm{canon}}}_{{\mathit{N}}})}}\)</span> where <span class="math notranslate nohighlight">\({{\mathrm{canon}}}_{{\mathit{N}}}\)</span> is a payload whose most significant bit is <span class="math notranslate nohighlight">\(1\)</span> while all others are <span class="math notranslate nohighlight">\(0\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{array}{&#64;{}lcl&#64;{}l&#64;{}}
+{{\mathrm{canon}}}_{{\mathit{N}}} &amp;=&amp; {2^{{\mathrm{signif}}({\mathit{N}}) - 1}} &amp;  \\
+\end{array}\end{split}\]</div>
+<p>An <em>arithmetic NaN</em> is a floating-point value <span class="math notranslate nohighlight">\({\pm{\mathsf{nan}}{({\mathit{m}})}}\)</span> with <span class="math notranslate nohighlight">\({\mathit{m}} \geq {{\mathrm{canon}}}_{{\mathit{N}}}\)</span>, such that the most significant bit is <span class="math notranslate nohighlight">\(1\)</span> while all others are arbitrary.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>In the abstract syntax, subnormals are distinguished by the leading 0 of the significand. The exponent of subnormals has the same value as the smallest possible exponent of a normal number. Only in the <a class="reference internal" href="../binary/values.html#binary-float"><span class="std std-ref">binary representation</span></a> the exponent of a subnormal is encoded differently than the exponent of any normal number.</p>
+<p>In the abstract syntax, subnormals are distinguished by the leading <span class="math notranslate nohighlight">\(0\)</span> of the significand. The exponent of subnormals has the same value as the smallest possible exponent of a normal number. Only in the <a class="reference internal" href="../binary/values.html#binary-float"><span class="std std-ref">binary representation</span></a> the exponent of a subnormal is encoded differently than the exponent of any normal number.</p>
 <p>The notion of canonical NaN defined here is unrelated to the notion of canonical NaN that the <a class="reference external" href="https://ieeexplore.ieee.org/document/8766229">IEEE 754</a> standard (Section 3.5.2) defines for decimal interchange formats.</p>
 </div>
 <section id="id2">
 <h3>Conventions<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>The meta variable <span class="math notranslate nohighlight">\(z\)</span> ranges over floating-point values where clear from context.</p></li>
+<li><p>The meta variable <span class="math notranslate nohighlight">\({\mathit{z}}\)</span> ranges over floating-point values where clear from context.</p></li>
 </ul>
 </section>
 </section>
@@ -188,19 +187,16 @@ They are represented in the abstract syntax using <span class="math notranslate 
 <span id="syntax-name"></span><span id="syntax-char"></span><span id="index-5"></span><h2>Names<a class="headerlink" href="#names" title="Permalink to this heading">¶</a></h2>
 <p><em>Names</em> are sequences of <em>characters</em>, which are <em>scalar values</em> as defined by <a class="reference external" href="https://www.unicode.org/versions/latest/">Unicode</a> (Section 2.4).</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}\begin{array}{llrlll}
-\def\mathdef2922#1{{}}\mathdef2922{name} &amp; \href{../syntax/values.html#syntax-name}{\mathit{name}} &amp;::=&amp;
-  \href{../syntax/values.html#syntax-name}{\mathit{char}}^\ast \qquad\qquad (\mathrel{\mbox{if}} |\href{../binary/values.html#binary-utf8}{\mathrm{utf8}}(\href{../syntax/values.html#syntax-name}{\mathit{char}}^\ast)| &lt; 2^{32}) \\
-\def\mathdef2922#1{{}}\mathdef2922{character} &amp; \href{../syntax/values.html#syntax-name}{\mathit{char}} &amp;::=&amp;
-  \def\mathdef2963#1{\mathrm{U{+}#1}}\mathdef2963{00} ~|~ \dots ~|~ \def\mathdef2964#1{\mathrm{U{+}#1}}\mathdef2964{D7FF} ~|~
-  \def\mathdef2965#1{\mathrm{U{+}#1}}\mathdef2965{E000} ~|~ \dots ~|~ \def\mathdef2966#1{\mathrm{U{+}#1}}\mathdef2966{10FFFF} \\
+\[\begin{split}\begin{array}{&#64;{}l&#64;{}rrl&#64;{}l&#64;{}}
+&amp; {\mathit{name}} &amp;::=&amp; {{\mathit{char}}^\ast} \\
+&amp; {\mathit{char}} &amp;::=&amp; \mathrm{U{+}00} ~|~ \dots ~|~ \mathrm{U{+}D7FF} ~|~ \mathrm{U{+}E000} ~|~ \dots ~|~ \mathrm{U{+}10FFFF} \\
 \end{array}\end{split}\]</div>
 <p>Due to the limitations of the <a class="reference internal" href="../binary/values.html#binary-name"><span class="std std-ref">binary format</span></a>,
 the length of a name is bounded by the length of its <a class="reference internal" href="../binary/values.html#binary-utf8"><span class="std std-ref">UTF-8</span></a> encoding.</p>
 <section id="convention">
 <h3>Convention<a class="headerlink" href="#convention" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>Characters (Unicode scalar values) are sometimes used interchangeably with natural numbers <span class="math notranslate nohighlight">\(n &lt; 1114112\)</span>.</p></li>
+<li><p>Characters (Unicode scalar values) are sometimes used interchangeably with natural numbers <span class="math notranslate nohighlight">\({\mathit{n}} &lt; 1114112\)</span>.</p></li>
 </ul>
 </section>
 </section>
