@@ -872,12 +872,13 @@ let to_wast seed m result =
 
   let spectest = Textual m_spectest |> to_phrase in
   let def = Textual m_r |> to_phrase in
-  let script =
-    match result with
-    | Ok _ -> [
-      (Module (Some (to_phrase "$spectest_values"), spectest) |> to_phrase);
-      (Register (Utf8.decode "spectest_values", Some (to_phrase "$spectest_values")) |> to_phrase);
-      (Module (None, def) |> to_phrase)]
+  let pre_script = [
+    (Module (Some (to_phrase "$spectest_values"), spectest) |> to_phrase);
+    (Register (Utf8.decode "spectest_values", Some (to_phrase "$spectest_values")) |> to_phrase)
+  ] in
+  let script = pre_script @ match result with
+    | Ok _ ->
+      [ (Module (None, def) |> to_phrase) ]
     | Error Exception.Trap ->
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
     | Error Exception.Exhaustion ->
