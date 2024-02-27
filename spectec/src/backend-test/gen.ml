@@ -907,7 +907,7 @@ let to_wast seed m result =
     if List.exists is_exhaustion assertions then
       let assertions_returns = List.filter (is_exhaustion %> not) assertions in
 
-      to_file (string_of_int seed ^ "-r") (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
+      to_file (string_of_int seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
 
       let _ = List.fold_left (fun (i, s) a ->
         if is_exhaustion a then
@@ -921,6 +921,7 @@ let to_wast seed m result =
     else
       to_file (string_of_int seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
   | Error Exception.Exhaustion ->
+      to_file (string_of_int seed) pre_script;
       to_file (string_of_int seed ^ "-e") script
   | Error _ ->
       to_file (string_of_int seed) script
@@ -947,7 +948,7 @@ let gen_test el' il' al' =
 
   List.init !Flag.n (fun i -> !Flag.seed + i)
   |> List.iter (fun seed ->
-    prerr_endline ("Generating " ^ string_of_int seed ^ ".wast...");
+    if seed mod 100 = 0 then prerr_endline ("=== Generating " ^ string_of_int seed ^ ".wast... ===");
 
     (* Set random seed *)
     Random.init seed;
@@ -967,6 +968,9 @@ let gen_test el' il' al' =
 
     (* Convert to Wast *)
     to_wast seed module_ result;
+
+    (* Conform test *)
+    Conform_test.conform_test seed;
   )
 
   (* Print Coverage *)
