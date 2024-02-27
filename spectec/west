@@ -40,7 +40,7 @@ def test_engine_seed (engine: str, cmd: str, seed: int) -> None:
     temp_dir = TemporaryDirectory(prefix=f"west-{engine}-")
     temp_dir_path = temp_dir.name
 
-    subprocess.run (["./watsup", *sorted(glob.glob(f"spec/wasm-{engine}/*.watsup")), "--test", "--test-seed", f"{seed}", "--test:out", temp_dir_path])
+    subprocess.run (["./watsup", *sorted(glob.glob(f"spec/wasm-{engine}/*.watsup")), "--test", "--test:seed", f"{seed}", "--test:out", temp_dir_path])
 
     files = os.listdir(temp_dir_path)
 

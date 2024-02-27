@@ -1,2 +1,3 @@
 let out = ref "out"
-let seed = ref 42
+let n = ref 100
+let seed = ref 0

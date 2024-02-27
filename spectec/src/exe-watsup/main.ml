@@ -130,10 +130,7 @@ let argspec = Arg.align
     " Splice Sphinx";
   "--prose", Arg.Unit (fun () -> target := Prose), " Generate prose";
   "--interpreter", Arg.Rest_all (fun args -> target := Interpreter args), " Generate interpreter";
-  "--interpreter", Arg.Rest_all (fun args -> target := Interpreter args),
-    " Generate interpreter";
   "--test", Arg.Unit (fun () -> target := Test), " Generate test suite";
-  "--test-seed", Arg.Int (fun i -> Backend_test.Flag.seed := i), " Generate test suite";
 
   "--print-el", Arg.Set print_el, " Print EL";
   "--print-il", Arg.Set print_elab_il, " Print IL (after elaboration)";
@@ -143,9 +140,11 @@ let argspec = Arg.align
 ] @ List.map pass_argspec all_passes @ [
   "--all-passes", Arg.Unit (fun () -> List.iter enable_pass all_passes)," Run all passes";
 
-  "--test-version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " The version of wasm, default to 3";
-
+  (* flags for test generation *)
+  "--test:version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " The version of wasm, default to 3";
   "--test:out", Arg.String (fun s -> Backend_test.Flag.out := s), " Set the output directory of test generation, default to `out`";
+  "--test:n", Arg.Int (fun i -> Backend_test.Flag.n := i), "  Set the number of test cases to generate, default to 100";
+  "--test:seed", Arg.Int (fun i -> Backend_test.Flag.(seed := i; n := 1)), "  Generate specific test case";
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";

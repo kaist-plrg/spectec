@@ -1,4 +1,3 @@
-open Flag
 open Utils
 open Valid
 
@@ -840,7 +839,7 @@ let invoke_to_wast ((f, args), result) =
     Printf.sprintf "Unexpected error in invoking %s" f |> prerr_endline;
     None
 
-let to_wast m result =
+let to_wast seed m result =
   let open Reference_interpreter2.Script in
 
   let global ty value =
@@ -907,11 +906,11 @@ let to_wast m result =
     if List.exists is_exhaustion assertions then
       let assertions_returns = List.filter (is_exhaustion %> not) assertions in
 
-      to_file (string_of_int !seed ^ "-r") (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
+      to_file (string_of_int seed ^ "-r") (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
 
       let _ = List.fold_left (fun (i, s) a ->
         if is_exhaustion a then
-          let () = to_file (string_of_int !seed ^ "-e" ^ string_of_int i) (script @ [Assertion (to_phrase a) |> to_phrase]) in
+          let () = to_file (string_of_int seed ^ "-e" ^ string_of_int i) (script @ [Assertion (to_phrase a) |> to_phrase]) in
           (i + 1, s)
         else
           (i, s @ [Assertion (to_phrase a) |> to_phrase])
@@ -919,11 +918,11 @@ let to_wast m result =
 
       ()
     else
-      to_file (string_of_int !seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
+      to_file (string_of_int seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
   | Error Exception.Exhaustion ->
-      to_file (string_of_int !seed ^ "-e") script
+      to_file (string_of_int seed ^ "-e") script
   | Error _ ->
-      to_file (string_of_int !seed) script
+      to_file (string_of_int seed) script
   (*
   try
     Reference_interpreter.Valid.check_module m_r;
@@ -941,27 +940,33 @@ let gen_test el' il' al' =
   al := al';
 
   (* Initialize *)
-  Random.init !seed;
   Ds.init !al;
   rts := List.map get_rt (get_typing_rules !il);
   estimate_const ();
 
-  (* Generate tests *)
-  init_cache ();
-  let module_ = gen default_context "module" in
+  List.init !Flag.n (fun i -> !Flag.seed + i)
+  |> List.iter (fun seed ->
+    prerr_endline ("Generating " ^ string_of_int seed ^ ".wast...");
 
-  (* Mutatiion *)
-  let module_ = patch module_ in
+    (* Set random seed *)
+    Random.init seed;
 
-  (* TODO *)
-  Builtin.builtin () |> ignore;
+    (* Generate test *)
+    init_cache ();
+    let module_ = gen default_context "module" in
 
-  (* Injection *)
-  let result = inject module_ in
+    (* Mutatiion *)
+    let module_ = patch module_ in
 
-  (* Convert to Wast *)
-  to_wast module_ result
+    (* TODO *)
+    Builtin.builtin () |> ignore;
 
+    (* Injection *)
+    let result = inject module_ in
+
+    (* Convert to Wast *)
+    to_wast seed module_ result;
+  )
 
   (* Print Coverage *)
   (* Ds.(Info.print (InfoMap.uncovered !info_map)) *)
