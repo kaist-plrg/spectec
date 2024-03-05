@@ -729,7 +729,7 @@ let mk_assertion funcinst =
     invoke, Error e
 
 let print_assertion ((f, args), result) =
-  print_endline (match result with
+  Log.debug (match result with
   | Ok returns -> Printf.sprintf "(assert_return (invoke %s [%s]) [%s])"
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
@@ -766,18 +766,20 @@ type test = module_ * instant_result
 
 (** Output **)
 
-let print_test (m, result) =
-  print_endline (string_of_module m);
+let print_module module_ =
+  Log.debug (string_of_module module_)
+let print_result result =
+  let print = Log.debug in
   (match result with
   | Ok assertions ->
-    print_endline "Instantiation success";
+    print "Instantiation success";
     List.iter print_assertion assertions
-  | Error Exception.Trap -> print_endline ("Instantiation failed")
-  | Error Exception.Exhaustion -> print_endline ("Infinite loop in instantiation")
+  | Error Exception.Trap -> print ("Instantiation failed")
+  | Error Exception.Exhaustion -> print ("Infinite loop in instantiation")
   | Error e ->
     Printf.printf "Unexpected error during instantiation: %s" (Printexc.to_string e)
   );
-  print_endline "================"
+  print "================"
 
 let to_phrase x = Reference_interpreter2.Source.(x @@ no_region)
 
@@ -948,7 +950,7 @@ let gen_test el' il' al' =
 
   List.init !Flag.n (fun i -> !Flag.seed + i)
   |> List.iter (fun seed ->
-    if seed mod 100 = 0 then prerr_endline ("=== Generating " ^ string_of_int seed ^ ".wast... ===");
+    if seed mod 100 = 0 then Log.info ("=== Generating " ^ string_of_int seed ^ ".wast... ===");
 
     (* Set random seed *)
     Random.init seed;
@@ -963,8 +965,14 @@ let gen_test el' il' al' =
     (* TODO *)
     Builtin.builtin () |> ignore;
 
+    (* Print module *)
+    print_module module_;
+
     (* Injection *)
     let result = inject module_ in
+
+    (* Print result *)
+    print_result result;
 
     (* Convert to Wast *)
     to_wast seed module_ result;

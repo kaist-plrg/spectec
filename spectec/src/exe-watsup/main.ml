@@ -145,6 +145,7 @@ let argspec = Arg.align
   "--test:out", Arg.String (fun s -> Backend_test.Flag.out := s), " Set the output directory of test generation, default to `out`";
   "--test:n", Arg.Int (fun i -> Backend_test.Flag.n := i), "  Set the number of test cases to generate, default to 100";
   "--test:seed", Arg.Int (fun i -> Backend_test.Flag.(seed := i; n := 1)), "  Generate specific test case";
+  "--test:log", Arg.Int (fun i -> Backend_test.Flag.log := i), "  Set the logging level, default to 3 (warn)";
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";
