@@ -944,7 +944,6 @@ let gen_test el' il' al' =
   al := al';
 
   (* Initialize *)
-  Ds.init !al;
   rts := List.map get_rt (get_typing_rules !il);
   estimate_const ();
 
@@ -961,6 +960,9 @@ let gen_test el' il' al' =
 
     (* Mutatiion *)
     let module_ = patch module_ in
+
+    (* Initialize ds *)
+    Ds.init !al;
 
     (* TODO *)
     Builtin.builtin () |> ignore;
