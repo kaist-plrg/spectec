@@ -172,6 +172,16 @@ let al_to_memory_type: value -> memory_type = function
 
 (* Destruct value *)
 
+let al_to_func': value -> func' = function
+  | CaseV ("FUNC", [ idx; _locals; _instrs ]) ->
+    {
+      ftype = al_to_idx idx;
+      locals = [];
+      body = [];
+    }
+  | v -> fail "func" v
+let al_to_func: value -> func = al_to_phrase al_to_func'
+
 let rec al_to_field: value -> Aggr.field = function
   | CaseV ("PACK", [pack_size; c]) ->
     (* TODO: fix bug in packsize *)
@@ -185,6 +195,15 @@ let rec al_to_field: value -> Aggr.field = function
     in
     Aggr.PackField (pack_size', ref (al_to_int c))
   | v -> Aggr.ValField (ref (al_to_value v))
+
+and al_to_func_inst: value -> Instance.func_inst = function
+  | StrV r when Record.mem "TYPE" r && Record.mem "MODULE" r && Record.mem "CODE" r ->
+    Func.AstFunc (
+      Types.DefT (RecT [], 0l),
+      Reference_interpreter.Lib.Promise.make (),
+      al_to_func (Record.find "CODE" r)
+    )
+  | v -> fail "func" v
 
 and al_to_array: value -> Aggr.array = function
   | StrV r when Record.mem "TYPE" r && Record.mem "FIELD" r ->
@@ -225,6 +244,10 @@ and al_to_ref: value -> ref_ = function
     let arr_insts = Record.find "ARRAY" (Ds.get_store ()) in
     let arr = addr |> al_to_int |> listv_nth arr_insts |> al_to_array in
     Aggr.ArrayRef arr
+  | CaseV ("REF.FUNC_ADDR", [ addr ]) ->
+    let func_insts = Record.find "FUNC" (Ds.get_store ()) in
+    let func = addr |> al_to_int |> listv_nth func_insts |> al_to_func_inst in
+    Instance.FuncRef func
   | CaseV ("REF.EXTERN", [ r ]) -> Extern.ExternRef (al_to_ref r)
   | v -> fail "ref" v
 

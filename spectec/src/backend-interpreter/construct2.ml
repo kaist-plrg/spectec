@@ -117,6 +117,25 @@ let al_to_memory_type: value -> memory_type = function
   | v -> fail "memory type" v
 
 
+let al_to_func': value -> func' = function
+  | CaseV ("FUNC", [ idx; _locals; _instrs ]) ->
+    {
+      ftype = al_to_var idx;
+      locals = [];
+      body = [];
+    }
+  | v -> fail "func" v
+let al_to_func: value -> func = al_to_phrase al_to_func'
+
+let al_to_func_inst: value -> Instance.func_inst = function
+  | StrV r when Record.mem "TYPE" r && Record.mem "MODULE" r && Record.mem "CODE" r ->
+    Func.AstFunc (
+      al_to_func_type (Record.find "TYPE" r),
+      ref Instance.empty_module_inst,
+      al_to_func (Record.find "CODE" r)
+    )
+  | v -> fail "func" v
+
 (* Destruct value *)
 
 let rec al_to_num: value -> num = function
@@ -133,7 +152,10 @@ and al_to_vec: value -> vec = function
 and al_to_ref: value -> ref_ = function
   | CaseV ("REF.NULL", [ rt ]) -> NullRef (al_to_ref_type rt)
   (*| CaseV ("REF.HOST_ADDR", [ i32 ]) -> Script.HostRef (al_to_int32 i32)*)
-  | CaseV ("REF.FUNC_ADDR", [ a ]) -> Script.ExternRef (al_to_int32 a)
+  | CaseV ("REF.FUNC_ADDR", [ addr ]) ->
+    let func_insts = Record.find "FUNC" (Ds.get_store ()) in
+    let func = addr |> al_to_int |> listv_nth func_insts |> al_to_func_inst in
+    Instance.FuncRef func
   | v -> fail "ref" v
 
 and al_to_value: value -> Values.value = function
