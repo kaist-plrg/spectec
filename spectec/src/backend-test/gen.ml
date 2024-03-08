@@ -719,7 +719,7 @@ let mk_assertion funcinst =
   in
   let invoke = name, args in
 
-  let store = Ds.get_store () in
+  let store = Ds.get_store () |> Ds.copy_store in
   try
     let returns = Interpreter.invoke [ addr; listV_of_list args ] in
     invoke, Ok (unwrap_listv_to_list returns)

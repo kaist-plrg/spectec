@@ -7,6 +7,7 @@ val bound_func : string -> bool
 val lookup_algo : string -> algorithm
 
 val get_store : unit -> store
+val copy_store : store -> store
 val set_store : store -> unit
 
 type env = value Env.t

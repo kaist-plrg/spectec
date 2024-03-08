@@ -45,6 +45,24 @@ let lookup_algo name =
 
 let _store : store ref = ref Record.empty
 let get_store () = !_store
+let copy_store r =
+  let func = Record.find "FUNC" r |> copy_listv in
+  let global = Record.find "GLOBAL" r |> copy_listv in
+  let table = Record.find "TABLE" r |> copy_listv in
+  let mem = Record.find "MEM" r |> copy_listv in
+  let elem = Record.find "ELEM" r |> copy_listv in
+  let data = Record.find "DATA" r |> copy_listv in
+  let struct_ = Record.find "STRUCT" r |> copy_listv in
+  let array_ = Record.find "ARRAY" r |> copy_listv in
+  Record.empty
+  |> Record.add "FUNC" func
+  |> Record.add "GLOBAL" global
+  |> Record.add "TABLE" table
+  |> Record.add "MEM" mem
+  |> Record.add "ELEM" elem
+  |> Record.add "DATA" data
+  |> Record.add "STRUCT" struct_
+  |> Record.add "ARRAY" array_
 let set_store store = _store := store
 
 

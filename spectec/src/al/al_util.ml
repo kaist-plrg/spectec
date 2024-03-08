@@ -99,42 +99,6 @@ let singleton v = listV [|v|]
 let some x = caseV (x, [optV (Some (tupV []))])
 let none x = caseV (x, [optV None])
 
-
-(* Helper functions *)
-
-let listv_map f = function
-  | ListV arr_ref -> ListV (ref (Array.map f !arr_ref))
-  | _ -> failwith "Not a list"
-
-
-let listv_find f = function
-  | ListV arr_ref -> Array.find_opt f !arr_ref |> Option.get
-  | _ -> failwith "Not a list"
-
-let listv_nth l n =
-  match l with
-  | ListV arr_ref -> Array.get !arr_ref n
-  | _ -> failwith "Not a list"
-
-let strv_access field = function
-  | StrV r -> Record.find field r
-  | _ -> failwith "Not a record"
-
-let map
-  (destruct: value -> 'a)
-  (construct: 'b -> value)
-  (op: 'a -> 'b)
-  (v: value): value =
-    destruct v |> op |> construct
-let map2
-  (destruct: value -> 'a)
-  (construct: 'b -> value)
-  (op: 'a -> 'a -> 'b)
-  (v1: value)
-  (v2: value): value =
-    op (destruct v1) (destruct v2) |> construct
-
-
 (* Destruct *)
 
 (* TODO: move to error file *)
@@ -192,3 +156,40 @@ let casev_nth_arg n = function
 let unwrap_strv = function
   | StrV r -> r
   | v -> fail "struct" v
+
+(* Helper functions *)
+
+let listv_map f = function
+  | ListV arr_ref -> ListV (ref (Array.map f !arr_ref))
+  | _ -> failwith "Not a list"
+
+
+let listv_find f = function
+  | ListV arr_ref -> Array.find_opt f !arr_ref |> Option.get
+  | _ -> failwith "Not a list"
+
+let listv_nth l n =
+  match l with
+  | ListV arr_ref -> Array.get !arr_ref n
+  | _ -> failwith "Not a list"
+
+let strv_access field = function
+  | StrV r -> Record.find field r
+  | _ -> failwith "Not a record"
+
+let map
+  (destruct: value -> 'a)
+  (construct: 'b -> value)
+  (op: 'a -> 'b)
+  (v: value): value =
+    destruct v |> op |> construct
+let map2
+  (destruct: value -> 'a)
+  (construct: 'b -> value)
+  (op: 'a -> 'a -> 'b)
+  (v1: value)
+  (v2: value): value =
+    op (destruct v1) (destruct v2) |> construct
+
+let copy_listv l = unwrap_listv_to_array l |> Array.copy |> listV
+
