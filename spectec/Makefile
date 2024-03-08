@@ -30,7 +30,7 @@ exe: $(CLONEDIR)
 $(CLONEDIR):
 	@rm -rf $(CLONEDIR)
 	git clone --single-branch https://github.com/WebAssembly/gc.git $(CLONEDIR)
-	@(cd $(CLONEDIR)/interpreter; git checkout 3fa0537 -q; rm dune-project jslib/wast.ml script/run.mli valid/match.mli; cp ../../dune-ref-interp dune)
+	@(cd $(CLONEDIR)/interpreter; git checkout 3fa0537 -q; rm dune-project jslib/wast.ml script/run.mli valid/match.mli; cp ../../dune-ref-interp dune; cp ../../../../../interpreter/exec/fxx.ml exec/fxx.ml)
 
 
 # Latex

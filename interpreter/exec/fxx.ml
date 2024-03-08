@@ -118,7 +118,7 @@ struct
      * operand is not NaN, we can nondeterministically pick whether to return
      * pos_nan or neg_nan.
      *)
-    let nan = if is_nan x then x else Rep.pos_nan in
+    let nan = if is_nan x then x else if x > Rep.zero then Rep.pos_nan else Rep.neg_nan in
     canonicalize_nan nan
 
   let binary x op y =

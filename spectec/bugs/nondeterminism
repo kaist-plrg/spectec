@@ -1,0 +1,1 @@
+1. f64.sqrt(neg) -> ref_interp: +NaN, engine: -NaN
