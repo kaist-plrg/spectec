@@ -2,7 +2,7 @@
 
 ```sh
 $ cd ../spec/wasm-3.0 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 3 --interpreter ../../test-interpreter/sample.wat addTwo 30 12 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 3 --interpreter ../../test-interpreter/sample.wat addTwo 30 12 2> /dev/null
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -18,7 +18,7 @@ watsup 0.4 generator
 42
 == Complete.
 $ cd ../spec/wasm-3.0 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 3 --interpreter ../../test-interpreter/sample.wasm addTwo 40 2 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 3 --interpreter ../../test-interpreter/sample.wasm addTwo 40 2 2> /dev/null
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -34,7 +34,7 @@ watsup 0.4 generator
 42
 == Complete.
 $ cd ../spec/wasm-3.0 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 3 --interpreter ../../test-interpreter/sample.wast 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 3 --interpreter ../../test-interpreter/sample.wast 2> /dev/null
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -54,7 +54,7 @@ watsup 0.4 generator
 $ for v in 1 2 3; do ( \
 >   echo "Running test for Wasm $v.0..." && \
 >   cd ../spec/wasm-$v.0 && \
->   dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version $v --interpreter ../../test-interpreter/spec-test-$v \
+>   dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version $v --interpreter ../../test-interpreter/spec-test-$v \
 > ) done 2>/dev/null
 Running test for Wasm 1.0...
 watsup 0.4 generator
@@ -1315,7 +1315,7 @@ Total [45764/45764] (100.00%)
 == Complete.
 $ echo "Running test for Wasm 2.0 except SIMD..." && \
 > cd ../spec/wasm-1.5 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test-version 2 --interpreter ../../test-interpreter/spec-test-1.5 2> /dev/null
+> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 2 --interpreter ../../test-interpreter/spec-test-1.5 2> /dev/null
 Running test for Wasm 2.0 except SIMD...
 watsup 0.4 generator
 == Parsing...
