@@ -73,17 +73,10 @@ syntax laneidx hint(desc "lane index") = u8
 
 syntax typeidx hint(desc "type index") = idx
 syntax funcidx hint(desc "function index") = idx
-syntax globalidx hint(desc "global index") = idx
-syntax tableidx hint(desc "table index") = idx
-syntax memidx hint(desc "memory index") = idx
-syntax elemidx hint(desc "elem index") = idx
-syntax dataidx hint(desc "data index") = idx
-syntax labelidx hint(desc "label index") = idx
 syntax localidx hint(desc "local index") = idx
 
 var x : idx
 var y : idx
-var l : labelidx
 var x33 : s33 hint(show x)
 
 
@@ -99,11 +92,8 @@ syntax numtype hint(desc "number type") =
 syntax vectype hint(desc "vector type") =
   | V128
 
-syntax reftype hint(desc "reference type") =
-  | FUNCREF | EXTERNREF
-
 syntax valtype hint(desc "value type") =
-  | numtype | vectype | reftype | BOT
+  | numtype | vectype
 
 syntax inn hint(show I#n) = | I32 | I64
 syntax fnn hint(show F#n) = | F32 | F64
@@ -120,39 +110,18 @@ syntax packedtype = | I8 | I16
 
 ;; External types
 
-syntax mut = MUT?
-
-syntax limits hint(desc "limits") =
-  `[u32 .. u32]
-
-syntax globaltype hint(desc "global type") =
-  mut valtype
 syntax functype hint(desc "function type") =
   resulttype -> resulttype
-syntax tabletype hint(desc "table type") =
-  limits reftype
-syntax memtype hint(desc "memory type") =
-  limits I8
-syntax elemtype hint(desc "element type") =
-  reftype
-syntax datatype hint(desc "data type") =
-  OK
 syntax externtype hint(desc "external type") =
-  | FUNC functype | GLOBAL globaltype | TABLE tabletype | MEM memtype
+  FUNC functype
 
 
 ;; Meta variables
 
-var lim : limits
-
 var t : valtype
 var ft : functype
-var gt : globaltype
-var mt : memtype
 var nt : numtype
 var pt : packedtype
-var rt : reftype
-var tt : tabletype
 var vt : vectype
 var xt : externtype
 
@@ -239,13 +208,6 @@ var vrelop : relop_vectype
 var vcvtop : cvtop_vectype
 
 
-;; Memory operators
-
-syntax memop hint(desc "memory operator") = {ALIGN u32, OFFSET u32}
-
-var mo : memop
-
-
 ;;
 ;; Instructions
 ;;
@@ -262,23 +224,7 @@ syntax blocktype hint(desc "block type") =
 
 var bt : blocktype
 
-syntax instr/control hint(desc "control instruction") =
-  | UNREACHABLE
-  | NOP
-  | DROP
-  | SELECT (valtype*)?
-  | BLOCK blocktype instr*
-  | LOOP blocktype instr*
-  | IF blocktype instr* ELSE instr*
-  | BR labelidx
-  | BR_IF labelidx
-  | BR_TABLE labelidx* labelidx
-  | CALL funcidx
-  | CALL_INDIRECT tableidx typeidx
-  | RETURN
-  | ...
-
-syntax instr/numeric hint(desc "numeric instruction") = ...
+syntax instr/numeric hint(desc "numeric instruction") =
   | CONST numtype c_numtype          hint(show %.CONST %)
   | UNOP numtype unop_numtype        hint(show %.%)
   | BINOP numtype binop_numtype      hint(show %.%)
@@ -323,55 +269,10 @@ syntax instr/vector hint(desc "vector instruction") = ...
   | VEXTADD_PAIRWISE shape shape sx                           hint(show %.VEXTADD_PAIRWISE#_#%#_#%)
   | ...
 
-
-syntax instr/reference hint(desc "reference instruction") = ...
-  | REF.NULL reftype
-  | REF.FUNC funcidx
-  | REF.IS_NULL
-  | ...
-
 syntax instr/local hint(desc "local instruction") = ...
   | LOCAL.GET localidx
   | LOCAL.SET localidx
   | LOCAL.TEE localidx
-  | ...
-
-syntax instr/global hint(desc "global instruction") = ...
-  | GLOBAL.GET globalidx
-  | GLOBAL.SET globalidx
-  | ...
-
-syntax instr/table hint(desc "table instruction") = ...
-  | TABLE.GET tableidx
-  | TABLE.SET tableidx
-  | TABLE.SIZE tableidx
-  | TABLE.GROW tableidx
-  | TABLE.FILL tableidx
-  | TABLE.COPY tableidx tableidx
-  | TABLE.INIT tableidx elemidx
-  | ELEM.DROP elemidx
-  | ...
-
-
-syntax packshape = nat X nat
-syntax vloadop =
-  | SHAPE packshape sx  hint(show %#_#%)
-  | SPLAT nat           hint(show %#_#SPLAT)
-  | ZERO nat            hint(show %#_#ZERO)
-
-syntax instr/memory hint(desc "memory instruction") = ...
-  | MEMORY.SIZE
-  | MEMORY.GROW
-  | MEMORY.FILL
-  | MEMORY.COPY
-  | MEMORY.INIT dataidx
-  | DATA.DROP dataidx
-  | LOAD numtype (n _ sx)? memop  hint(show %.LOAD % %)  hint(show %.LOAD#% %)
-  | STORE numtype n? memop        hint(show %.STORE % %) hint(show %.STORE#% %)
-  | VLOAD vloadop? memop          hint(show V128.LOAD %) hint(show V128.LOAD#% %)
-  | VLOAD_LANE n memop laneidx    hint(show V128.LOAD#%#_#LANE % %)
-  | VSTORE memop                  hint(show V128.STORE %)
-  | VSTORE_LANE n memop laneidx   hint(show V128.STORE#%#_#LANE % %)
 
 syntax expr hint(desc "expression") =
   instr*
@@ -386,8 +287,9 @@ var e : expr
 ;; Modules
 ;;
 
-syntax elemmode = | ACTIVE tableidx expr | PASSIVE | DECLARE
-syntax datamode = | ACTIVE memidx expr | PASSIVE
+syntax empty = nat*
+syntax none = nat?
+
 
 syntax type hint(desc "type") =
   TYPE functype
@@ -395,35 +297,17 @@ syntax local hint(desc "local") =
   LOCAL valtype
 syntax func hint(desc "function") =
   FUNC typeidx local* expr
-syntax global hint(desc "global") =
-  GLOBAL globaltype expr
-syntax table hint(desc "table") =
-  TABLE tabletype
-syntax mem hint(desc "memory") =
-  MEMORY memtype
-syntax elem hint(desc "table segment") =
-  ELEM reftype expr* elemmode
-syntax data hint(desc "memory segment") =
-  DATA byte* datamode
-syntax start hint(desc "start function") =
-  START funcidx
 
 syntax externidx hint(desc "external index") =
-  | FUNC funcidx | GLOBAL globalidx | TABLE tableidx | MEM memidx
+  FUNC funcidx
 syntax export hint(desc "export") =
   EXPORT name externidx
-syntax import hint(desc "import") =
-  IMPORT name name externtype
 
 syntax module hint(desc "module") =
-  MODULE type* import* func* global* table* mem* elem* data* start? export*
+  MODULE type* empty func* empty empty empty empty empty none export*
 
 
 var ty : type
 var loc : local
-var glob : global
-var tab : table
-var im : import
 var ex : export
-var st : start
 var xx : externidx

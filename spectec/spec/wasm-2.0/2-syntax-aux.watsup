@@ -30,38 +30,3 @@ def $packedsize(I16) = 16
 def $lanesize(lanetype) : nat  hint(show |%|)
 def $lanesize(numtype) = $size(numtype)
 def $lanesize(packedtype) = $packedsize(packedtype)
-
-;;
-;; Auxiliary definitions on Indices
-;;
-
-;; Free indices
-
-def $free_dataidx_instr(instr) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_instr(MEMORY.INIT x) = x
-def $free_dataidx_instr(DATA.DROP x) = x
-def $free_dataidx_instr(in) = eps
-
-def $free_dataidx_instrs(instr*) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_instrs(eps) = eps
-def $free_dataidx_instrs(instr instr'*) = $free_dataidx_instr(instr) $free_dataidx_instrs(instr'*)
-
-def $free_dataidx_expr(expr) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_expr(in*) = $free_dataidx_instrs(in*)
-
-def $free_dataidx_func(func) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_func(FUNC x loc* e) = $free_dataidx_expr(e)
-
-def $free_dataidx_funcs(func*) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_funcs(eps) = eps
-def $free_dataidx_funcs(func func'*) = $free_dataidx_func(func) $free_dataidx_funcs(func'*)
-
-
-;;
-;; Auxiliary definitions on Instructions
-;;
-
-;; Shorthands for Instructions
-
-def $memop0 : memop  hint(show )
-def $memop0 = {ALIGN 0, OFFSET 0}

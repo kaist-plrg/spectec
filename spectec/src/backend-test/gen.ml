@@ -292,6 +292,8 @@ let rec gen c name =
 
   (* HARDCODE: Wasm expression *)
   match name with
+  | "none" -> optV None
+  | "empty" -> listV [||]
   | "expr" ->
     let out =
       match c.parent_case with
