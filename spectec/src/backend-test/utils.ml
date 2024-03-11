@@ -39,3 +39,5 @@ let rec walk_value f v =
   | CaseV (c, vl) -> CaseV (c, List.map new_ vl)
   | OptV v_opt ->  OptV (Option.map new_ v_opt)
   | TupV vl -> TupV (List.map new_ vl)
+
+let copy_value = walk_value (fun v -> v)
