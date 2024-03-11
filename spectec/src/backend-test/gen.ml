@@ -721,13 +721,13 @@ let mk_assertion funcinst =
   in
   let invoke = name, args in
 
-  let store = Ds.get_store () |> Ds.copy_store in
+  let store = Ds.get_store () |> strV |> copy_value in
   try
     let returns = Interpreter.invoke [ addr; listV_of_list args ] in
     invoke, Ok (unwrap_listv_to_list returns)
   with e ->
     if e = Exception.Exhaustion then
-      Ds.set_store store;
+      store |> unwrap_strv |> Ds.set_store;
     invoke, Error e
 
 let print_assertion ((f, args), result) =
