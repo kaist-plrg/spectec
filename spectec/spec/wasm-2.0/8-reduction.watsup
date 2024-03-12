@@ -37,48 +37,6 @@ rule Eval_expr:
 ;; Instructions
 ;;
 
-;; Numeric instructions
-
-rule Step_pure/unop-val:
-  (CONST nt c_1) (UNOP nt unop)  ~>  (CONST nt c)
-  -- if $unop(unop, nt, c_1) = c  ;; TODO
-
-rule Step_pure/unop-trap:
-  (CONST nt c_1) (UNOP nt unop)  ~>  TRAP
-  -- if $unop(unop, nt, c_1) = eps  ;; TODO
-
-
-rule Step_pure/binop-val:
-  (CONST nt c_1) (CONST nt c_2) (BINOP nt binop)  ~>  (CONST nt c)
-  -- if $binop(binop, nt, c_1, c_2) = c  ;; TODO
-
-rule Step_pure/binop-trap:
-  (CONST nt c_1) (CONST nt c_2) (BINOP nt binop)  ~>  TRAP
-  -- if $binop(binop, nt, c_1, c_2) = eps  ;; TODO
-
-
-rule Step_pure/testop:
-  (CONST nt c_1) (TESTOP nt testop)  ~>  (CONST I32 c)
-  -- if c = $testop(testop, nt, c_1)
-
-rule Step_pure/relop:
-  (CONST nt c_1) (CONST nt c_2) (RELOP nt relop)  ~>  (CONST I32 c)
-  -- if c = $relop(relop, nt, c_1, c_2)
-
-
-rule Step_pure/extend:
-  (CONST nt c) (EXTEND nt n)  ~>  (CONST nt $ext(n, $size(nt), S, $wrap($size(nt), n, c)))
-
-
-rule Step_pure/cvtop-val:
-  (CONST nt_1 c_1) (CVTOP nt_2 cvtop nt_1 sx?)  ~>  (CONST nt_2 c)
-  -- if $cvtop(cvtop, nt_1, nt_2, sx?, c_1) = c  ;; TODO
-
-rule Step_pure/cvtop-trap:
-  (CONST nt_1 c_1) (CVTOP nt_2 cvtop nt_1 sx?)  ~>  TRAP
-  -- if $cvtop(cvtop, nt_1, nt_2, sx?, c_1) = eps  ;; TODO
-
-
 ;; Vector instructions
 
 rule Step_pure/vvunop:
@@ -252,19 +210,6 @@ rule Step_pure/vextadd_pairwise:
   -- if $concat_bytes((i_1 i_2)*) = $ext($lanesize(lnt_1), $lanesize(lnt_2), sx, i)^k
   -- if j* = $iadd($lanesize(lnt_2), i_1, i_2)*
   -- if $lanes(sh_2, cv) = j*
-
-
-
-;; Local instructions
-
-rule Step_read/local.get:
-  z; (LOCAL.GET x)  ~>  $local(z, x)
-
-rule Step/local.set:
-  z; val (LOCAL.SET x)  ~>  $with_local(z, x, val); eps
-
-rule Step_pure/local.tee:
-  val (LOCAL.TEE x)  ~>  val val (LOCAL.SET x)
 
 
 ;; Call instructions

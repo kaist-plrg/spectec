@@ -447,7 +447,7 @@ and gen_wasm_expr c rt1 rt2 label =
       let l = List.map (fun _ -> nullary "DROP") rt1 @ List.map default rt2 in
       listV_of_list l
     else
-      let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
+      let n = Random.int 5 + 5 (* 1, 2, 3, 4, 5 *) in
       (* TODO: make input optional? *)
       push (List.rev rt1, Some (List.rev rt2), label, n) expr_info_stack;
       try
@@ -510,8 +510,17 @@ and gen_typ c typ =
       nullary "DEFERRED_FUNCS"
     )
     else
-      let l = List.init n (fun i -> gen_typ { c with i = i } typ') in
-      if name = "type" then types_cache := l;
+      let l =
+        if name = "type" then (
+          let open Al.Ast in
+          let type_ = CaseV ("TYPE", [tupV [listV [||]; (listV [|nullary "V128"; nullary "V128"|])]]) in
+          let l = [type_; type_] in
+          types_cache := l;
+          l
+        ) else (
+          List.init n (fun i -> gen_typ { c with i = i } typ')
+        )
+      in
       if name = "local" then locals_cache := l;
       if name = "table" then tables_cache := l;
       if name = "global" then globals_cache := l;
