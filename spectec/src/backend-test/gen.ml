@@ -282,8 +282,8 @@ let is_func_table = function
 exception OutOfLife
 
 let gen_vector () =
-  let gen_byte _ = string_of_int (Random.int 256) in
-  gen_byte |> List.init 16 |> List.fold_left (^) "" |> vecV
+  let gen_byte _ = Char.chr (Random.int 256) in
+  String.init 16 gen_byte |> vecV
 
 (* Generate specific syntax from input IL *)
 let rec gen c name =
