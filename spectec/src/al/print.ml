@@ -16,7 +16,7 @@ let string_of_list stringifier sep = function
     List.fold_left
         (fun acc elem -> acc ^ sep ^ stringifier elem)
         (stringifier h) (List.filteri (fun i _ -> i <= limit) t)
-    ^ (if is_long then (sep ^ "...") else "")
+    ^ (if is_long then (sep ^ "..." ^ stringifier (List.hd (List.rev t))) else "")
 
 let rec repeat str num =
   if num = 0 then ""
@@ -46,20 +46,19 @@ let rec string_of_record r =
   depth := !depth - 1;
   str
 
-and string_of_value = function
+and string_of_value =
+  function
   | LabelV (v1, v2) ->
     sprintf "Label_%s %s" (string_of_value v1) (string_of_value v2)
   (*| FrameV (None, v2) -> sprintf "(Frame %s)" (string_of_value v2)
   | FrameV (Some v1, v2) -> sprintf "(Frame %s %s)" (string_of_value v1) (string_of_value v2) *)
   | FrameV _ -> "FrameV"
-  | StoreV _ -> "StoreV"
   | ListV lv -> "[" ^ string_of_values ", " (Array.to_list !lv) ^ "]"
-  | NumV n -> Printf.sprintf "0x%LX" n
+  | NumV n -> "0x" ^ Z.format "%X" n
   | BoolV b -> string_of_bool b
-  | VecV v -> "VecV (" ^ String.concat " " (List.init 4 (fun i -> Int32.to_string (Bytes.get_int32_le (Bytes.of_string v) (i*4)))) ^ ")"
   | TextV s -> s
   | TupV vl -> "(" ^ string_of_values ", " vl ^ ")"
-  | CaseV ("CONST", hd::tl) -> "(" ^ string_of_value hd ^ ".CONST " ^ string_of_values " " tl ^ ")"
+  | CaseV (("CONST" | "VCONST"), hd::tl) -> "(" ^ string_of_value hd ^ ".CONST " ^ string_of_values " " tl ^ ")"
   | CaseV (s, []) -> s
   | CaseV (s, vl) -> "(" ^ s ^ " " ^ string_of_values " " vl ^ ")"
   | StrV r -> string_of_record r
@@ -116,7 +115,7 @@ and string_of_record_expr r =
 
 and string_of_expr expr =
   match expr.it with
-  | NumE i -> Int64.to_string i
+  | NumE i -> Z.to_string i
   | BoolE b -> string_of_bool b
   | UnE (NotOp, { it = IsCaseOfE (e, kwd); _ }) ->
     sprintf "%s is not of the case %s" (string_of_expr e) (string_of_kwd kwd)
@@ -158,7 +157,7 @@ and string_of_expr expr =
   | SubE (id, _) -> id
   | IterE (e, _, iter) -> string_of_expr e ^ string_of_iter iter
   | InfixE (e1, infix, e2) -> "(" ^ string_of_expr e1 ^ " " ^ infix ^ " " ^ string_of_expr e2 ^ ")"
-  | CaseE (("CONST", _), hd::tl) -> "(" ^ string_of_expr hd ^ ".CONST " ^ string_of_exprs " " tl ^ ")"
+  | CaseE ((("CONST"|"VCONST"), _), hd::tl) -> "(" ^ string_of_expr hd ^ ".CONST " ^ string_of_exprs " " tl ^ ")"
   | CaseE ((s, _), []) -> s
   | CaseE ((s, _), el) -> "(" ^ s ^ " " ^ string_of_exprs " " el ^ ")"
   | OptE (Some e) -> "?(" ^ string_of_expr e ^ ")"
@@ -343,11 +342,9 @@ let structured_string_of_ids ids =
 let rec structured_string_of_value = function
   | LabelV (v1, v2) -> "LabelV (" ^ structured_string_of_value v1 ^ "," ^ structured_string_of_value v2 ^ ")"
   | FrameV _ -> "FrameV (TODO)"
-  | StoreV _ -> "StoreV"
-  | ListV _ -> "ListV"
+  | ListV lv -> "ListV" ^ "[" ^ string_of_values ", " (Array.to_list !lv) ^ "]"
   | BoolV b -> "BoolV (" ^ string_of_bool b ^ ")"
-  | NumV n -> "NumV (" ^ Int64.to_string n ^ ")"
-  | VecV v -> "VecV (" ^ String.concat " " (List.init 4 (fun i -> Int32.to_string (Bytes.get_int32_le (Bytes.of_string v) (i*4)))) ^ ")"
+  | NumV n -> "NumV (" ^ Z.to_string n ^ ")"
   | TextV s -> "TextV (" ^ s ^ ")"
   | TupV vl ->  "TupV (" ^ structured_string_of_values vl ^ ")"
   | CaseV (s, vl) -> "CaseV(" ^ s ^ ", [" ^ structured_string_of_values vl ^ "])"
@@ -378,7 +375,7 @@ and structured_string_of_record_expr r =
 
 and structured_string_of_expr expr =
   match expr.it with
-  | NumE i -> Int64.to_string i
+  | NumE i -> Z.to_string i
   | BoolE b -> string_of_bool b
   | UnE (op, e) ->
     "UnE ("

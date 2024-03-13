@@ -35,7 +35,7 @@ execution_of_CALL_REF ?(x)
   b) Let [t_1^n]->[t_2^m] be y_0.
   c) Assert: Due to validation, there are at least n values on the top of the stack.
   d) Pop val^n from the stack.
-  e) Let f be { LOCAL: ?(val)^n ++ $default(t)*; MODULE: fi.MODULE; }.
+  e) Let f be { LOCAL: ?(val)^n ++ $default_(t)*; MODULE: fi.MODULE; }.
   f) Let F be the activation of f with arity m.
   g) Enter F with label [FRAME_]:
     1. Let L be the label_m{[]}.
@@ -89,7 +89,7 @@ let call_ref =
           letI (f, strE (Record.empty
             |> Record.add
               ("LOCAL", "frame")
-              (catE (iterE (optE (Some v), ["val"], ListN (n, None)), iterE (callE("default", [t]), ["t"], List)))
+              (catE (iterE (optE (Some v), ["val"], ListN (n, None)), iterE (callE("default_", [t]), ["t"], List)))
             |> Record.add
               ("MODULE", "frame")
               (accE (fi, dotP ("MODULE", "module")))
@@ -112,7 +112,7 @@ let group_bytes_by =
   let n' = varE "n'" in
 
   let bytes_ = iterE (varE "byte", ["byte"], List) in
-  let bytes_left = listE [accE (bytes_, sliceP (numE 0L, n))] in
+  let bytes_left = listE [accE (bytes_, sliceP (numE Z.zero, n))] in
   let bytes_right = callE
     (
       "group_bytes_by",
@@ -147,7 +147,7 @@ let array_new_data =
   let mut = varE "mut" in
   let zt = varE "zt" in
 
-  let nt = varE "nt" in
+  let cnn = varE "cnn" in
 
   let c = varE "c" in
 
@@ -157,12 +157,12 @@ let array_new_data =
   let cn = iterE (c, ["c"], ListN (n, None)) in
 
   let expanddt_with_type = callE ("expanddt", [callE ("type", [x])]) in
-  let storagesize = callE ("storagesize", [zt]) in
-  let unpacknumtype = callE ("unpacknumtype", [zt]) in
+  let zsize = callE ("zsize", [zt]) in
+  let cunpack = callE ("cunpack", [zt]) in
   (* include z or not ??? *)
   let data = callE ("data", [y]) in
-  let group_bytes_by = callE ("group_bytes_by", [binE (DivOp, storagesize, numE 8L); bstar]) in
-  let inverse_of_bytes_ = iterE (callE ("inverse_of_ibytes", [storagesize; gb]), ["gb"], List) in
+  let group_bytes_by = callE ("group_bytes_by", [binE (DivOp, zsize, numE (Z.of_int 8)); bstar]) in
+  let inverse_of_bytes_ = iterE (callE ("inverse_of_ibytes", [zsize; gb]), ["gb"], List) in
 
   RuleA (
     ("ARRAY.NEW_DATA", "admininstr"),
@@ -180,23 +180,23 @@ let array_new_data =
           ifI (
             binE (
               GtOp,
-              binE (AddOp, i, binE (DivOp, binE (MulOp, n, storagesize), numE 8L)),
+              binE (AddOp, i, binE (DivOp, binE (MulOp, n, zsize), numE (Z.of_int 8))),
               lenE (accE (callE ("data", [y]), dotP ("DATA", "datainst")))
             ),
             [ trapI () ],
             []
           );
-          letI (nt, unpacknumtype);
+          letI (cnn, cunpack);
           letI (
             bstar,
             accE (
               accE (data, dotP ("DATA", "datainst")),
-              sliceP (i, binE (DivOp, binE (MulOp, n, storagesize), numE 8L))
+              sliceP (i, binE (DivOp, binE (MulOp, n, zsize), numE (Z.of_int 8)))
             )
           );
           letI (gbstar, group_bytes_by);
           letI (cn, inverse_of_bytes_);
-          pushI (iterE (caseE (("CONST", "admininstr"), [nt; c]), ["c"], ListN (n, None)));
+          pushI (iterE (caseE (("CONST", "admininstr"), [cnn; c]), ["c"], ListN (n, None)));
           executeI (caseE (("ARRAY.NEW_FIXED", "admininstr"), [x; n]));
         ],
         []
@@ -210,7 +210,7 @@ let return_instrs_of_instantiate config =
   let store, frame, rhs = config in
   [
     enterI (
-      frameE (Some (numE 0L), frame),
+      frameE (Some (numE Z.zero), frame),
       listE ([ caseE (("FRAME_", "admininstr"), []) ]), rhs
     );
     returnI (Some (tupE [ store; varE "mm" ]))
@@ -226,3 +226,48 @@ let return_instrs_of_invoke config =
     popI (iterE (varE "val", ["val"], ListN (varE "k", None)));
     returnI (Some (iterE (varE "val", ["val"], ListN (varE "k", None))))
   ]
+
+let ref_type_of =
+  (* TODO: some / none *)
+  let null = caseV ("NULL", [ optV (Some (listV [||])) ]) in
+  let nonull = caseV ("NULL", [ optV None ]) in
+  let none = nullary "NONE" in
+  let nofunc = nullary "NOFUNC" in
+  let noextern = nullary "NOEXTERN" in
+
+  let match_heap_type v1 v2 =
+    let open Reference_interpreter in
+    let ht1 = Construct.al_to_heap_type v1 in
+    let ht2 = Construct.al_to_heap_type v2 in
+    Match.match_ref_type [] (Types.Null, ht1) (Types.Null, ht2)
+  in
+
+  function
+  (* null *)
+  | [CaseV ("REF.NULL", [ ht ]) as v] ->
+    if match_heap_type none ht then
+      CaseV ("REF", [ null; none])
+    else if match_heap_type nofunc ht then
+      CaseV ("REF", [ null; nofunc])
+    else if match_heap_type noextern ht then
+      CaseV ("REF", [ null; noextern])
+    else
+      v
+      |> Print.string_of_value
+      |> Printf.sprintf "Invalid null reference: %s"
+      |> failwith
+  (* i31 *)
+  | [CaseV ("REF.I31_NUM", [ _ ])] -> CaseV ("REF", [ nonull; nullary "I31"])
+  (* host *)
+  | [CaseV ("REF.HOST_ADDR", [ _ ])] -> CaseV ("REF", [ nonull; nullary "ANY"])
+  (* array/func/struct addr *)
+  | [CaseV (name, [ NumV i ])]
+  when String.starts_with ~prefix:"REF." name && String.ends_with ~suffix:"_ADDR" name ->
+    let field_name = String.sub name 4 (String.length name - 9) in
+    let object_ = listv_nth (Ds.Store.access field_name) (Z.to_int i) in
+    let dt = strv_access "TYPE" object_ in
+    CaseV ("REF", [ nonull; dt])
+  (* extern *)
+  (* TODO: check null *)
+  | [CaseV ("REF.EXTERN", [ _ ])] -> CaseV ("REF", [ nonull; nullary "EXTERN"])
+  | _ -> failwith "Invalid arguments for $ref_type_of"

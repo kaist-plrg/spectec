@@ -30,10 +30,10 @@ let rec string_of_vt = function
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 
 let decompose_vloadop = function
-| OptV (Some (CaseV ("ZERO", [ NumV n ])))
-| OptV (Some (CaseV ("SPLAT", [ NumV n ]))) -> n
-| OptV (Some (CaseV ("SHAPE", [ TupV [NumV m; NumV n]; _ ]))) -> Int64.mul m n
-| OptV (None) -> 128L
+| OptV (Some (CaseV ("ZERO", [ n ])))
+| OptV (Some (CaseV ("SPLAT", [ n ]))) -> unwrap_numv_to_int n
+| OptV (Some (CaseV ("SHAPE", [ TupV [m; n]; _ ]))) -> unwrap_numv_to_int m * unwrap_numv_to_int n
+| OptV (None) -> 128
 | v -> failwith ("Invalid vloadop: " ^ Print.string_of_value v)
 
 let decompose_memop s = (
@@ -86,12 +86,12 @@ let correct_cvtop = function
 | _ -> false
 
 let validate_shape = function
-  | TupV [ CaseV ("I8", []); NumV _ ] -> tupV [ caseV ("I8", []); numV 16L ]
-  | TupV [ CaseV ("I16", []); NumV _ ] -> tupV [ caseV ("I16", []); numV 8L ]
-  | TupV [ CaseV ("I32", []); NumV _ ] -> tupV [ caseV ("I32", []); numV 4L ]
-  | TupV [ CaseV ("I64", []); NumV _ ] -> tupV [ caseV ("I64", []); numV 2L ]
-  | TupV [ CaseV ("F32", []); NumV _ ] -> tupV [ caseV ("F32", []); numV 4L ]
-  | TupV [ CaseV ("F64", []); NumV _ ] -> tupV [ caseV ("F64", []); numV 2L ]
+  | TupV [ CaseV ("I8", []); NumV _ ] -> tupV [ caseV ("I8", []); numV_of_int 16 ]
+  | TupV [ CaseV ("I16", []); NumV _ ] -> tupV [ caseV ("I16", []); numV_of_int 8 ]
+  | TupV [ CaseV ("I32", []); NumV _ ] -> tupV [ caseV ("I32", []); numV_of_int 4 ]
+  | TupV [ CaseV ("I64", []); NumV _ ] -> tupV [ caseV ("I64", []); numV_of_int 2 ]
+  | TupV [ CaseV ("F32", []); NumV _ ] -> tupV [ caseV ("F32", []); numV_of_int 4 ]
+  | TupV [ CaseV ("F64", []); NumV _ ] -> tupV [ caseV ("F64", []); numV_of_int 2 ]
   | v -> failwith ("Invalid shape: " ^ Print.string_of_value v)
 
 (* Estimate if given instruction is valid with expected type, rt1* -> rt2* *)
@@ -102,7 +102,8 @@ let validate_instr case args const (rt1, rt2) =
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )
   | "EXTEND" -> ( match args with
-    | [ CaseV ("I32", []) as nt; NumV 32L ] -> Some [ nt; choose [ numV 8L; numV 16L ] ]
+    | [ CaseV ("I32", []) as nt; n ] when unwrap_numv_to_int n = 32 ->
+      Some [ nt; choose [ numV_of_int 8; numV_of_int 16 ] ]
     | nt :: _ when is_inn nt -> Some args
     | _ -> None )
   | "CVTOP" -> if correct_cvtop args then Some args else None
@@ -154,7 +155,7 @@ let validate_instr case args const (rt1, rt2) =
     | [ vloadop; memop; ] ->
       let n = decompose_vloadop vloadop in
       let (a, o) = decompose_memop memop in
-      let a' = dec_align a (Int64.to_int n / 8) in
+      let a' = dec_align a (n / 8) in
 
       Some [ vloadop; compose_memop a' o; ]
     | v -> failwith ("Invalid vec load op: " ^ Print.string_of_value (listV_of_list v))
@@ -170,11 +171,13 @@ let validate_instr case args const (rt1, rt2) =
     )
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
-    | [ NumV n; memop; _ ] ->
+    | [ n; memop; _ ] ->
+      let i = unwrap_numv_to_int n in
       let (a, o) = decompose_memop memop in
-      let a' = dec_align a (Int64.to_int n / 8) in
+      let a' = dec_align a (i / 8) in
+      let j = Random.int (128 / i) in
 
-      Some [ NumV n; compose_memop a' o; numV (Random.int64 (Int64.div 128L n)) ]
+      Some [ n; compose_memop a' o; numV_of_int j ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VUNOP" | "VBINOP" | "VRELOP"->

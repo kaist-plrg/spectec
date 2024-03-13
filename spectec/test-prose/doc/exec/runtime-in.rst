@@ -20,11 +20,11 @@ $${syntax+:
 
 .. _def-default:
 
-$${definition-prose: default}
+$${definition-prose: default_}
 
 \
 
-$${definition: default}
+$${definition: default_}
 
 Results
 ~~~~~~~
@@ -221,7 +221,7 @@ $${definition: globalsxv}
 .. _syntax-structinst:
 .. _syntax-arrayinst:
 .. _syntax-fieldval:
-.. _syntax-packedval:
+.. _syntax-packval:
 .. _exec-runtime-aggregate-instances:
 
 Aggregate Instances
@@ -231,7 +231,7 @@ $${syntax+:
   structinst
   arrayinst
   fieldval
-  packedval
+  packval
 }
 
 .. _def-arrayinst:

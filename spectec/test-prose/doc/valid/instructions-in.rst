@@ -51,14 +51,6 @@ $${rule-prose: valid/relop}
 
 $${rule: Instr_ok/relop}
 
-.. _valid-extend:
-
-$${rule-prose: valid/extend}
-
-\
-
-$${rule: Instr_ok/extend}
-
 .. _valid-cvtop:
 
 $${rule-prose: valid/cvtop}
@@ -287,13 +279,13 @@ $${rule: Instr_ok/i31.get}
 Vector Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. _valid-vvconst:
+.. _valid-vconst:
 
-$${rule-prose: valid/vvconst}
+$${rule-prose: valid/vconst}
 
 \
 
-$${rule: Instr_ok/vvconst}
+$${rule: Instr_ok/vconst}
 
 .. _valid-vvunop:
 
@@ -383,17 +375,17 @@ $${rule-prose: valid/vrelop}
 
 $${rule: Instr_ok/vrelop}
 
-.. _valid-vishiftop:
+.. _valid-vshiftop:
 
-$${rule-prose: valid/vishiftop}
+$${rule-prose: valid/vshiftop}
 
 \
 
-$${rule: Instr_ok/vishiftop}
+$${rule: Instr_ok/vshiftop}
 
 .. _valid-vtestop:
 
-$${rule-prose: valid/vall_true}
+$${rule-prose: valid/vtestop}
 
 \
 
@@ -423,29 +415,21 @@ $${rule-prose: valid/vbitmask}
 
 $${rule: Instr_ok/vbitmask}
 
-.. _valid-vdot:
+.. _valid-vextunop:
 
-$${rule-prose: valid/vdot}
-
-\
-
-$${rule: Instr_ok/vdot}
-
-.. _valid-vextmul:
-
-$${rule-prose: valid/vextmul}
+$${rule-prose: valid/vextunop}
 
 \
 
-$${rule: Instr_ok/vextmul}
+$${rule: Instr_ok/vextunop}
 
-.. _valid-vextadd_pairwise:
+.. _valid-vextbinop:
 
-$${rule-prose: valid/vextadd_pairwise}
+$${rule-prose: valid/vextbinop}
 
 \
 
-$${rule: Instr_ok/vextadd_pairwise}
+$${rule: Instr_ok/vextbinop}
 
 .. _valid-instructions-external-reference:
 
@@ -511,7 +495,7 @@ TODO (not found)
 
 \
 
-$${rule+: Instrf_ok/local.set}
+$${rule+: Instr_ok/local.set}
 
 .. _valid-local.tee:
 
@@ -522,7 +506,7 @@ TODO (not found)
 
 \
 
-$${rule+: Instrf_ok/local.tee}
+$${rule+: Instr_ok/local.tee}
 
 .. _valid-global.get:
 
@@ -875,7 +859,6 @@ Instruction Sequences
 ~~~~~~~~~~~~~~~~~~~~~
 
 $${rule+:
-  Instrf_ok/instr
   Instrs_ok/*
 }
 

@@ -1,5 +1,5 @@
 exception Trap
 exception OutOfMemory
 exception Timeout
-exception MissingReturnValue
+exception MissingReturnValue of string
 exception Exhaustion

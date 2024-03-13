@@ -27,18 +27,21 @@ let flatten_rec =
     | _ -> [ def ]
   )
 
-let find_syn name =
-  match
-    List.find_map (fun def ->
-      match def.it with
-      | Il.Ast.SynD (id, deftyp) when id.it = name -> Some deftyp
-      | _ -> None
-    ) !il
-  with
-  | Some syn -> syn
+let extract_deftyp inst =
+  match inst.it with
+  | Il.Ast.InstD (_binds, _args, deftyp) -> deftyp
+(* TODO: Extract deftyp with considering parameters *)
+let has_name name def =
+  match def.it with
+  | Il.Ast.TypD (id, _params, insts) when id.it = name -> Some (choose insts |> extract_deftyp)
+  | _ -> None
+let find_deftyp name =
+  match List.find_map (has_name name) !il with
+  | Some deftyp -> deftyp
   | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 
-let string_of_atom = Il.Print.string_of_atom
+let string_of_atom = Il.Atom.string_of_atom
+let string_of_mixop = Il.Atom.string_of_mixop
 let string_of_module m = match m with
 | Al.Ast.CaseV ("MODULE", args) ->
   "(MODULE\n  " ^ (List.map Al.Print.string_of_value args |> String.concat "\n  ") ^ "\n)"
@@ -78,13 +81,13 @@ let get_rt rule =
   let open Il.Ast in
   let rec estimate_rt e =
     match e.it with
-    | CaseE (atom, { it = TupE []; _}) -> [ T (nullary (string_of_atom atom)) ]
+    | CaseE ([[atom]], { it = TupE []; _}) -> [ T (nullary (string_of_atom atom)) ]
     | ListE es -> List.concat_map estimate_rt es
     | VarE id -> [ SubT (id.it, Il.Print.string_of_typ e.note) ]
-    | SubE ({ it = VarE id; _ }, { it = VarT id'; _ }, _)  -> [ SubT (id.it, id'.it) ]
+    | SubE ({ it = VarE id; _ }, { it = VarT (id', _); _ }, _)  -> [ SubT (id.it, id'.it) ]
     | SubE (
       { it = CallE (name, _); _},
-      { it = VarT id; _ },
+      { it = VarT (id, _); _ },
       _
     ) when name.it = "unpacked" -> [ SubT (id.it, id.it) ]
     | IterE (e', (List, _)) -> [ SeqT (List.hd (estimate_rt e')) ]
@@ -112,7 +115,7 @@ let get_rt rule =
   match exp.it with
   | TupE [_c; lhs; rhs] ->
     (match rhs.it with
-    | MixE (_, args) ->
+    | CaseE (_, args) ->
       (match args.it with
       | TupE [t1; t2] | TupE [t1; _; t2] ->
         let name = id.it |> String.split_on_char '-' |> List.hd |> String.uppercase_ascii in
@@ -200,7 +203,7 @@ let estimate_const () =
           (match args.it with
           | TupE [_; e; _] | TupE [_; e] ->
             (match e.it with
-            | CaseE (Atom atomid, _) | MixE ([Atom atomid] :: _, _) ->
+            | CaseE ([ { it = Atom atomid; _ } ] :: _, _) ->
               push atomid const_ctxs
             | _ -> ()
             )
@@ -231,7 +234,7 @@ let default_context = {
 }
 
 let types_cache = ref []
-let type_cache = ref (numV 0L)
+let type_cache = ref zero
 let locals_cache = ref []
 let tids_cache = ref []
 let globals_cache = ref []
@@ -241,7 +244,7 @@ let refs_cache = ref []
 
 let init_cache () =
   types_cache := [];
-  type_cache := (numV 0L);
+  type_cache := zero;
   locals_cache := [];
   tids_cache := [];
   globals_cache := [];
@@ -268,9 +271,9 @@ let get_type types tid =
 let estimate_out t types =
   let open Al.Ast in
   match t with
-  | NumV i64 ->
-    i64
-    |> Int64.to_int
+  | NumV n ->
+    n
+    |> Z.to_int
     |> get_type types
     |> snd
   | TupV [ CaseV ("MUT", _); v ] | v -> [ T v ]
@@ -280,10 +283,6 @@ let is_func_table = function
   | _ -> false
 
 exception OutOfLife
-
-let gen_vector () =
-  let gen_byte _ = Char.chr (Random.int 256) in
-  String.init 16 gen_byte |> vecV
 
 (* Generate specific syntax from input IL *)
 let rec gen c name =
@@ -303,56 +302,21 @@ let rec gen c name =
   (* HARDCODE: name *)
   | "name" -> Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])
   (* HARDCODE: memidx to be always 0 *)
-  | "memidx" -> numV 0L
+  | "memidx" -> zero
   (* HARCODE: typeidx of function is already cached *)
   | "typeidx" when c.parent_case = "FUNC" ->
     List.nth !tids_cache c.i |> numV_of_int |> do_cache type_cache
-  (* HARDCODE: c_vectype to be string *)
-  | "c_vectype" ->
-    gen_vector ()
+  (* HARDCODE: vN to be 16 bytes (128 bits) *)
+  | "vN" -> numV (gen_bytes 16)
   (* HARDCODE: pack_size to be 8/16/32 *)
   | "n" when List.mem c.parent_case
     [ "LOAD"; "STORE"; "EXTEND"; "VLOAD_LANE"; "VSTORE_LANE" ] ->
       numV_of_int (choose [8; 16; 32])
   | _ ->
-    let syn = find_syn name in
+    let deftyp = find_deftyp name in
     let result =
-      match syn.it with
+      match deftyp.it with
       | AliasT typ -> gen_typ c' typ
-      (* TupV *)
-      | NotationT ([[]; []; []], typs) -> Al.Ast.TupV (gen_typs c' typs)
-      (* limits *)
-      | NotationT ([[LBrack]; [Dot2]; [RBrack]], typs) ->
-        let pair = gen_typs c' typs in
-        let fst = List.hd pair in
-        let snd = List.hd (List.tl pair) in
-        let new_snd = map2 unwrap_numv numV Int64.add fst snd in
-        Al.Ast.TupV [ fst; new_snd ]
-      (* Shape *)
-      | NotationT ([[]; [Atom "X"]; []], typs) when name = "shape" ->
-        let shape = Al.Ast.TupV (gen_typs c' typs) in
-        validate_shape shape
-      (* packshape *)
-      | NotationT ([[]; [Atom "X"]; []], _) when name = "packshape" ->
-        (* TODO: Hardcode packshape *)
-        let packshape = choose [ [32L; 2L]; [16L; 4L]; [8L; 8L] ] in
-        tupV (List.map numV packshape)
-      (* CaseV *)
-      | NotationT ((Atom atomid :: _) :: _, typs)
-      | NotationT ([[]; [Atom atomid]], typs) (* Hack for I8 *) ->
-        let c'' = { c' with parent_case = atomid } in
-        let args =
-          typs
-          |> gen_typs c''
-          (* Regenerated deferred wasm funcs *)
-          |> List.map (gen_wasm_funcs c'')
-        in
-        Al.Ast.CaseV (atomid, args)
-      (* InfixE *)
-      | NotationT ([[]; [Arrow]; []], typs)
-      | NotationT ([[]; [Star; Arrow]; [Star]], typs) ->
-        let pair = gen_typs c' typs in
-        Al.Ast.TupV pair
       (* StrV *)
       | StructT typfields ->
         let rec_ =
@@ -367,15 +331,15 @@ let rec gen c name =
       | VariantT typcases when name = "instr" ->
         (* HARDCODE: checks if currently in a context that requires const instrution *)
         let const_required = List.mem c.parent_case !const_ctxs in
-        let const_filter (atom, _, _) = const_required --> List.mem (string_of_atom atom) !consts in
-        let block_filter (atom, _, _) =
-          (c.depth_limit <= 0) --> not (List.mem (string_of_atom atom) [ "BLOCK"; "LOOP"; "IF" ])
+        let const_filter (mixop, _, _) = const_required --> List.mem (string_of_mixop mixop) !consts in
+        let block_filter (mixop, _, _) =
+          (c.depth_limit <= 0) --> not (List.mem (string_of_mixop mixop) [ "BLOCK"; "LOOP"; "IF" ])
         in
         let typcases' = typcases |> List.filter const_filter |> List.filter block_filter in
         let rec try_instr life =
           if life = 0 then raise OutOfLife;
-          let atom, (_, typs, _), _ = choose typcases' in
-          let case = string_of_atom atom in
+          let mixop, (_, typs, _), _ = choose typcases' in
+          let case = string_of_mixop mixop in
           let t1, t2, entangles = Record.find case !rts in
           let rt1, rt2, induced_args = fix_rts case const_required t1 t2 entangles in
           let valid_rts =
@@ -418,18 +382,10 @@ let rec gen c name =
         in
         try_instr 100
       | VariantT typcases ->
-        let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "BOT") typcases in
-        (* let typcases = List.filter (fun (atom, _, _) -> atom <> Il.Ast.Atom "EXTERNREF") typcases in *)
+        let typcases = List.filter (fun (mixop, _, _) -> string_of_mixop mixop <> "BOT") typcases in
+        (* let typcases = List.filter (fun (mixop, _, _) -> string_of_mixop mixop <> "EXTERNREF") typcases in *)
         let typcase = choose typcases in
-        let atom, (_, typs, _), _ = typcase in
-        let case = string_of_atom atom in
-        let args = gen_typs { c' with parent_case = case } typs in
-        Al.Ast.CaseV (case, args)
-      | _ ->
-        failwith (
-          Printf.sprintf "TODO: gen of %s: %s"
-            (Il.Print.string_of_deftyp syn) (Il.Print.structured_string_of_deftyp syn)
-        )
+        gen_typcase c' typcase
     in
 
     result
@@ -437,6 +393,44 @@ let rec gen c name =
       name = "globaltype" || name = "reftype" && c.parent_case = "ELEM"
     ) type_cache
     |> append_cache_if (name = "funcidx" && not c.is_func) refs_cache
+
+and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
+  let open Il.Atom in
+  match mixop with
+    (* TupV *)
+    | [[]; []; []] -> Al.Ast.TupV (gen_typs c typs)
+    (* limits *)
+    | [[{ it = LBrack; _}]; [{ it = Dot2; _}]; [{it = RBrack; _}]] ->
+      let pair = gen_typs c typs in
+      let fst = List.hd pair in
+      let snd = List.hd (List.tl pair) in
+      (* Make snd larger than fst *)
+      let new_snd = map2 unwrap_numv numV Z.add fst snd in
+      Al.Ast.TupV [ fst; new_snd ]
+    (* Shape *)
+    | [[]; [{it = Atom "X"; _}]; []] ->
+      let shape = Al.Ast.TupV (gen_typs c typs) in
+      validate_shape shape
+    (* CaseV *)
+    | ({it = Atom atomid; _} :: _) :: _
+    | [[]; [{it = Atom atomid; _}]] (* Hack for I8 *) ->
+      let c' = { c with parent_case = atomid } in
+      let args =
+        typs
+        |> gen_typs c'
+        (* Regenerated deferred wasm funcs *)
+        |> List.map (gen_wasm_funcs c')
+      in
+      Al.Ast.CaseV (atomid, args)
+    (* InfixE *)
+    | [[]; [{it = Arrow; _}]; []]
+    | [[]; [{it = Star; _}; {it = Arrow; _}]; [{it = Star; _}]] ->
+      let pair = gen_typs c typs in
+      Al.Ast.TupV pair
+    | _ ->
+      let case = string_of_mixop mixop in
+      let args = gen_typs { c with parent_case = case } typs in
+      Al.Ast.CaseV (case, args)
 
 and gen_wasm_expr c rt1 rt2 label =
   let max_life = 100 in
@@ -466,7 +460,7 @@ and gen_wasm_funcs c = function
 and gen_typ c typ =
   match typ.it with
   (* HARDCODE: imported builtins *)
-  | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
+  | IterT ({ it = VarT (id, _); _ }, List) when id.it = "import" ->
     let import name kind t =
       Al.Ast.CaseV ("IMPORT", [ TextV "spectest_values"; TextV name; caseV (kind, [t])])
     in
@@ -477,11 +471,11 @@ and gen_typ c typ =
       import "global_i64" "GLOBAL" (TupV [const; nullary "I64"]);
       import "global_f32" "GLOBAL" (TupV [const; nullary "F32"]);
       import "global_f64" "GLOBAL" (TupV [const; nullary "F64"]);
-      import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; nullary "FUNCREF" ]);
+      (* import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; nullary "FUNCREF" ]); *)
       (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
     ]
   (* HARDCODE: export functios *)
-  | IterT ({ it = VarT id; _ }, List) when id.it = "export" ->
+  | IterT ({ it = VarT (id, _); _ }, List) when id.it = "export" ->
     let l =
       List.init (List.length !tids_cache) (fun i ->
         let funcidx = numV_of_int i in
@@ -491,12 +485,12 @@ and gen_typ c typ =
     in
     listV_of_list l
   (* General types *)
-  | VarT id -> gen c id.it
-  | NumT NatT when c.parent_case = "SPLAT" -> numV (choose [8L; 16L; 32L])
-  | NumT NatT when c.parent_case = "ZERO" -> numV (choose [32L; 64L])
+  | VarT (id, _) -> gen c id.it
+  | NumT NatT when c.parent_case = "SPLAT" -> numV_of_int (choose [8; 16; 32])
+  | NumT NatT when c.parent_case = "ZERO" -> numV_of_int (choose [32; 64])
   | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
-    let name = match typ'.it with VarT id -> id.it | _ -> "" in
+    let name = match typ'.it with VarT (id, _) -> id.it | _ -> "" in
     let n =
       match name with
       | "table" | "data" | "elem" | "type" | "func" | "global" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
@@ -515,15 +509,15 @@ and gen_typ c typ =
       if name = "global" then globals_cache := l;
       if name = "elem" then elems_cache := l;
       listV_of_list l
-  | TupT typs -> TupV (List.map (gen_typ c) typs)
+  | TupT typs -> TupV (typs |> List.map snd |> List.map (gen_typ c))
   | IterT (typ', Opt) ->
     if Random.bool() then optV None
     else optV (Some (gen_typ c typ'))
-  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.structured_string_of_typ typ)
+  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
 
 and gen_typs c typs =
   match typs.it with
-  | TupT typs' -> List.map (gen_typ c) typs'
+  | TupT typs' -> typs' |> List.map snd |> List.map (gen_typ c)
   | _ -> [ gen_typ c typs ]
 
 and fix_rts case const_required rt1 rt2 entangles =
@@ -710,10 +704,10 @@ let mk_assertion funcinst =
   let args =
     List.map (function
       | Al.Ast.CaseV ("I32", [])
+      | Al.Ast.CaseV ("F32", []) as t -> caseV ("CONST", [t; numV (gen_bytes 4)])
       | Al.Ast.CaseV ("I64", [])
-      | Al.Ast.CaseV ("F32", [])
-      | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; numV_of_int (Random.full_int 0x7fffffff)])
-      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VVCONST", [t; gen_vector ()])
+      | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; numV (gen_bytes 8)])
+      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VVCONST", [t; numV (gen_bytes 16)])
       | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
     ) arg_types
   in
@@ -781,12 +775,12 @@ let print_result result =
   );
   print "================"
 
-let to_phrase x = Reference_interpreter2.Source.(x @@ no_region)
+let to_phrase x = Reference_interpreter.Source.(x @@ no_region)
 
 let value_to_wast v =
-  let open Reference_interpreter2 in
+  let open Reference_interpreter in
   let open Script in
-  let open Values in
+  let open Value in
 
   let f32_pos_nan = F32.to_bits F32.pos_nan in
   let f32_neg_nan = F32.to_bits F32.neg_nan |> Int32.logand 0x0000_0000_ffff_ffffl in
@@ -794,9 +788,9 @@ let value_to_wast v =
   let f64_neg_nan = F64.to_bits F64.neg_nan in
 
   match v with
-  | Al.Ast.CaseV ("REF.FUNC_ADDR", _) -> RefResult (RefTypePat FuncRefType) |> to_phrase
+  | Al.Ast.CaseV ("REF.FUNC_ADDR", _) -> RefResult (RefTypePat FuncHT) |> to_phrase
   | _ ->
-    match Construct2.al_to_value v with
+    match Construct.al_to_value v with
     | Num n -> NumResult (NumPat (n |> to_phrase)) |> to_phrase
     | Ref r -> RefResult (RefPat (r |> to_phrase)) |> to_phrase
     (* TODO: Check implementattion *)
@@ -829,9 +823,9 @@ let value_to_wast v =
       | _ -> failwith "hi"
 
 let invoke_to_wast ((f, args), result) =
-  let open Reference_interpreter2.Script in
+  let open Reference_interpreter.Script in
   let f' = Reference_interpreter.Utf8.decode f in
-  let args' = List.map (Construct2.al_to_value %> to_phrase) args in
+  let args' = List.map (Construct.al_to_value %> to_phrase) args in
   let action = Invoke (None, f', args') |> to_phrase in
   match result with
   | Ok returns -> Some (AssertReturn (action, List.map value_to_wast returns))
@@ -842,7 +836,7 @@ let invoke_to_wast ((f, args), result) =
     None
 
 let to_wast seed m result =
-  let open Reference_interpreter2.Script in
+  let open Reference_interpreter.Script in
 
   let global ty value =
     caseV ("GLOBAL", [ TupV ([ CaseV ("MUT", [ OptV None ]); nullary ty]);
@@ -850,16 +844,16 @@ let to_wast seed m result =
   in
 
   let export name var =
-    caseV ("EXPORT", [ TextV name; CaseV ("GLOBAL", [ Construct2.al_of_int32 var ])])
+    caseV ("EXPORT", [ TextV name; CaseV ("GLOBAL", [ Construct.al_of_int32 var ])])
   in
 
   let m_spectest = ("MODULE", [
     empty_list; empty_list; empty_list;
     listV_of_list [
-      global "I32" (Construct2.al_of_int32 666l);
-      global "I64" (Construct2.al_of_int64 666L);
-      global "F32" (0x4426a666l |> Construct2.al_of_int32);
-      global "F64" (0x4084d4cccccccccdL |> Construct2.al_of_int64);
+      global "I32" (Construct.al_of_int32 666l);
+      global "I64" (Construct.al_of_int64 666L);
+      global "F32" (0x4426a666l |> Construct.al_of_int32);
+      global "F64" (0x4084d4cccccccccdL |> Construct.al_of_int64);
     ];
     empty_list; empty_list; empty_list; empty_list; OptV None;
     listV_of_list [
@@ -868,9 +862,9 @@ let to_wast seed m result =
       export "global_f32" 2l;
       export "global_f64" 3l;
     ];
-  ]) |> caseV |> Construct2.al_to_module in
+  ]) |> caseV |> Construct.al_to_module in
 
-  let m_r = Construct2.al_to_module m in
+  let m_r = Construct.al_to_module m in
 
   let spectest = Textual m_spectest |> to_phrase in
   let def = Textual m_r |> to_phrase in
@@ -898,7 +892,7 @@ let to_wast seed m result =
   let to_file name script =
     let file = Filename.concat !Flag.out (name ^ ".wast") in
     let oc = open_out file in
-    Reference_interpreter2.Print.script oc 80 `Textual script;
+    Reference_interpreter.Print.script oc 80 `Textual script;
     close_out oc
   in
 

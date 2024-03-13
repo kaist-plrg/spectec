@@ -104,7 +104,7 @@ let get_global_value module_name globalname =
   |> strv_access "VALUE"
   |> casev_nth_arg 0
   |> al_to_int
-  |> listv_nth (Record.find "GLOBAL" (get_store ()))
+  |> listv_nth (Store.access "GLOBAL")
   |> strv_access "VALUE"
   |> Array.make 1
   |> listV
@@ -137,7 +137,7 @@ let test_assertion assertion =
   match assertion.it with
   | AssertReturn (action, expected) ->
     let result = run_action action |> al_to_list al_to_value in
-    Run.assert_result no_region result (List.map it expected);
+    Run.assert_result no_region result expected;
     success
   | AssertTrap (action, re) -> (
     try
@@ -172,7 +172,18 @@ let run_command' command =
     ignore (run_action a); success
   | Assertion a -> test_assertion a
   | Meta _ -> pass
-let run_command = try_run run_command'
+
+let run_command command =
+  let start_time = Sys.time () in
+  let result =
+    try
+      run_command' command
+    with e ->
+      print_endline ("- Test failed at " ^ string_of_region command.at ^
+        " (" ^ Printexc.to_string e ^ ")");
+      fail
+  in
+  result, Sys.time () -. start_time
 
 let run_wast name script =
   let script =
@@ -245,23 +256,20 @@ let rec run_file path args =
   if Sys.is_directory path then
     run_dir path
   else try
-    (* Read file *)
-    let file = In_channel.with_open_bin path In_channel.input_all in
-
     (* Check file extension *)
     match Filename.extension path with
     | ".wast" ->
-      file
-      |> parse_file path Parse.Script.parse_string
+      path
+      |> parse_file path Parse.Script.parse_file
       |> run_wast path
     | ".wat" ->
-      file
-      |> parse_file path Parse.Module.parse_string
+      path
+      |> parse_file path Parse.Module.parse_file
       |> textual_to_module
       |> run_wat args
     | ".wasm" ->
-      file
-      |> parse_file path (Decode.decode "wasm module")
+      In_channel.with_open_bin path In_channel.input_all
+      |> parse_file path (Decode.decode path)
       |> run_wasm args
     | _ -> pass, 0.
   with Decode.Code _ | Parse.Syntax _ -> pass, 0.

@@ -18,9 +18,7 @@ let exports = ref empty_list
 (* TODO: Remove these hardcodenesses *)
 
 (* type *)
-let patch_types types =
-  let type_ = caseV ("TYPE", [tupV [empty_list; empty_list]]) in
-  listV (Array.append [|type_|] (unwrap_listv_to_array types))
+let patch_types types = types
 
 (* import *)
 let patch_imports _imports =
@@ -36,19 +34,7 @@ let patch_imports _imports =
   |]
 
 (* func *)
-let inc_type_idx = function (* Due to manually added 0th type, [] -> [] *)
-  | CaseV ("FUNC", tid :: args) ->
-    let add = map2 unwrap_numv numV Int64.add in
-    let inc_type_idx' =
-      walk_value (function
-        | CaseV ("_IDX", [tid]) -> caseV ("_IDX", [add tid one])
-        | v -> v
-      )
-    in
-    CaseV ("FUNC", (add tid one) :: List.map inc_type_idx' args)
-  | v -> v
 let patch_func func = func
-  |> inc_type_idx
 let patch_funcs funcs = listv_map patch_func funcs
 
 (* global *)

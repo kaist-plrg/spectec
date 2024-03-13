@@ -38,13 +38,13 @@ let both_empty cond1 cond2 =
   let get_list cond =
     match cond.it with
     | BinE (EqOp, e, { it = ListE []; _ })
-    | BinE (EqOp, { it = ListE []; _ }, e)
-    | BinE (EqOp, { it = LenE e; _ }, { it = NumE 0L; _ })
-    | BinE (EqOp, { it = NumE 0L; _ }, { it = LenE e; _ })
-    | BinE (LtOp, { it = LenE e; _ }, { it = NumE 1L; _ })
-    | BinE (LeOp, { it = LenE e; _ }, { it = NumE 0L; _ })
-    | BinE (GeOp, { it = NumE 0L; _ }, { it = LenE e; _ })
-    | BinE (GeOp, { it = NumE 1L; _ }, { it = LenE e; _ }) -> Some e
+    | BinE (EqOp, { it = ListE []; _ }, e) -> Some e
+    | BinE (EqOp, { it = LenE e; _ }, { it = NumE z; _ })
+    | BinE (EqOp, { it = NumE z; _ }, { it = LenE e; _ })
+    | BinE (LeOp, { it = LenE e; _ }, { it = NumE z; _ })
+    | BinE (GeOp, { it = NumE z; _ }, { it = LenE e; _ }) when z = Z.zero -> Some e
+    | BinE (LtOp, { it = LenE e; _ }, { it = NumE z; _ })
+    | BinE (GeOp, { it = NumE z; _ }, { it = LenE e; _ }) when z = Z.one -> Some e
     | _ -> None
   in
   match get_list cond1, get_list cond2 with
@@ -55,13 +55,13 @@ let both_non_empty cond1 cond2 =
   let get_list cond =
     match cond.it with
     | BinE (NeOp, e, { it = ListE []; _ })
-    | BinE (NeOp, { it = ListE []; _ }, e)
-    | BinE (NeOp, { it = LenE e; _ }, { it = NumE 0L; _ })
-    | BinE (NeOp, { it = NumE 0L; _ }, { it = LenE e; _ })
-    | BinE (LtOp, { it = NumE 0L; _ }, { it = LenE e; _ })
-    | BinE (GtOp, { it = LenE e; _ }, { it = NumE 0L; _ })
-    | BinE (LeOp, { it = NumE 1L; _ }, { it = LenE e; _ })
-    | BinE (GeOp, { it = LenE e; _ }, { it = NumE 1L; _ }) -> Some e
+    | BinE (NeOp, { it = ListE []; _ }, e) -> Some e
+    | BinE (NeOp, { it = LenE e; _ }, { it = NumE z; _ })
+    | BinE (NeOp, { it = NumE z; _ }, { it = LenE e; _ })
+    | BinE (LtOp, { it = NumE z; _ }, { it = LenE e; _ })
+    | BinE (GtOp, { it = LenE e; _ }, { it = NumE z; _ }) when z = Z.zero -> Some e
+    | BinE (LeOp, { it = NumE z; _ }, { it = LenE e; _ })
+    | BinE (GeOp, { it = LenE e; _ }, { it = NumE z; _ }) when z = Z.one-> Some e
     | _ -> None
   in
   match get_list cond1, get_list cond2 with
@@ -94,9 +94,6 @@ let unify_tail l1 l2 =
   let unified, l1', l2' = unify [] (List.rev l1) (List.rev l2) in
   List.rev unified, List.rev l1', List.rev l2'
 
-let intersect_list xs ys = List.filter (fun x -> List.mem x ys) xs
-let diff_list xs ys = Lib.List.filter_not (fun x -> List.mem x ys) xs
-
 
 (* AL -> AL transpilers *)
 
@@ -108,22 +105,22 @@ let rec insert_otherwise else_body instrs =
       let at = inst.at in
       match inst.it with
       | IfI (c, il, []) ->
-          let _, il' = walk il in
-          (true, ifI (c, il', else_body) ~at:at)
+        let _, il' = walk il in
+        (true, ifI (c, il', else_body) ~at:at)
       | IfI (c, il1, il2) ->
-          let visit_if1, il1' = walk il1 in
-          let visit_if2, il2' = walk il2 in
-          let visit_if = visit_if || visit_if1 || visit_if2 in
-          (visit_if, ifI (c, il1', il2') ~at:at)
+        let visit_if1, il1' = walk il1 in
+        let visit_if2, il2' = walk il2 in
+        let visit_if = visit_if || visit_if1 || visit_if2 in
+        (visit_if, ifI (c, il1', il2') ~at:at)
       | OtherwiseI il ->
-          let visit_if', il' = walk il in
-          let visit_if = visit_if || visit_if' in
-          (visit_if, otherwiseI il' ~at:at)
+        let visit_if', il' = walk il in
+        let visit_if = visit_if || visit_if' in
+        (visit_if, otherwiseI il' ~at:at)
       | EitherI (il1, il2) ->
-          let visit_if1, il1' = walk il1 in
-          let visit_if2, il2' = walk il2 in
-          let visit_if = visit_if || visit_if1 || visit_if2 in
-          (visit_if, eitherI (il1', il2') ~at:at)
+        let visit_if1, il1' = walk il1 in
+        let visit_if2, il2' = walk il2 in
+        let visit_if = visit_if || visit_if1 || visit_if2 in
+        (visit_if, eitherI (il1', il2') ~at:at)
       | _ -> (visit_if, inst))
     false instrs
 
@@ -135,16 +132,17 @@ let merge instrs1 instrs2 =
   let unified_tail =
     match tail2 with
     | [{ it = OtherwiseI else_body; _ }] ->
-        let visit_if, merged = insert_otherwise else_body tail1 in
-        if not visit_if then
-          print_endline
-            ("Warning: No corresponding if for"
-            ^ take 100 (Print.string_of_instrs instrs2));
-        merged
+      let visit_if, merged = insert_otherwise else_body tail1 in
+      if not visit_if then
+        print_endline
+          ("Warning: No corresponding if for"
+          ^ take 100 (Print.string_of_instrs instrs2));
+      merged
     | _ -> tail1 @ tail2
   in
   head @ unified_tail
 
+let merge_blocks blocks = List.fold_right merge blocks []
 
 (* Enhance readability of AL *)
 
@@ -162,11 +160,11 @@ let rec unify_if instrs =
       match (new_i, il) with
       | { it = IfI (c1, body1, []); at = at1; _ }, { it = IfI (c2, body2, []); at = at2; _ } :: rest
         when Eq.eq_expr c1 c2 ->
-          (* Assumption: common should have no side effect (replace) *)
-          let common, own_body1, own_body2 = unify_head body1 body2 in
-          let body = unify_if (common @ own_body1 @ own_body2) in
-          let at = over_region [ at1; at2 ] in
-          ifI (c1, body, []) ~at:at :: rest
+        (* Assumption: common should have no side effect (replace) *)
+        let common, own_body1, own_body2 = unify_head body1 body2 in
+        let body = unify_if (common @ own_body1 @ own_body2) in
+        let at = over_region [ at1; at2 ] in
+        ifI (c1, body, []) ~at:at :: rest
       | _ -> new_i :: il)
     instrs []
 
@@ -184,8 +182,8 @@ let rec infer_else instrs =
       match (new_i, il) with
       | { it = IfI (c1, then_body1, else_body1); at = at1; _ }, { it = IfI (c2, else_body2, then_body2); at = at2; _ } :: rest
         when eq_cond c1 (neg c2) ->
-          let at = over_region [ at1; at2 ] in
-          ifI (c1, then_body1 @ then_body2, else_body1 @ else_body2) ~at:at :: rest
+        let at = over_region [ at1; at2 ] in
+        ifI (c1, then_body1 @ then_body2, else_body1 @ else_body2) ~at:at :: rest
       | _ -> new_i :: il)
     instrs []
 
@@ -265,6 +263,8 @@ let merge_three_branches i =
   | _ -> i
 
 let remove_dead_assignment il =
+  let open Free in
+  let (@) = IdSet.union in
   let rec remove_dead_assignment' il pair =
     List.fold_right
       (fun instr (acc, bounds) ->
@@ -273,26 +273,26 @@ let remove_dead_assignment il =
         | IfI (e, il1, il2) ->
           let il1', bounds1 = remove_dead_assignment' il1 ([], bounds) in
           let il2', bounds2 = remove_dead_assignment' il2 ([], bounds) in
-          ifI (e, il1', il2') ~at:at :: acc, bounds1 @ bounds2 @ Free.free_expr e
+          ifI (e, il1', il2') ~at:at :: acc, bounds1 @ bounds2 @ free_expr e
         | EitherI (il1, il2) ->
           let il1', bounds1 = remove_dead_assignment' il1 ([], bounds) in
           let il2', bounds2 = remove_dead_assignment' il2 ([], bounds) in
           eitherI (il1', il2') ~at:at :: acc, bounds1 @ bounds2
         | EnterI (e1, e2, il) ->
           let il', bounds = remove_dead_assignment' il ([], bounds) in
-          enterI (e1, e2, il') ~at:at :: acc, bounds @ Free.free_expr e1 @ Free.free_expr e2
+          enterI (e1, e2, il') ~at:at :: acc, bounds @ free_expr e1 @ free_expr e2
         | LetI (e1, e2) ->
-          let bindings = (Free.free_expr e1) in
-          if intersect_list bindings bounds = [] then
+          let bindings = free_expr e1 in
+          if IdSet.(is_empty (inter bindings bounds)) then
             acc, bounds
           else
-            (instr :: acc), (diff_list bounds bindings) @ Free.free_expr e2
+            (instr :: acc), (IdSet.diff bounds bindings) @ free_expr e2
         | AssertI _ when acc = [] -> acc, bounds
         | _ ->
-          instr :: acc, bounds @ Free.free_instr instr)
+          instr :: acc, bounds @ free_instr instr)
       il pair
   in
-  remove_dead_assignment' il ([], []) |> fst
+  remove_dead_assignment' il ([], IdSet.empty) |> fst
 
 let remove_sub e =
   let e' =
@@ -390,8 +390,8 @@ let infer_case_assert instrs =
       | _ -> i
     ) il in
     match Util.Lib.List.split_last_opt il' with
-    | _, None -> []
-    | hd, Some tl -> hd @ rewrite_if tl
+    | None -> []
+    | Some (hd, tl) -> hd @ rewrite_if tl
   in
   rewrite_il instrs
 
@@ -513,41 +513,40 @@ let rec infer_assert instrs =
     | _ -> instrs
   else instrs
 
-let rec enforce_return_r rinstrs =
+let rec enforce_return' il =
   let rev = List.rev in
-  match rinstrs with
+  match il with
   | [] -> []
-  | tl :: hd ->
-    let at = tl.at in
-    match tl.it with
-    | ReturnI _ | TrapI -> rinstrs
+  | hd :: tl ->
+    let at = hd.at in
+    match hd.it with
+    | ReturnI _ | TrapI -> il
     | IfI (c, il1, il2) ->
-      ( match enforce_return' il1, enforce_return' il2 with
-      | [], [] -> enforce_return_r hd
-      | new_il, [] -> rev new_il @ (assertI c ~at:at :: hd)
-      | [], new_il -> rev new_il @ (assertI (neg c) ~at:at :: hd)
-      | new_il1, new_il2 -> ifI (c, new_il1, new_il2) ~at:at :: hd )
-    | OtherwiseI il -> otherwiseI (enforce_return' il) ~at:at :: hd
+      (match enforce_return il1, enforce_return il2 with
+      | [], [] -> enforce_return' tl
+      | new_il, [] -> rev new_il @ (assertI c ~at:at :: tl)
+      | [], new_il -> rev new_il @ (assertI (neg c) ~at:at :: tl)
+      | new_il1, new_il2 -> ifI (c, new_il1, new_il2) ~at:at :: tl
+      )
+    | OtherwiseI il -> otherwiseI (enforce_return il) ~at:at :: tl
     | EitherI (il1, il2) ->
-      ( match enforce_return' il1, enforce_return' il2 with
-      | [], [] -> enforce_return_r hd
+      (match enforce_return il1, enforce_return il2 with
+      | [], [] -> enforce_return' tl
       | new_il, []
-      | [], new_il -> rev new_il @ hd
-      | new_il1, new_il2 -> eitherI (new_il1, new_il2) ~at:at :: hd )
-    | _ -> enforce_return_r hd
-and enforce_return' instrs = instrs |> List.rev |> enforce_return_r |> List.rev
+      | [], new_il -> rev new_il @ tl
+      | new_il1, new_il2 -> eitherI (new_il1, new_il2) ~at:at :: tl
+      )
+    | _ -> enforce_return' tl
+
+and enforce_return il = il |> List.rev |> enforce_return' |> List.rev
 
 let contains_return il =
   let ret = ref false in
-  let config =
-    {
-      Walk.default_config with
-      pre_instr =
-        (fun i -> (match i.it with ReturnI _ | TrapI -> ret := true | _ -> ()); [ i ])
-    } in
+  let pre_instr = fun i -> (match i.it with ReturnI _ | TrapI -> ret := true | _ -> ()); [ i ] in
+  let config = { Walk.default_config with pre_instr } in
   List.map (Walk.walk_instr config) il |> ignore;
   !ret
 
 (* If intrs contain a return statement, make sure that every path has return statement in the end *)
-let enforce_return instrs =
-  if contains_return instrs then enforce_return' instrs else instrs
+let ensure_return il =
+  if contains_return il then enforce_return il else il

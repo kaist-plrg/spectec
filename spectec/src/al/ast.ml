@@ -3,7 +3,6 @@ open Util.Source
 (* Types *)
 
 type ty = string (* TODO *)
-type vec128 = string
 
 (* Identifiers *)
 
@@ -22,9 +21,8 @@ type ('a, 'b) record = ('a * 'b ref) list
 and store = (kwd', value) record
 
 and value =
-  | NumV of int64                      (* number *)
+  | NumV of Z.t                        (* number *)
   | BoolV of bool                      (* boolean *)
-  | VecV of vec128                     (* vector *)
   | TextV of string                    (* string *)
   | ListV of value growable_array      (* list of values *)
   | StrV of (kwd', value) record       (* key-value mapping *)
@@ -33,7 +31,6 @@ and value =
   | TupV of value list                 (* tuple of values *)
   | FrameV of value option * value     (* TODO: desugar using CaseV? *)
   | LabelV of value * value            (* TODO: desugar using CaseV? *)
-  | StoreV of store ref                (* TODO: check Wasm specificity? *)
 
 type extend_dir =                      (* direction of extension *)
   | Front                              (* extend from the front *)
@@ -76,7 +73,7 @@ type iter =
 and expr = expr' phrase
 and expr' =
   | VarE of id                          (* varid *)
-  | NumE of int64                       (* number *)
+  | NumE of Z.t                         (* number *)
   | BoolE of bool                       (* boolean *)
   | UnE of unop * expr                  (* unop expr *)
   | BinE of binop * expr * expr         (* expr binop expr *)

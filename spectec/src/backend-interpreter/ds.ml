@@ -43,6 +43,7 @@ let lookup_algo name =
 
 (* Store *)
 
+(** MERGE **)
 let _store : store ref = ref Record.empty
 let get_store () = !_store
 let copy_store r =
@@ -64,6 +65,26 @@ let copy_store r =
   |> Record.add "STRUCT" struct_
   |> Record.add "ARRAY" array_
 let set_store store = _store := store
+(* * * *)
+module Store = struct
+  let store = ref Record.empty
+
+  let init () =
+    store :=
+      Record.empty
+      |> Record.add "FUNC" (listV [||])
+      |> Record.add "GLOBAL" (listV [||])
+      |> Record.add "TABLE" (listV [||])
+      |> Record.add "MEM" (listV [||])
+      |> Record.add "ELEM" (listV [||])
+      |> Record.add "DATA" (listV [||])
+      |> Record.add "STRUCT" (listV [||])
+      |> Record.add "ARRAY" (listV [||])
+
+  let get () = strV !store
+
+  let access field = Record.find field !store
+end
 
 
 (* Environment *)
@@ -86,8 +107,6 @@ let lookup_env key env =
       key (string_of_env env)
     |> prerr_endline;
     raise Not_found
-
-let add_store = Env.add "s" (Ast.StoreV _store)
 
 
 (* Info *)
@@ -153,110 +172,74 @@ end
 (* AL Context *)
 
 module AlContext = struct
-  (* TODO: Change name *)
-  type return_value =
-    | Bot
-    | None
-    | Some of value
+  type mode =
+    (* Al context *)
+    | Al of string * instr list * env
+    (* Wasm context *)
+    | Wasm of int
+    (* Special context for enter/execute *)
+    | Enter of instr list * env
+    | Execute of value
+    (* Return register *)
+    | Return of value
 
-  type t = string * env * return_value * int
+  let al (name, il, env) = Al (name, il, env)
+  let wasm n = Wasm n
+  let enter (il, env) = Enter (il, env)
+  let execute v = Execute v
+  let return v = Return v
 
-  let context_stack: t list ref = ref []
-  let context_stack_length = ref 0
+  type t = mode list
 
-  let create_context name = name, Env.empty, Bot, 0
+  let tl = List.tl
 
-  let init_context () =
-    context_stack := [];
-    context_stack_length := 0
+  let is_reducible = function
+    | [] | [ Return _ ] -> false
+    | _ -> true
 
-  let push_context ctx =
-    context_stack := ctx :: !context_stack;
-    context_stack_length := 1 + !context_stack_length
+  let can_tail_call instr =
+    match instr.it with
+    | IfI _ | EitherI _ | PopI _ | LetI _ | ReturnI _ -> false
+    | _ -> true
 
-  let pop_context () =
-    context_stack_length := !context_stack_length - 1;
-    match !context_stack with
-    | h :: t -> context_stack := t; h
-    | _ -> failwith "AL context stack underflow"
+  let get_name ctx =
+    match List.hd ctx with
+    | Al (name, _, _) -> name
+    | Wasm _ -> "Wasm"
+    | Execute _ -> "Execute"
+    | Enter _ -> "Enter"
+    | Return _ -> "Return"
 
-  let get_context () =
-    match !context_stack with
-    | h :: _ -> h
-    | _ -> failwith "AL context stack underflow"
+  let add_instrs il = function
+    | Al (name, il', env) :: t -> Al (name, il @ il', env) :: t
+    | Enter (il', env) :: t -> Enter (il @ il', env) :: t
+    | _ -> failwith "Not in AL context"
 
-  let get_name () =
-    let name, _, _, _ = get_context () in
-    name
+  let get_env = function
+    | Al (_, _, env) :: _ -> env
+    | Enter (_, env) :: _ -> env
+    | _ -> failwith "Not in AL context"
 
-  (* Print *)
+  let set_env env = function
+    | Al (name, instrs, _) :: t -> Al (name, instrs, env) :: t
+    | Enter (instrs, _) :: t -> Enter (instrs, env) :: t
+    | _ -> failwith "Not in AL context"
 
-  let string_of_return_value = function
-    | Bot -> "⊥"
-    | None -> "None"
-    | Some v -> string_of_value v
+  let update_env k v = function
+    | Al (name, il, env) :: t -> Al (name, il, Env.add k v env) :: t
+    | Enter (instrs, env) :: t -> Enter (instrs, Env.add k v env) :: t
+    | _ -> failwith "Not in AL context"
 
-  let string_of_context ctx =
-    let name, _, return_value, depth = ctx in
-    Printf.sprintf "(%s, %s, %s)"
-      name
-      (string_of_return_value return_value)
-      (string_of_int depth)
+  let get_return_value = function
+    | [ Return v ] -> Some v
+    | [] -> None
+    | _ -> failwith "Unreachable"
 
-  let string_of_context_stack () =
-    List.fold_left
-      (fun acc ctx -> (string_of_context ctx) ^ " :: " ^ acc)
-      "[]" !context_stack
-
-  (* Env *)
-
-  let set_env env =
-    let name, _, return_value, depth = pop_context () in
-    push_context (name, env, return_value, depth)
-
-  let update_env n v =
-    let name, env, return_value, depth = pop_context () in
-    push_context (name, Env.add n v env, return_value, depth)
-
-  let get_env () =
-    let _, env, _, _ = get_context () in
-    env
-
-  (* Return value *)
-
-  let set_return_value v =
-    let name, env, return_value, depth = pop_context () in
-    assert (return_value = Bot);
-    push_context (name, env, Some v, depth)
-
-  let set_return () =
-    let name, env, return_value, depth = pop_context () in
-    assert (return_value = Bot);
-    push_context (name, env, None, depth)
-
-  let get_return_value () =
-    let _, _, return_value, _ = get_context () in
-    return_value
-
-  (* Depth *)
-
-  let get_depth () =
-    let _, _, _, depth = get_context () in
-    depth
-
-  let increase_depth () =
-    let name, env, return_value, depth = pop_context () in
-    push_context (name, env, return_value, depth + 1)
-
-  let rec decrease_depth () =
-    let name, env, return_value, depth = pop_context () in
-    if depth > 0 then
-      push_context (name, env, return_value, depth - 1)
-    else (
-      decrease_depth ();
-      push_context (name, env, return_value, depth)
-    )
-
+  let rec decrease_depth = function
+    | Wasm 1 :: t -> t
+    | Wasm n :: t -> Wasm (n - 1) :: t
+    | Al _ as mode :: t -> mode :: decrease_depth t
+    | _ -> failwith "Not in AL or Wasm context"
 end
 
 
@@ -335,13 +318,18 @@ module WasmContext = struct
 
   let is_value = function
     | CaseV ("CONST", _) -> true
-    | CaseV ("VVCONST", _) -> true
+    | CaseV ("VCONST", _) -> true
     | CaseV (ref, _)
       when String.starts_with ~prefix:"REF." ref -> true
     | _ -> false
 
   let get_value_stack () =
     let _, vs, _ = get_context () in
+    vs
+
+  let pop_value_stack () =
+    let v, vs, ws = pop_context () in
+    push_context (v, [], ws);
     vs
 
   let push_value v =
@@ -393,13 +381,4 @@ let init algos =
   func_map := fmap;
 
   (* Initialize store *)
-  _store :=
-    Record.empty
-    |> Record.add "FUNC" (listV [||])
-    |> Record.add "GLOBAL" (listV [||])
-    |> Record.add "TABLE" (listV [||])
-    |> Record.add "MEM" (listV [||])
-    |> Record.add "ELEM" (listV [||])
-    |> Record.add "DATA" (listV [||])
-    |> Record.add "STRUCT" (listV [||])
-    |> Record.add "ARRAY" (listV [||])
+  Store.init ()

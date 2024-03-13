@@ -47,8 +47,8 @@ let al_to_el_binop = function
    *)
 let al_to_el_infixop op =
   let elatom, typ = match op with
-  | "->" -> Some El.Ast.Arrow, ""
-  | "X" -> Some (El.Ast.Atom "X"), "shape"
+  | "->" -> Some Il.Atom.Arrow, ""
+  | "X" -> Some (Il.Atom.Atom "X"), "shape"
   | _ -> None, ""
   in
   Option.map
@@ -56,7 +56,7 @@ let al_to_el_infixop op =
     elatom
 
 let al_to_el_kwd (id, typ) = 
-  let elatom = El.Ast.Atom id in
+  let elatom = Il.Atom.Atom id in
   elatom $$ no_region % (ref typ)
 
 let rec al_to_el_iter iter = match iter with
@@ -91,9 +91,8 @@ and al_to_el_path pl =
 and al_to_el_expr expr =
   let exp' =
     match expr.it with
-    | Al.Ast.NumE i -> 
-        let ei = Int64.to_int i in
-        let eli = El.Ast.NatE (El.Ast.DecOp, ei) in
+    | Al.Ast.NumE i ->
+        let eli = El.Ast.NatE (El.Ast.DecOp, i) in
         Some eli
     | Al.Ast.UnE (op, e) ->
         let* elop = al_to_el_unop op in 
@@ -329,7 +328,7 @@ and render_expr' env expr =
       let loop = Al.Al_util.iterE (ids, [], iter) in
       let sloop = render_expr env loop in
       sprintf "for all %s, %s" sloop se
-  | Al.Ast.ArityE e -> 
+  | Al.Ast.ArityE e ->
       let se = render_expr env e in
       sprintf "the arity of %s" se 
   | Al.Ast.GetCurLabelE -> "the current label"
@@ -382,7 +381,7 @@ and render_expr' env expr =
   | _ ->
       let se = Al.Print.string_of_expr expr in
       let msg = sprintf "%s was not properly handled\n" se in
-      Util.Source.error expr.at "prose backend error: " msg 
+      Util.Source.error expr.at "prose backend" msg
 
 and render_path env path =
   match path.it with

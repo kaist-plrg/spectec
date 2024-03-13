@@ -1,11 +1,10 @@
 (library
   (name backend_interpreter)
-  (libraries reference_interpreter reference_interpreter2 util il el str middlend al)
+  (libraries reference_interpreter util il el str middlend al)
   (modules
     interpreter
     numerics
     construct
-    construct2
     runner
     exception
     manual

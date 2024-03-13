@@ -24,22 +24,22 @@ relation Externtype_ok: |- externtype : OK  hint(show "K-extern")
 
 
 rule Limits_ok:
-  |- `[n_1 .. n_2] : k
-  -- if n_1 <= n_2 <= k
+  |- `[n .. m] : k
+  -- if n <= m <= k
 
 rule Functype_ok:
-  |- ft : OK
+  |- t_1* -> t_2* : OK
 
 rule Globaltype_ok:
-  |- gt : OK
+  |- MUT? t : OK
 
 rule Tabletype_ok:
-  |- lim rt : OK
-  -- Limits_ok: |- lim : $(2^32-1)
+  |- limits reftype : OK
+  -- Limits_ok: |- limits : $(2^32-1)
 
 rule Memtype_ok:
-  |- lim I8 : OK
-  -- Limits_ok: |- lim : $(2^16)
+  |- limits I8 : OK
+  -- Limits_ok: |- limits : $(2^16)
 
 
 rule Externtype_ok/func:
@@ -166,13 +166,13 @@ rule Instrs_ok/frame:
   -- Instrs_ok: C |- instr* : t_1* -> t_2*
 
 
-;; Polymorphic instructions
-
-rule Instr_ok/unreachable:
-  C |- UNREACHABLE : t_1* -> t_2*
+;; Parametric instructions
 
 rule Instr_ok/nop:
   C |- NOP : eps -> eps
+
+rule Instr_ok/unreachable:
+  C |- UNREACHABLE : t_1* -> t_2*
 
 rule Instr_ok/drop:
   C |- DROP : t -> eps
@@ -191,15 +191,12 @@ rule Instr_ok/select-impl:
 
 relation Blocktype_ok: context |- blocktype : functype hint(show "K-block")
 
-rule Blocktype_ok/void:
-  C |- _RESULT eps : eps -> eps
-
-rule Blocktype_ok/result:
-  C |- _RESULT t : eps -> t
+rule Blocktype_ok/valtype:
+  C |- _RESULT valtype? : eps -> valtype?
 
 rule Blocktype_ok/typeidx:
-  C |- _IDX x : ft
-  -- if C.TYPE[x] = ft
+  C |- _IDX typeidx : t_1* -> t_2*
+  -- if C.TYPE[typeidx] = t_1* -> t_2*
 
 
 rule Instr_ok/block:
@@ -237,10 +234,6 @@ rule Instr_ok/br_table:
 
 ;; Function instructions
 
-rule Instr_ok/return:
-  C |- RETURN : t_1* t* -> t_2*
-  -- if C.RETURN = (t*)
-
 rule Instr_ok/call:
   C |- CALL x : t_1* -> t_2*
   -- if C.FUNC[x] = t_1* -> t_2*
@@ -250,6 +243,10 @@ rule Instr_ok/call_indirect:
   -- if C.TABLE[x] = lim FUNCREF
   -- if C.TYPE[y] = t_1* -> t_2*
 
+rule Instr_ok/return:
+  C |- RETURN : t_1* t* -> t_2*
+  -- if C.RETURN = (t*)
+
 
 ;; Numeric instructions
 
@@ -257,35 +254,28 @@ rule Instr_ok/const:
   C |- CONST nt c_nt : eps -> nt
 
 rule Instr_ok/unop:
-  C |- UNOP nt unop : nt -> nt
+  C |- UNOP nt unop_nt : nt -> nt
 
 rule Instr_ok/binop:
-  C |- BINOP nt binop : nt nt -> nt
+  C |- BINOP nt binop_nt : nt nt -> nt
 
 rule Instr_ok/testop:
-  C |- TESTOP nt testop : nt -> I32
+  C |- TESTOP nt testop_nt : nt -> I32
 
 rule Instr_ok/relop:
-  C |- RELOP nt relop : nt nt -> I32
+  C |- RELOP nt relop_nt : nt nt -> I32
 
-
-rule Instr_ok/extend:
-  C |- EXTEND nt n : nt -> nt
-  -- if n <= $size(nt)
 
 rule Instr_ok/cvtop-reinterpret:
   C |- CVTOP nt_1 REINTERPRET nt_2 : nt_2 -> nt_1
-  -- if nt_1 =/= nt_2
   -- if $size(nt_1) = $size(nt_2)
 
 rule Instr_ok/cvtop-convert-i:
   C |- CVTOP inn_1 CONVERT inn_2 sx? : inn_2 -> inn_1
-  -- if inn_1 =/= inn_2
   -- if sx? = eps <=> $size(inn_1) > $size(inn_2)
 
 rule Instr_ok/cvtop-convert-f:
   C |- CVTOP fnn_1 CONVERT fnn_2 : fnn_2 -> fnn_1
-  -- if fnn_1 =/= fnn_2
 
 
 ;; Reference instructions
@@ -304,70 +294,72 @@ rule Instr_ok/ref.is_null:
 ;; Vector instructions
 
 rule Instr_ok/vvconst:
-  C |- VVCONST V128 c_vt : eps -> V128
+  C |- VCONST V128 c : eps -> V128
 
 rule Instr_ok/vvunop:
-  C |- VVUNOP vt vvunop : V128 -> V128
+  C |- VVUNOP V128 vvunop : V128 -> V128
 
 rule Instr_ok/vvbinop:
-  C |- VVBINOP vt vvbinop : V128 V128 -> V128
+  C |- VVBINOP V128 vvbinop : V128 V128 -> V128
 
 rule Instr_ok/vvternop:
-  C |- VVTERNOP vt vvternop : V128 V128 V128 -> V128
+  C |- VVTERNOP V128 vvternop : V128 V128 V128 -> V128
 
 rule Instr_ok/vvtestop:
-  C |- VVTESTOP vt vvtestop : V128 -> I32
+  C |- VVTESTOP V128 vvtestop : V128 -> I32
+
+rule Instr_ok/vbitmask:
+  C |- VBITMASK sh : V128 -> I32
 
 rule Instr_ok/vswizzle:
   C |- VSWIZZLE sh : V128 V128 -> V128
 
 rule Instr_ok/vshuffle:
-  C |- VSHUFFLE sh laneidx* : V128 V128 -> V128
-  -- (if $(laneidx<$dim(sh) * 2))*
+  C |- VSHUFFLE (imm X N) i* : V128 V128 -> V128
+  -- (if $(i < N*2))*
 
 rule Instr_ok/vsplat:
-  C |- VSPLAT sh : $unpacked(sh) -> V128
+  C |- VSPLAT (lnn X N) : $unpack(lnn) -> V128
 
+;; TODO: This rule (or the abstract syntax) is too liberal, since some combinations are illegal
 rule Instr_ok/vextract_lane:
-  C |- VEXTRACT_LANE sh sx? laneidx : V128 -> $unpacked(sh)
-  -- if laneidx < $dim(sh)
+  C |- VEXTRACT_LANE (lnn X N) sx? i : V128 -> $unpack(lnn)
+  -- if i < N
 
 rule Instr_ok/vreplace_lane:
-  C |- VREPLACE_LANE sh laneidx : V128 $unpacked(sh) -> V128
-  -- if laneidx < $dim(sh)
+  C |- VREPLACE_LANE (lnn X N) i : V128 $unpack(lnn) -> V128
+  -- if i < N
 
 rule Instr_ok/vunop:
-  C |- VUNOP sh vunop : V128 -> V128
+  C |- VUNOP sh vunop_sh : V128 -> V128
 
 rule Instr_ok/vbinop:
-  C |- VBINOP sh vbinop : V128 V128 -> V128
+  C |- VBINOP sh vbinop_sh : V128 V128 -> V128
+
+rule Instr_ok/vtestop:
+  C |- VTESTOP sh vtestop_sh : V128 -> I32
 
 rule Instr_ok/vrelop:
-  C |- VRELOP sh vrelop : V128 V128 -> V128
+  C |- VRELOP sh vrelop_sh : V128 V128 -> V128
 
-rule Instr_ok/vishiftop:
-  C |- VISHIFTOP sh vishiftop : V128 I32 -> V128
+rule Instr_ok/vshiftop:
+  C |- VSHIFTOP sh vshiftop_sh : V128 I32 -> V128
 
-rule Instr_ok/vall_true:
-  C |- VALL_TRUE sh : V128 -> I32
-
+;; TODO: This rule (or the abstract syntax) is too liberal, since many of the combinations are illegal
 rule Instr_ok/vcvtop:
   C |- VCVTOP sh vcvtop hf? sh sx? zero : V128 -> V128
 
 rule Instr_ok/vnarrow:
   C |- VNARROW sh sh sx : V128 V128 -> V128
 
+rule Instr_ok/vextunop:
+  C |- VEXTUNOP sh sh vextunop sx : V128 -> V128
+
+rule Instr_ok/vextbinop:
+  C |- VEXTBINOP sh sh vextbinop sx : V128 V128 -> V128
+
 rule Instr_ok/vbitmask:
   C |- VBITMASK sh : V128 -> I32
-
-rule Instr_ok/vdot:
-  C |- VDOT sh sh sx : V128 V128 -> V128
-
-rule Instr_ok/vextmul:
-  C |- VEXTMUL sh half sh sx : V128 V128 -> V128
-
-rule Instr_ok/vextadd_pairwise:
-  C |- VEXTADD_PAIRWISE sh sh sx : V128 -> V128
 
 
 ;; Local instructions
@@ -408,7 +400,7 @@ rule Instr_ok/table.set:
 
 rule Instr_ok/table.size:
   C |- TABLE.SIZE x : eps -> I32
-  -- if C.TABLE[x] = tt
+  -- if C.TABLE[x] = lim rt
 
 rule Instr_ok/table.grow:
   C |- TABLE.GROW x : rt I32 -> I32
@@ -461,49 +453,49 @@ rule Instr_ok/data.drop:
   -- if C.DATA[x] = OK
 
 rule Instr_ok/load:
-  C |- LOAD nt (n _ sx)? {ALIGN n_A, OFFSET n_O} : I32 -> nt
+  C |- LOAD nt (n _ sx)? memop : I32 -> nt
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) <= $size(nt)/8)
-  -- if $(2^(n_A) <= n/8 < $size(nt)/8)?
+  -- if $(2^(memop.ALIGN) <= $size(nt)/8)
+  -- if $(2^(memop.ALIGN) <= n/8 < $size(nt)/8)?
   -- if n? = eps \/ nt = inn
 
 rule Instr_ok/store:
-  C |- STORE nt n? {ALIGN n_A, OFFSET n_O} : I32 nt -> eps
+  C |- STORE nt n? memop : I32 nt -> eps
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) <= $size(nt)/8)
-  -- if $(2^(n_A) <= n/8 < $size(nt)/8)?
+  -- if $(2^(memop.ALIGN) <= $size(nt)/8)
+  -- if $(2^(memop.ALIGN) <= n/8 < $size(nt)/8)?
   -- if n? = eps \/ nt = inn
 
 rule Instr_ok/vload:
-  C |- VLOAD (SHAPE (M X N) sx) {ALIGN n_A, OFFSET n_O} : I32 -> V128
+  C |- VLOAD (SHAPE M X N sx) memop : I32 -> V128
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) <= M/8 * N)
+  -- if $(2^(memop.ALIGN) <= M/8 * N)
 
 rule Instr_ok/vload-splat:
-  C |- VLOAD (SPLAT n) {ALIGN n_A, OFFSET n_O} : I32 -> V128
+  C |- VLOAD (SPLAT n) memop : I32 -> V128
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) <= n/8)
+  -- if $(2^(memop.ALIGN) <= n/8)
 
 rule Instr_ok/vload-zero:
-  C |- VLOAD (ZERO n) {ALIGN n_A, OFFSET n_O} : I32 -> V128
+  C |- VLOAD (ZERO n) memop : I32 -> V128
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) < n/8)
+  -- if $(2^(memop.ALIGN) < n/8)
 
 rule Instr_ok/vload_lane:
-  C |- VLOAD_LANE n {ALIGN n_A, OFFSET n_O} laneidx : I32 V128 -> V128
+  C |- VLOAD_LANE n memop laneidx : I32 V128 -> V128
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) < n/8)
+  -- if $(2^(memop.ALIGN) < n/8)
   -- if $(laneidx < 128 / n)
 
 rule Instr_ok/vstore:
-  C |- VSTORE {ALIGN n_A, OFFSET n_O} : I32 V128 -> eps
+  C |- VSTORE memop : I32 V128 -> eps
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) <= $size(V128)/8)
+  -- if $(2^(memop.ALIGN) <= $size(V128)/8)
 
 rule Instr_ok/vstore_lane:
-  C |- VSTORE_LANE n {ALIGN n_A, OFFSET n_O} laneidx : I32 V128 -> eps
+  C |- VSTORE_LANE n memop laneidx : I32 V128 -> eps
   -- if C.MEM[0] = mt
-  -- if $(2^(n_A) < n/8)
+  -- if $(2^(memop.ALIGN) < n/8)
   -- if $(laneidx < 128 / n)
 
 
@@ -518,8 +510,8 @@ relation Expr_ok_const: context |- expr : valtype CONST  hint(show "TC-expr")
 rule Instr_const/const:
   C |- (CONST nt c) CONST
 
-rule Instr_const/vvconst:
-  C |- (VVCONST vt c_vt) CONST
+rule Instr_const/vconst:
+  C |- (VCONST vt vc) CONST
 
 rule Instr_const/ref.null:
   C |- (REF.NULL rt) CONST
@@ -652,20 +644,31 @@ rule Externidx_ok/mem:
 
 relation Module_ok: |- module : OK      hint(show "T-module")
 
+;; TODO: refs
 rule Module_ok:
   |- MODULE type* import* func* global* table* mem* elem* data^n start? export* : OK
-  ;; TODO: incremental contexts for globals
-  -- if C = {TYPE ft'*, FUNC ft*, GLOBAL gt*, TABLE tt*, MEM mt*, ELEM rt*, DATA OK^n}
-
   -- (Type_ok: |- type : ft')*
-  -- (Func_ok: C |- func : ft)*
-  -- (Global_ok: C |- global : gt)*
-  -- (Table_ok: C |- table : tt)*
-  -- (Mem_ok: C |- mem : mt)*
+  -- (Import_ok: {TYPE ft'*} |- import : ixt)*
 
-  -- (Elem_ok: C |- elem : rt)*
-  -- (Data_ok: C |- data : OK)^n
+  -- (Global_ok: C' |- global : gt)*
+  -- (Table_ok: C' |- table : tt)*
+  -- (Mem_ok: C' |- mem : mt)*
+
+  -- (Elem_ok: C' |- elem : rt)*
+  -- (Data_ok: C' |- data : OK)^n
+
+  -- (Func_ok: C |- func : ft)*
   -- (Start_ok: C |- start : OK)?
+  -- (Export_ok: C |- export : xt)*
 
   -- if |mt*| <= 1
   ;; -- TODO: disjoint export names
+
+  -- if C = {TYPE ft'*, FUNC ift* ft*, GLOBAL igt* gt*, TABLE itt* tt*, MEM imt* mt*, ELEM rt*, DATA OK^n}
+
+  -- if C' = {TYPE ft'*, FUNC ift* ft*, GLOBAL igt*, TABLE itt* tt*, MEM imt* mt*}
+
+  -- if ift* = $funcsxt(ixt*)
+  -- if igt* = $globalsxt(ixt*)
+  -- if itt* = $tablesxt(ixt*)
+  -- if imt* = $memsxt(ixt*)

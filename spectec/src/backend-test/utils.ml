@@ -20,6 +20,9 @@ let groupi_by f xs =
     new_ groups
   ) [] ixs
 
+let append_byte bs b = Z.(logor (shift_left bs 8) b)
+let gen_byte _ = Random.int 256 |> Z.of_int
+let gen_bytes n = List.init n gen_byte |> List.fold_left append_byte Z.zero
 
 (* TODO: move this to al/walk.ml *)
 open Al.Ast
@@ -29,11 +32,9 @@ let rec walk_value f v =
   match f v with
   | NumV _
   | BoolV _
-  | VecV _
   | TextV _
   | FrameV _
-  | LabelV _
-  | StoreV _ -> v
+  | LabelV _ -> v
   | ListV a -> ListV (ref (Array.map new_ !a))
   | StrV r -> StrV (Util.Record.map Fun.id new_ r)
   | CaseV (c, vl) -> CaseV (c, List.map new_ vl)

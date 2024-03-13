@@ -15,9 +15,9 @@ $${syntax+:
   externtype
 }
 
-$${syntax: {instr/control}}
+$${syntax: {instr/block}}
 
-$${syntax: {instr/numeric instr/local instr/global instr/memory} expr}
+$${syntax: {instr/num instr/local instr/global instr/memory} expr}
 
 
 
@@ -40,12 +40,12 @@ $${rule+: Instr_ok/loop}
 $${rule+: Instr_ok/if}
 
 
-$${rule+: Instr_ok/cvtop-*}
+$${rule-ignore: Instr_ok/cvtop-*}
 
 
 **Runtime**
 
-$${definition: default}
+$${definition: default_}
 
 $${definition: {funcaddr funcinst} {func table}}
 
