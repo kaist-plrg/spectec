@@ -26,11 +26,11 @@ let conform_test seed =
   let st_ref = test_engine "../interpreter/wasm" wast in
   let st_wt = test_engine "wasmtime wast" wast in
   let st_wr = test_engine "wasmer wast" wast in
-  let st_we = test_engine "wasmedge" wast in
+  let st_we = test_engine "runtimes/wasmedge/wasmedge" wast in
   if st_ref = 0 && st_wt = 0 && st_wr = 0 && st_we = 0 then (
     Sys.command ("rm " ^ wast) |> ignore
   )
-  else if st_wt = st_wr then (
+  else if st_ref = 0 && st_wt = st_wr && st_we = 0 then (
     Log.warn (wast ^ " may have nondeterministic behavior");
     Sys.command ("rm " ^ wast) |> ignore
   )
@@ -38,5 +38,5 @@ let conform_test seed =
     warn "../interpreter/wasm" wast st_ref;
     warn "wasmtime wast" wast st_wt;
     warn "wasmer wast" wast st_wr;
-    warn "wasmedge" wast st_we
+    warn "runtimes/wasmedge/wasmedge" wast st_we
   )

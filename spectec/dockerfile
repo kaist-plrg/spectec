@@ -57,7 +57,6 @@ RUN git checkout lww
 WORKDIR /home/spectec/spectec/runtimes/wasmedge
 RUN curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | bash -s -- -p .
 RUN /bin/bash -c "source ./env && make"
-ENV PATH="$PATH:/home/spectec/spectec/runtimes/wasmedge"
 
 
 WORKDIR /home/spectec/spectec
