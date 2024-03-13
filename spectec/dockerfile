@@ -31,6 +31,9 @@ RUN cmake --build .
 ENV PATH="$PATH:/home/wabt/bin"
 
 
+WORKDIR /home
+
+
 # Install wasmer
 
 RUN curl https://get.wasmer.io -sSfL | sh
@@ -43,10 +46,19 @@ ENV PATH="$PATH:$WASMER_DIR/bin"
 
 RUN curl https://wasmtime.dev/install.sh -sSf | bash
 
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# RUN . "$HOME/.cargo/env"
+RUN git clone https://github.com/bytecodealliance/wasmtime.git
+WORKDIR /home/wasmtime
+RUN git submodule update --init
+# RUN cargo build
+
+
+WORKDIR /home
+
 
 # Install spectec
 
-WORKDIR /home
 RUN git clone https://github.com/kaist-plrg/spectec.git
 WORKDIR /home/spectec/spectec
 RUN git checkout lww
