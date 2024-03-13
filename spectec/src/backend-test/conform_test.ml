@@ -3,7 +3,7 @@ let known_msgs = [
 ]
 
 let is_known_bug msg =
-  Sys.command ("grep " ^ msg ^ " stderr &> /dev/null") = 0
+  Sys.command ("grep " ^ msg ^ " stderr > /dev/null") = 0
 
 let test_engine engine wast =
   let cmd = engine ^ " " ^ wast in
