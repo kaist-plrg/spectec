@@ -280,10 +280,72 @@ let is_func_table = function
   | _ -> false
 
 exception OutOfLife
+module Interesting = Map.Make (Int)
+let interesting_values = 
+  let f n =
+    let (+) = Int64.add in 
+    let (-) = Int64.sub in 
+    if n > 1 then
+      let v = Int64.shift_left Int64.minus_one n in
+      let vs = [ v+1L; v; v-1L ] in
+      vs @ List.map Int64.abs vs
+    else if n = 1 then [ 2L; -2L ]
+    else if n = 0 then [ 1L; -1L ]
+    else assert false
+  in
+  let open Reference_interpreter in
+  let i8 = 0L :: List.concat (List.init 8 f) in
+  let i16 = 0L :: List.concat (List.init 16 f) in
+  let f32 = [
+    F32.zero; F32.pos_nan; F32.neg_nan;
+    F32.div (F32.of_string "1") F32.zero;
+    F32.div (F32.of_string "-1") F32.zero
+  ]
+  |> List.map F32.to_bits
+  |> List.map Int64.of_int32
+  in
+  let i32 =
+    0L :: List.concat (List.init 32 f)
+  in
+  let f64 = [
+    F64.zero; F64.pos_nan; F64.neg_nan;
+    F64.div (F64.of_string "1") F64.zero;
+    F64.div (F64.of_string "-1") F64.zero
+  ]
+  |> List.map F64.to_bits
+  in
+  let i64 =
+    0L :: Int64.max_int :: Int64.sub Int64.max_int 1L 
+    :: Int64.min_int :: Int64.add Int64.min_int 1L
+    :: List.concat (List.init 62 f)
+  in
+
+  let encode length n =
+    let r = ref n in
+    let f _ =
+      let res = Int64.unsigned_rem !r 256L |> Int64.to_int |> Char.chr in
+      r := Int64.unsigned_div !r 256L;
+      res
+    in
+    String.init length f
+  in
+  Interesting.empty
+  |> Interesting.add 8 (List.map (encode 1) i8)
+  |> Interesting.add 16 (List.map (encode 2) i16)
+  |> Interesting.add 32 (List.map (encode 4) (i32@f32))
+  |> Interesting.add 64 (List.map (encode 8) (i64@f64))
 
 let gen_vector () =
-  let gen_byte _ = Char.chr (Random.int 256) in
-  String.init 16 gen_byte |> vecV
+  let lanesize = choose [2; 4; 8; 16] in
+  List.init lanesize
+    (fun _ ->
+      interesting_values
+      |> Interesting.find (128/lanesize)
+      |> choose
+    )
+  |> List.fold_left (^) ""
+  |> vecV
+
 
 (* Generate specific syntax from input IL *)
 let rec gen c name =
