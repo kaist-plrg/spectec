@@ -24,7 +24,10 @@ WORKDIR /home
 RUN git clone --recursive https://github.com/WebAssembly/wabt
 WORKDIR /home/wabt
 RUN git submodule update --init
-RUN mkdir wabt/build && cd wabt/build && cmake .. && cmake --build .
+RUN mkdir build
+WORKDIR /home/wabt/build
+RUN cmake ..
+RUN cmake --build .
 ENV PATH="$PATH:/home/wabt/bin"
 
 
