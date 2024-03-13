@@ -16,14 +16,27 @@ let test_engine engine wast =
     else res
   in
   Log.debug ("Status: " ^ (string_of_int st));
-  if st > 0 then
-    Log.warn ("`" ^ cmd ^ "` failed");
   st
+
+let warn engine wast status =
+  if status <> 0 then Log.warn ("`" ^ engine ^ " " ^ wast ^ "` failed")
 
 let conform_test seed =
   let wast = Printf.sprintf "out/%d.wast" seed in
   let st_ref = test_engine "../interpreter/wasm" wast in
   let st_wt = test_engine "wasmtime wast" wast in
   let st_wr = test_engine "wasmer wast" wast in
-  if st_ref = 0 && st_wt = 0 && st_wr = 0 then
+  let st_we = test_engine "wasmedge" wast in
+  if st_ref = 0 && st_wt = 0 && st_wr = 0 && st_we = 0 then (
     Sys.command ("rm " ^ wast) |> ignore
+  )
+  else if st_wt = st_wr then (
+    Log.warn (wast ^ " may have nondeterministic behavior");
+    Sys.command ("rm " ^ wast) |> ignore
+  )
+  else (
+    warn "../interpreter/wasm" wast st_ref;
+    warn "wasmtime wast" wast st_wt;
+    warn "wasmer wast" wast st_wr;
+    warn "wasmedge" wast st_we
+  )
