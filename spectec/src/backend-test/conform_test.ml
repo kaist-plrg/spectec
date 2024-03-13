@@ -15,6 +15,7 @@ let test_engine engine wast =
       0
     else res
   in
+  if st = 255 then exit 130;
   Log.debug ("Status: " ^ (string_of_int st));
   st
 
