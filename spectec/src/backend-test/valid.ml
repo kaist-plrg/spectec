@@ -21,6 +21,54 @@ let f64T = nullary "F64"
 let make_ishape i = tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]
 let make_fshape i = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ]
 
+module Interesting = Map.Make (String)
+let interesting_values =
+  let f n =
+    let (+) = Int64.add in
+    let (-) = Int64.sub in
+    if n > 1 then
+      let v = Int64.shift_left Int64.minus_one n in
+      let vs = [ v+1L; v; v-1L ] in
+      vs @ List.map Int64.abs vs
+    else if n = 1 then [ 2L; -2L ]
+    else if n = 0 then [ 1L; -1L ]
+    else assert false
+  in
+  let open Reference_interpreter in
+  let i8 = 0L :: List.concat (List.init 8 f) in
+  let i16 = 0L :: List.concat (List.init 16 f) in
+  let f32 = [
+    F32.zero; F32.pos_nan; F32.neg_nan;
+    F32.div (F32.of_string "1") F32.zero;
+    F32.div (F32.of_string "-1") F32.zero
+  ]
+  |> List.map F32.to_bits
+  |> List.map Int64.of_int32
+  in
+  let i32 =
+    0L :: List.concat (List.init 32 f)
+  in
+  let f64 = [
+    F64.zero; F64.pos_nan; F64.neg_nan;
+    F64.div (F64.of_string "1") F64.zero;
+    F64.div (F64.of_string "-1") F64.zero
+  ]
+  |> List.map F64.to_bits
+  in
+  let i64 =
+    0L :: Int64.max_int :: Int64.sub Int64.max_int 1L
+    :: Int64.min_int :: Int64.add Int64.min_int 1L
+    :: List.concat (List.init 62 f)
+  in
+
+  Interesting.empty
+  |> Interesting.add "i8" i8
+  |> Interesting.add "i16" i16
+  |> Interesting.add "i32" i32
+  |> Interesting.add "f32" f32
+  |> Interesting.add "i64" i64
+  |> Interesting.add "f64" f64
+
 let rec string_of_vt = function
 | T v -> Al.Print.string_of_value v
 | SubT (x, sub) -> x ^ "<:" ^ sub
@@ -98,6 +146,10 @@ let validate_shape = function
 (* TODO: Perhaps some of these can be automated? *)
 let validate_instr case args const (rt1, rt2) =
   match case with
+  | "CONST" ->
+    let ty = choose ["i"; "f"] ^ string_of_int (choose [32; 64]) in
+    let n = interesting_values |> Interesting.find ty |> choose |> numV in
+    Some [nullary ty; n]
   | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )

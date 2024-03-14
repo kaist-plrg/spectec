@@ -2,20 +2,12 @@ FROM ubuntu:20.04
 
 RUN apt-get update
 RUN apt-get upgrade --yes
-RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install cmake python3 python3-pip git make curl --yes
-
-
-# Installing OCaml
-#   - opam v2.0.5
-#   - OCaml v5.0.0
-#   - dune v3.10.0
-#   - menhir v20230608
-
-RUN apt-get install opam --yes
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install cmake python3 python3-pip git make curl vim opam --yes
 RUN opam init --disable-sandboxing
 RUN opam switch create 5.0.0
 RUN opam install dune menhir --yes
 RUN eval $(opam config env)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 
 # Install wabt
@@ -33,7 +25,6 @@ ENV PATH="$PATH:/home/wabt/bin"
 
 WORKDIR /home
 
-
 # Install wasmer
 
 RUN curl https://get.wasmer.io -sSfL | sh
@@ -45,14 +36,7 @@ ENV PATH="$PATH:$WASMER_DIR/bin"
 # Install wasmtime
 
 RUN curl https://wasmtime.dev/install.sh -sSf | bash
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-# RUN . "$HOME/.cargo/env"
 RUN git clone https://github.com/bytecodealliance/wasmtime.git
-WORKDIR /home/wasmtime
-RUN git checkout v18.0.2
-RUN git submodule update --init
-# RUN cargo build
 
 
 WORKDIR /home
