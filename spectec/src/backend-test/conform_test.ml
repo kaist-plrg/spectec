@@ -19,25 +19,9 @@ let test_engine engine wast =
   Log.debug ("Status: " ^ (string_of_int st));
   st
 
-let warn engine wast status =
-  if status <> 0 then Log.warn ("`" ^ engine ^ " " ^ wast ^ "` failed")
-
 let conform_test seed =
   let wast = Printf.sprintf "out/%d.wast" seed in
-  let st_ref = test_engine "../interpreter/wasm" wast in
-  let st_wt = test_engine "../../wasmtime/target/release/wasmtime wast" wast in
-  let st_wr = test_engine "wasmer wast" wast in
-  let st_we = test_engine "runtimes/wasmedge/wasmedge" wast in
-  if st_ref = 0 && st_wt = 0 && st_wr = 0 && st_we = 0 then (
-    Sys.command ("rm " ^ wast) |> ignore
-  )
-  else if st_ref = 0 && st_wt = st_wr && st_we = 0 then (
-    Log.warn (wast ^ " may have nondeterministic behavior");
-    Sys.command ("rm " ^ wast) |> ignore
-  )
-  else (
-    warn "../interpreter/wasm" wast st_ref;
-    warn "wasmtime wast" wast st_wt;
-    warn "wasmer wast" wast st_wr;
-    warn "runtimes/wasmedge/wasmedge" wast st_we
-  )
+  let wt_12 = test_engine "../../wasmtime/target/release/wasmtime wast" wast in
+  let wt_18 = test_engine "wasmtime wast" wast in
+  if wt_12 <> wt_18 then Log.warn ("../../wasmtime/target/release/wasmtime wast " ^ wast)
+  else Sys.command ("rm " ^ wast) |> ignore
