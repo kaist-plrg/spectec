@@ -18,20 +18,12 @@ let exports = ref empty_list
 (* TODO: Remove these hardcodenesses *)
 
 (* type *)
-let patch_types types = types
+let patch_type type_ = type_
+let patch_types types = listv_map patch_type types
 
 (* import *)
-let patch_imports _imports =
-  let mk_import name kind t = caseV ("IMPORT", [ TextV "spectest_values"; TextV name; caseV (kind, [t])]) in
-  listV [|
-    (* mk_import "print" "FUNC" zero; *)
-    mk_import "global_i32" "GLOBAL" (TupV [none "MUT"; nullary "I32"]);
-    mk_import "global_i64" "GLOBAL" (TupV [none "MUT"; nullary "I64"]);
-    mk_import "global_f32" "GLOBAL" (TupV [none "MUT"; nullary "F32"]);
-    mk_import "global_f64" "GLOBAL" (TupV [none "MUT"; nullary "F64"]);
-    (* mk_import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; nullary "FUNCREF" ]); *)
-    (* mk_import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
-  |]
+let patch_import import = import
+let patch_imports imports = listv_map patch_import imports
 
 (* func *)
 let patch_func func = func

@@ -616,7 +616,11 @@ let func f =
 let table off i tab =
   let {ttype = TableT (lim, t); tinit} = tab.it in
   Node ("table $" ^ nat (off + i) ^ " " ^ limits nat32 lim,
-    atom ref_type t :: list instr tinit.it
+    atom ref_type t :: (
+      match tinit.it with
+      | [ { it = RefNull _; _ } ] -> []
+      | _ -> list instr tinit.it
+    )
   )
 
 let memory off i mem =

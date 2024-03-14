@@ -3819,11 +3819,7 @@ validation_of_RELOP nt relop_nt
 
 validation_of_CVTOP nt_1 REINTERPRET nt_2 ?()
 - $size(nt_1) must be equal to $size(nt_2).
-<<<<<<< HEAD
-- The instruction is valid with type ([nt_2] -> [nt_1]).
-=======
 - The instruction is valid with type ([nt_2] -> [] ++ [nt_1]).
->>>>>>> main
 
 validation_of_REF.NULL ht
 - Under the context C, ht must be valid.

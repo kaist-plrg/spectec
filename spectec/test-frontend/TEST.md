@@ -3475,24 +3475,6 @@ relation Instr_ok: `%|-%:%`(context, instr, instrtype)
   rule relop{C : context, nt : numtype, relop_nt : relop_(nt)}:
     `%|-%:%`(C, RELOP_instr(nt, relop_nt), `%->_%%`_instrtype(`%`_resulttype([(nt : numtype <: valtype) (nt : numtype <: valtype)]), [], `%`_resulttype([I32_valtype])))
 
-<<<<<<< HEAD
-  ;; 6-typing.watsup:700.1-703.34
-  rule cvtop-reinterpret {C : context, nt_1 : numtype, nt_2 : numtype}:
-    `%|-%:%`(C, CVTOP_instr(nt_1, REINTERPRET_cvtop, nt_2, ?()), `%->%`([(nt_2 <: valtype)], [(nt_1 <: valtype)]))
-    -- if (nt_1 =/= nt_2)
-    -- if ($size(nt_1 <: valtype) = $size(nt_2 <: valtype))
-
-  ;; 6-typing.watsup:705.1-708.50
-  rule cvtop-convert-i {C : context, inn_1 : inn, inn_2 : inn, sx? : sx?}:
-    `%|-%:%`(C, CVTOP_instr((inn_1 <: numtype), CONVERT_cvtop, (inn_2 <: numtype), sx?{sx}), `%->%`([(inn_2 <: valtype)], [(inn_1 <: valtype)]))
-    -- if (inn_1 =/= inn_2)
-    -- if ((sx?{sx} = ?()) <=> ($size(inn_1 <: valtype) > $size(inn_2 <: valtype)))
-
-  ;; 6-typing.watsup:710.1-712.24
-  rule cvtop-convert-f {C : context, fnn_1 : fnn, fnn_2 : fnn}:
-    `%|-%:%`(C, CVTOP_instr((fnn_1 <: numtype), CONVERT_cvtop, (fnn_2 <: numtype), ?()), `%->%`([(fnn_2 <: valtype)], [(fnn_1 <: valtype)]))
-    -- if (fnn_1 =/= fnn_2)
-=======
   ;; 6-typing.watsup:709.1-711.34
   rule cvtop-reinterpret{C : context, nt_1 : numtype, nt_2 : numtype}:
     `%|-%:%`(C, CVTOP_instr(nt_1, REINTERPRET_cvtop, nt_2, ?()), `%->_%%`_instrtype(`%`_resulttype([(nt_2 : numtype <: valtype)]), [], `%`_resulttype([(nt_1 : numtype <: valtype)])))
@@ -3506,7 +3488,6 @@ relation Instr_ok: `%|-%:%`(context, instr, instrtype)
   ;; 6-typing.watsup:717.1-718.50
   rule cvtop-convert-f{C : context, fnn_1 : fnn, fnn_2 : fnn}:
     `%|-%:%`(C, CVTOP_instr((fnn_1 : fnn <: numtype), CONVERT_cvtop, (fnn_2 : fnn <: numtype), ?()), `%->_%%`_instrtype(`%`_resulttype([(fnn_2 : fnn <: valtype)]), [], `%`_resulttype([(fnn_1 : fnn <: valtype)])))
->>>>>>> main
 
   ;; 6-typing.watsup:723.1-725.31
   rule ref.null{C : context, ht : heaptype}:

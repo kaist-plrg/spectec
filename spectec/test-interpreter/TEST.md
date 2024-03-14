@@ -2,11 +2,7 @@
 
 ```sh
 $ cd ../spec/wasm-3.0 && \
-<<<<<<< HEAD
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 3 --interpreter ../../test-interpreter/sample.wat addTwo 30 12 2> /dev/null
-=======
 > ../../src/exe-watsup/main.exe *.watsup -v -l --interpreter ../../test-interpreter/sample.wat addTwo 30 12 2> /dev/null
->>>>>>> main
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -22,11 +18,7 @@ watsup 0.4 generator
 42
 == Complete.
 $ cd ../spec/wasm-3.0 && \
-<<<<<<< HEAD
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 3 --interpreter ../../test-interpreter/sample.wasm addTwo 40 2 2> /dev/null
-=======
 > ../../src/exe-watsup/main.exe *.watsup -v -l --interpreter ../../test-interpreter/sample.wasm addTwo 40 2 2> /dev/null
->>>>>>> main
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -42,11 +34,7 @@ watsup 0.4 generator
 42
 == Complete.
 $ cd ../spec/wasm-3.0 && \
-<<<<<<< HEAD
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 3 --interpreter ../../test-interpreter/sample.wast 2> /dev/null
-=======
 > ../../src/exe-watsup/main.exe *.watsup -v -l --interpreter ../../test-interpreter/sample.wast 2> /dev/null
->>>>>>> main
 watsup 0.4 generator
 == Parsing...
 == Elaboration...
@@ -66,11 +54,7 @@ watsup 0.4 generator
 $ for v in 1 2 3; do ( \
 >   echo "Running test for Wasm $v.0..." && \
 >   cd ../spec/wasm-$v.0 && \
-<<<<<<< HEAD
->   dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version $v --interpreter ../../test-interpreter/spec-test-$v \
-=======
->   ../../src/exe-watsup/main.exe *.watsup -v -l --test-version $v --interpreter ../../test-interpreter/spec-test-$v \
->>>>>>> main
+>   ../../src/exe-watsup/main.exe *.watsup -v -l --test:version $v --interpreter ../../test-interpreter/spec-test-$v \
 > ) done 2>/dev/null
 Running test for Wasm 1.0...
 watsup 0.4 generator
@@ -1330,313 +1314,6 @@ watsup 0.4 generator
 - 0/0 (100.00%)
 
 Total [45764/45764] (100.00%)
-
-== Complete.
-$ echo "Running test for Wasm 2.0 except SIMD..." && \
-> cd ../spec/wasm-1.5 && \
-> dune exec ../../src/exe-watsup/main.exe -- *.watsup -v -l --test:version 2 --interpreter ../../test-interpreter/spec-test-1.5 2> /dev/null
-Running test for Wasm 2.0 except SIMD...
-watsup 0.4 generator
-== Parsing...
-== Elaboration...
-== IL Validation...
-== Running pass sideconditions...
-== IL Validation after pass sideconditions...
-== Running pass animate...
-== IL Validation after pass animate...
-== Translating to AL...
-== Initializing interpreter...
-== Interpreting...
-===== ../../test-interpreter/spec-test-1.5/address.wast =====
-- 259/259 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/align.wast =====
-- 73/73 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/binary-leb128.wast =====
-- 26/26 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/binary.wast =====
-- 38/38 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/block.wast =====
-- 53/53 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/br.wast =====
-- 77/77 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/br_if.wast =====
-- 89/89 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/br_table.wast =====
-- 150/150 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/bulk.wast =====
-- 117/117 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/call.wast =====
-- 71/71 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/call_indirect.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/comments.wast =====
-- 4/4 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/const.wast =====
-- 702/702 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/conversions.wast =====
-- 594/594 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/custom.wast =====
-- 3/3 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/data.wast =====
-- 39/39 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/elem.wast =====
-- 66/66 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/endianness.wast =====
-- 69/69 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/exports.wast =====
-- 65/65 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/f32.wast =====
-- 2501/2501 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/f32_bitwise.wast =====
-- 361/361 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/f32_cmp.wast =====
-- 2401/2401 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/f64.wast =====
-- 2501/2501 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/f64_bitwise.wast =====
-- 361/361 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/f64_cmp.wast =====
-- 2401/2401 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/fac.wast =====
-- 7/7 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/float_exprs.wast =====
-- 900/900 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/float_literals.wast =====
-- 85/85 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/float_memory.wast =====
-- 90/90 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/float_misc.wast =====
-- 441/441 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/forward.wast =====
-- 5/5 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/func.wast =====
-- 100/100 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/func_ptrs.wast =====
-- print_i32: 83
-- 29/29 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/global.wast =====
-- 63/63 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/i32.wast =====
-- 375/375 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/i64.wast =====
-- 385/385 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/if.wast =====
-- 124/124 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/imports.wast =====
-- print_i32: 13
-- print_i32_f32: 14 42
-- print_i32: 13
-- print_i32: 13
-- print_f32: 13
-- print_i32: 13
-- print_i64: 24
-- print_f64_f64: 25 53
-- print_i64: 24
-- print_f64: 24
-- print_f64: 24
-- print_f64: 24
-- print_i32: 13
-- 88/88 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/inline-module.wast =====
-- 1/1 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/int_exprs.wast =====
-- 108/108 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/int_literals.wast =====
-- 31/31 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/labels.wast =====
-- 26/26 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/left-to-right.wast =====
-- 96/96 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/linking.wast =====
-- 111/111 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/load.wast =====
-- 38/38 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/local_get.wast =====
-- 20/20 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/local_set.wast =====
-- 20/20 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/local_tee.wast =====
-- 56/56 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/loop.wast =====
-- 78/78 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory.wast =====
-- 55/55 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_copy.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_fill.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_grow.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_init.wast =====
-- 173/173 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_redundancy.wast =====
-- 8/8 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_size.wast =====
-- 40/40 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/memory_trap.wast =====
-- 182/182 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/names.wast =====
-- print_i32: 42
-- print_i32: 123
-- 486/486 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/nop.wast =====
-- 84/84 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/ref_func.wast =====
-- 13/13 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/ref_is_null.wast =====
-- 14/14 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/ref_null.wast =====
-- 3/3 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/return.wast =====
-- 64/64 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/select.wast =====
-- 120/120 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/skip-stack-guard-page.wast =====
-- 1/1 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/stack.wast =====
-- 7/7 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/start.wast =====
-- print_i32: 1
-- print_i32: 2
-- print: ()
-- 16/16 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/store.wast =====
-- 10/10 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/switch.wast =====
-- 27/27 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table-sub.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table.wast =====
-- 9/9 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_copy.wast =====
-- 1727/1727 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_fill.wast =====
-- 36/36 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_get.wast =====
-- 11/11 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_grow.wast =====
-- 43/43 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_init.wast =====
-- 712/712 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_set.wast =====
-- 19/19 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/table_size.wast =====
-- 37/37 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/token.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/tokens.wast =====
-- 35/35 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/traps.wast =====
-- 36/36 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/type.wast =====
-- 1/1 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/unreachable.wast =====
-- 64/64 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/unreached-invalid.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/unreached-valid.wast =====
-- 7/7 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/unwind.wast =====
-- 50/50 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/utf8-custom-section-id.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/utf8-import-field.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/utf8-import-module.wast =====
-- 0/0 (100.00%)
-
-===== ../../test-interpreter/spec-test-1.5/utf8-invalid-encoding.wast =====
-- 0/0 (100.00%)
-
-Total [20388/20388] (100.00%)
 
 == Complete.
 ```

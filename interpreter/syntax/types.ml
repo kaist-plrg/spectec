@@ -341,6 +341,8 @@ let rec string_of_heap_type = function
   | BotHT -> "something"
 
 and string_of_ref_type = function
+  | (Null, FuncHT) -> "funcref"
+  | (Null, ExternHT) -> "externref"
   | (nul, t) -> "(ref " ^ string_of_null nul ^ string_of_heap_type t ^ ")"
 
 and string_of_val_type = function

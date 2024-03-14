@@ -81,8 +81,15 @@ let get_rt rule =
   let open Il.Ast in
   let rec estimate_rt e =
     match e.it with
+    (* Propagte*)
+    | CaseE ([[]; []], e')
+    | TupE [e'] -> estimate_rt e'
+    (* Concrete type *)
     | CaseE ([[atom]], { it = TupE []; _}) -> [ T (nullary (string_of_atom atom)) ]
+    (* List type *)
     | ListE es -> List.concat_map estimate_rt es
+    | CatE (e1, e2) -> estimate_rt e1 @ estimate_rt e2
+    (* Var type *)
     | VarE id -> [ SubT (id.it, Il.Print.string_of_typ e.note) ]
     | SubE ({ it = VarE id; _ }, { it = VarT (id', _); _ }, _)  -> [ SubT (id.it, id'.it) ]
     | SubE (
@@ -90,8 +97,8 @@ let get_rt rule =
       { it = VarT (id, _); _ },
       _
     ) when name.it = "unpacked" -> [ SubT (id.it, id.it) ]
+    (* Iter type *)
     | IterE (e', (List, _)) -> [ SeqT (List.hd (estimate_rt e')) ]
-    | CatE (e1, e2) -> estimate_rt e1 @ estimate_rt e2
     | _ -> [ TopT ]
   in
 
@@ -301,17 +308,15 @@ let rec gen c name =
     gen_wasm_expr c' [] out out
   (* HARDCODE: name *)
   | "name" -> Al.Ast.TextV (choose ["a"; "b"; "c"] ^ choose ["1"; "2"; "3"])
-  (* HARDCODE: memidx to be always 0 *)
+  (* HARDCODE: memidx to be always 0 for wasm 2.0 *)
   | "memidx" -> zero
-  (* HARCODE: typeidx of function is already cached *)
+  (* HARDCODE: typeidx of function is already cached *)
   | "typeidx" when c.parent_case = "FUNC" ->
     List.nth !tids_cache c.i |> numV_of_int |> do_cache type_cache
   (* HARDCODE: vN to be 16 bytes (128 bits) *)
   | "vN" -> numV (gen_bytes 16)
   (* HARDCODE: pack_size to be 8/16/32 *)
-  | "n" when List.mem c.parent_case
-    [ "LOAD"; "STORE"; "EXTEND"; "VLOAD_LANE"; "VSTORE_LANE" ] ->
-      numV_of_int (choose [8; 16; 32])
+  | "packsize" -> numV_of_int (choose [8; 16; 32; 64])
   | _ ->
     let deftyp = find_deftyp name in
     let result =
@@ -331,15 +336,16 @@ let rec gen c name =
       | VariantT typcases when name = "instr" ->
         (* HARDCODE: checks if currently in a context that requires const instrution *)
         let const_required = List.mem c.parent_case !const_ctxs in
-        let const_filter (mixop, _, _) = const_required --> List.mem (string_of_mixop mixop) !consts in
+        let get_winstr_name mixop = string_of_atom (mixop |> List.hd |> List.hd) in
+        let const_filter (mixop, _, _) = const_required --> List.mem (get_winstr_name mixop) !consts in
         let block_filter (mixop, _, _) =
-          (c.depth_limit <= 0) --> not (List.mem (string_of_mixop mixop) [ "BLOCK"; "LOOP"; "IF" ])
+          (c.depth_limit <= 0) --> not (List.mem (get_winstr_name mixop) [ "BLOCK"; "LOOP"; "IF" ])
         in
         let typcases' = typcases |> List.filter const_filter |> List.filter block_filter in
         let rec try_instr life =
           if life = 0 then raise OutOfLife;
           let mixop, (_, typs, _), _ = choose typcases' in
-          let case = string_of_mixop mixop in
+          let case = get_winstr_name mixop in
           let t1, t2, entangles = Record.find case !rts in
           let rt1, rt2, induced_args = fix_rts case const_required t1 t2 entangles in
           let valid_rts =
@@ -397,8 +403,13 @@ let rec gen c name =
 and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
   let open Il.Atom in
   match mixop with
+    (* Propagation *)
+    | [[]; []] -> gen_typs c typs |> List.hd
     (* TupV *)
-    | [[]; []; []] -> Al.Ast.TupV (gen_typs c typs)
+    | [[]; []; []]
+    | [[]; [{it = Arrow; _}]; []]
+    | [[]; [{it = Star; _}; {it = Arrow; _}]; [{it = Star; _}]] ->
+      Al.Ast.TupV (gen_typs c typs)
     (* limits *)
     | [[{ it = LBrack; _}]; [{ it = Dot2; _}]; [{it = RBrack; _}]] ->
       let pair = gen_typs c typs in
@@ -418,15 +429,10 @@ and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
       let args =
         typs
         |> gen_typs c'
-        (* Regenerated deferred wasm funcs *)
-        |> List.map (gen_wasm_funcs c')
+        (* Regenerate deferred wasm funcs *)
+        |> List.map (gen_if_wasm_funcs c')
       in
       Al.Ast.CaseV (atomid, args)
-    (* InfixE *)
-    | [[]; [{it = Arrow; _}]; []]
-    | [[]; [{it = Star; _}; {it = Arrow; _}]; [{it = Star; _}]] ->
-      let pair = gen_typs c typs in
-      Al.Ast.TupV pair
     | _ ->
       let case = string_of_mixop mixop in
       let args = gen_typs { c with parent_case = case } typs in
@@ -435,9 +441,10 @@ and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
 and gen_wasm_expr c rt1 rt2 label =
   let max_life = 100 in
   let rec try_expr life =
-    if life = 0 then
+    if life = 0 then (
+      Log.debug ("Out of life during genrating expr: " ^ string_of_rt rt1 ^ " -> " ^ string_of_rt rt2);
       let l = List.map (fun _ -> nullary "DROP") rt1 @ List.map default rt2 in
-      listV_of_list l
+      listV_of_list l )
     else
       let n = Random.int 5 + 1 (* 1, 2, 3, 4, 5 *) in
       (* TODO: make input optional? *)
@@ -451,7 +458,7 @@ and gen_wasm_expr c rt1 rt2 label =
   in
   try_expr max_life
 
-and gen_wasm_funcs c = function
+and gen_if_wasm_funcs c = function
   | CaseV ("DEFERRED_FUNCS", []) ->
     let l = List.init (List.length !tids_cache) (fun i -> gen { c with i = i } "func") in
     listV_of_list l
@@ -484,6 +491,10 @@ and gen_typ c typ =
       )
     in
     listV_of_list l
+  (* HARDCODE: list *)
+  | VarT (id, [ { it = TypA typ'; _ } ]) when id.it = "list" ->
+    let it = Il.Ast.IterT (typ', List) in
+    gen_typ c { typ with it = it }
   (* General types *)
   | VarT (id, _) -> gen c id.it
   | NumT NatT when c.parent_case = "SPLAT" -> numV_of_int (choose [8; 16; 32])
@@ -494,6 +505,7 @@ and gen_typ c typ =
     let n =
       match name with
       | "table" | "data" | "elem" | "type" | "func" | "global" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
+      | "byte" -> Random.int 3 + 1 (* 1, 2, 3, HACK for wasmtime *)
       | _ -> Random.int 3 (* 0, 1, 2 *)
     in
     (* Hardcode: Defer generating functions *)
@@ -530,7 +542,8 @@ and fix_rts case const_required rt1 rt2 entangles =
     let pair = [ 0, bt ] in
     match bt with
     | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
-    | CaseV ("_RESULT", [ OptV (Some t) ]) -> i32_opt, [ T t ], pair
+    | CaseV ("_RESULT", [ OptV (Some t) ]) ->
+      i32_opt, [ T t ], pair
     | CaseV ("_IDX", [ tid ]) ->
       let rt1', rt2' = get_type !types_cache (unwrap_numv_to_int tid) in
       rt1' @ i32_opt, rt2', pair
@@ -651,7 +664,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     let table = choose tables in
     let tid = Random.int (List.length !types_cache) in
     let rt1', rt2' = get_type !types_cache tid in
-    rt1' @ [ T (nullary "I32") ], rt2', [ 0, numV_of_int table; 1, numV_of_int (tid + 1) (* move to patch? *) ]
+    rt1' @ [ T (nullary "I32") ], rt2', [ 0, numV_of_int table; 1, numV_of_int tid ]
 
   else
     let cache = ref Record.empty in
@@ -690,36 +703,34 @@ type instant_result = (assertion list, exn) result
 let mk_assertion funcinst =
   let name = strv_access "NAME" funcinst |> unwrap_textv in
   let addr = strv_access "VALUE" funcinst |> casev_nth_arg 0 in
-  let arg_types = try
-    Ds.get_store ()
-    |> Record.find "FUNC"
+  let arg_types =
+    Ds.Store.access "FUNC"
     |> unwrap_listv_to_list
     |> (fun l -> List.nth l (unwrap_numv_to_int addr))
     |> strv_access "TYPE"
     |> unwrap_tupv
     |> (fun l -> List.nth l 0)
     |> unwrap_listv_to_list
-  with _ -> []
   in
   let args =
     List.map (function
-      | Al.Ast.CaseV ("I32", [])
-      | Al.Ast.CaseV ("F32", []) as t -> caseV ("CONST", [t; numV (gen_bytes 4)])
-      | Al.Ast.CaseV ("I64", [])
-      | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; numV (gen_bytes 8)])
-      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VVCONST", [t; numV (gen_bytes 16)])
+      | Al.Ast.CaseV ("I32", []) as t -> caseV ("CONST", [t; numV (gen_bytes 4)])
+      | Al.Ast.CaseV ("F32", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout32) (gen_bytes 4)])
+      | Al.Ast.CaseV ("I64", []) as t -> caseV ("CONST", [t; numV (gen_bytes 8)])
+      | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout64) (gen_bytes 8)])
+      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VCONST", [t; numV (gen_bytes 16)])
       | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
     ) arg_types
   in
   let invoke = name, args in
 
-  let store = Ds.get_store () |> strV |> copy_value in
+  let store_bak = Ds.Store.get () |> copy_value in
   try
     let returns = Interpreter.invoke [ addr; listV_of_list args ] in
     invoke, Ok (unwrap_listv_to_list returns)
   with e ->
     if e = Exception.Exhaustion then
-      store |> unwrap_strv |> Ds.set_store;
+      store_bak |> Ds.Store.set;
     invoke, Error e
 
 let print_assertion ((f, args), result) =
@@ -731,8 +742,9 @@ let print_assertion ((f, args), result) =
   | Error Exception.Trap -> Printf.sprintf "(assert_trap (invoke %s [%s]))"
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
-  | Error e -> Printf.sprintf "Invocation of %s failed due to %s"
+  | Error e -> Printf.sprintf "(invoke %s [%s]) failed due to %s"
     f
+    (args |> List.map Al.Print.string_of_value |> String.concat " ")
     (Printexc.to_string e))
 
 let get_instant_result m : instant_result =
@@ -768,10 +780,9 @@ let print_result result =
   | Ok assertions ->
     print "Instantiation success";
     List.iter print_assertion assertions
-  | Error Exception.Trap -> print ("Instantiation failed")
+  | Error Exception.Trap -> print ("Instantiation trapped")
   | Error Exception.Exhaustion -> print ("Infinite loop in instantiation")
-  | Error e ->
-    Printf.printf "Unexpected error during instantiation: %s" (Printexc.to_string e)
+  | Error e -> print("Unexpected error during instantiation: " ^ Printexc.to_string e)
   );
   print "================"
 
@@ -831,8 +842,8 @@ let invoke_to_wast ((f, args), result) =
   | Ok returns -> Some (AssertReturn (action, List.map value_to_wast returns))
   | Error Exception.Exhaustion -> Some (AssertExhaustion (action, ""))
   | Error Exception.Trap -> Some (AssertTrap (action, ""))
-  | _ ->
-    Printf.sprintf "Unexpected error in invoking %s" f |> prerr_endline;
+  | Error e ->
+    Printf.sprintf "Unexpected error in invoking %s: %s" f (Printexc.to_string e) |> prerr_endline;
     None
 
 let to_wast seed m result =
@@ -852,8 +863,8 @@ let to_wast seed m result =
     listV_of_list [
       global "I32" (Construct.al_of_int32 666l);
       global "I64" (Construct.al_of_int64 666L);
-      global "F32" (0x4426a666l |> Construct.al_of_int32);
-      global "F64" (0x4084d4cccccccccdL |> Construct.al_of_int64);
+      global "F32" (0x4426a666l |> Z.of_int32_unsigned |> Construct.(al_of_floatN layout32));
+      global "F64" (0x4084d4cccccccccdL |> Z.of_int64_unsigned |> Construct.(al_of_floatN layout64));
     ];
     empty_list; empty_list; empty_list; empty_list; OptV None;
     listV_of_list [
@@ -879,8 +890,8 @@ let to_wast seed m result =
       [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
     | Error Exception.Exhaustion ->
       [ Module (None, def) |> to_phrase ]
-    | _ ->
-      Printf.sprintf "Unexpected error in instantiating module" |> prerr_endline;
+    | Error e ->
+      Printf.sprintf "Unexpected error in instantiating module: %s" (Printexc.to_string e) |> prerr_endline;
       []
   in
 

@@ -829,11 +829,11 @@ grammar Bexportsec : export* hint(desc "export section") =
 
 ;; Start section
 
-grammar Bstart : start* =
+grammar Bstart : start? =
   | x:Bfuncidx => (START x)
 
-grammar Bstartsec : start* hint(desc "start section") =
-  | st*:Bsection_(8, Bstart) => st*
+grammar Bstartsec : start? hint(desc "start section") = |
+;;  | st?:Bsection_(8, Bstart) => st?
 
 
 ;; Element section
@@ -935,7 +935,7 @@ grammar Bmodule : module =
     Bcustomsec*
 
 
-    start*:Bstartsec
+    start?:Bstartsec
     Bcustomsec*
 
 

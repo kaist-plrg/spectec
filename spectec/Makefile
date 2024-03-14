@@ -30,7 +30,8 @@ exe: $(CLONEDIR)
 	dune build $(SRCDIR)/$(EXE)
 	ln -f $(OUTDIR)/$(EXE) ./$(NAME)
 
-$(CLONEDIR):
+$(CLONEDIR): $(ROOTDIR)/interpreter/*/*.ml
+	rm -rf $(CLONEDIR)
 	cp -R $(ROOTDIR)/interpreter $(CLONEDIR)
 	rm -r $(CLONERM:%=$@/%)
 	cp $@/../dune-ref-interp $@/dune

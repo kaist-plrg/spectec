@@ -11,7 +11,7 @@ open Util
 
 let default_table_max = 4294967295L
 let default_memory_max = 65536L
-let version = ref 2
+let version = ref 3
 
 
 (* Failure *)
@@ -154,7 +154,8 @@ and al_to_heap_type: value -> heap_type = function
   | v -> fail "heap type" v
 
 and al_to_ref_type: value -> ref_type = function
-  | CaseV ("REF", [ n; ht ]) -> al_to_null n, al_to_heap_type ht
+  | CaseV ("REF", [ n; ht ]) when !version = 3 -> al_to_null n, al_to_heap_type ht
+  | _ as ht when !version = 2 -> Null, al_to_heap_type ht
   | v -> fail "ref type" v
 
 and al_to_num_type: value -> num_type = function
@@ -169,6 +170,7 @@ and al_to_val_type: value -> val_type = function
   | CaseV ("F32", _) | CaseV ("F64", _) as v -> NumT (al_to_num_type v)
   | CaseV ("V128", []) -> VecT V128T
   | CaseV ("REF", _) as v -> RefT (al_to_ref_type v)
+  | CaseV ("FUNCREF", []) | CaseV("EXTERNREF", []) as v when !version = 2 -> RefT (al_to_ref_type v)
   | CaseV ("BOT", []) -> BotT
   | v -> fail "val type" v
 
@@ -276,7 +278,7 @@ and al_to_ref: value -> ref_ = function
     let arr = addr |> al_to_int |> listv_nth arr_insts |> al_to_array in
     Aggr.ArrayRef arr
   | CaseV ("REF.FUNC_ADDR", [ addr ]) ->
-    let func_insts = Record.find "FUNC" (Ds.get_store ()) in
+    let func_insts = Ds.Store.access "FUNC" in
     let func = addr |> al_to_int |> listv_nth func_insts |> al_to_func_inst in
     Instance.FuncRef func
   | CaseV ("REF.EXTERN", [ r ]) -> Extern.ExternRef (al_to_ref r)
@@ -858,6 +860,11 @@ and al_to_instr': value -> Ast.instr' = function
   | CaseV ("MEMORY.FILL", [ idx ]) -> MemoryFill (al_to_idx idx)
   | CaseV ("MEMORY.COPY", [ idx1; idx2 ]) -> MemoryCopy (al_to_idx idx1, al_to_idx idx2)
   | CaseV ("MEMORY.INIT", [ idx1; idx2 ]) -> MemoryInit (al_to_idx idx1, al_to_idx idx2)
+  | CaseV ("MEMORY.SIZE", []) -> MemorySize (al_to_idx zero)
+  | CaseV ("MEMORY.GROW", []) -> MemoryGrow (al_to_idx zero)
+  | CaseV ("MEMORY.FILL", []) -> MemoryFill (al_to_idx zero)
+  | CaseV ("MEMORY.COPY", []) -> MemoryCopy (al_to_idx zero, al_to_idx zero)
+  | CaseV ("MEMORY.INIT", [ idx ]) -> MemoryInit (al_to_idx zero, al_to_idx idx)
   | CaseV ("DATA.DROP", [ idx ]) -> DataDrop (al_to_idx idx)
   | CaseV ("REF.AS_NON_NULL", []) -> RefAsNonNull
   | CaseV ("REF.TEST", [ rt ]) -> RefTest (al_to_ref_type rt)
@@ -898,7 +905,12 @@ let al_to_const: value -> const = al_to_list al_to_instr |> al_to_phrase
 (* Deconstruct module *)
 
 let al_to_type: value -> type_ = function
-  | CaseV ("TYPE", [ rt ]) -> al_to_phrase al_to_rec_type rt
+  | CaseV ("TYPE", [ rt ]) when !version = 3 -> al_to_phrase al_to_rec_type rt
+  | CaseV ("TYPE", [ ft ]) when !version = 2 ->
+    let comptype = unary "FUNC" ft in
+    let subtype = caseV ("SUBD", [some "FINAL"; empty_list; comptype]) in
+    let rectype = unary "REC" (listV [|subtype|]) in
+    al_to_phrase al_to_rec_type rectype
   | v -> fail "type" v
 
 let al_to_local': value -> local' = function
@@ -923,8 +935,10 @@ let al_to_global': value -> global' = function
 let al_to_global: value -> global = al_to_phrase al_to_global'
 
 let al_to_table': value -> table' = function
-  | CaseV ("TABLE", [ tt; const ]) ->
+  | CaseV ("TABLE", [ tt; const ]) when !version = 3 ->
     { ttype = al_to_table_type tt; tinit = al_to_const const }
+  | CaseV ("TABLE", [ tt ]) when !version = 2 ->
+    { ttype = al_to_table_type tt; tinit = [] @@ no_region }
   | v -> fail "table" v
 let al_to_table: value -> table = al_to_phrase al_to_table'
 
@@ -957,25 +971,24 @@ let al_to_data': value -> data_segment' = function
   | v -> fail "data segment" v
 let al_to_data: value -> data_segment = al_to_phrase al_to_data'
 
-  (*
 
-let al_to_import_desc module_ idesc =
-  match idesc.it with
-  | FuncImport x ->
-      let dts = def_types_of module_ in
-      let dt = Lib.List32.nth dts x.it |> al_to_def_type in
-      CaseV ("FUNC", [ dt ])
-  | TableImport tt -> CaseV ("TABLE", [ al_to_table_type tt ])
-  | MemoryImport mt -> CaseV ("MEM", [ al_to_memory_type mt ])
-  | GlobalImport gt -> CaseV ("GLOBAL", [ al_to_global_type gt ])
+let al_to_import_desc': value -> import_desc' = function
+  | CaseV ("FUNC", [ _ft ]) -> FuncImport (failwith "TODO: FuncImport")
+  | CaseV ("TABLE", [ tt ]) -> TableImport (al_to_table_type tt)
+  | CaseV ("MEM", [ mt ]) -> MemoryImport (al_to_memory_type mt)
+  | CaseV ("GLOBAL", [ gt ]) -> GlobalImport (al_to_global_type gt)
+  | v -> fail "improt_desc" v
+let al_to_import_desc: value -> import_desc = al_to_phrase al_to_import_desc'
 
-let al_to_import module_ import =
-  CaseV ("IMPORT", [
-    al_to_name import.it.module_name;
-    al_to_name import.it.item_name;
-    al_to_import_desc module_ import.it.idesc;
-  ])
-  *)
+let al_to_import': value -> import' = function
+  | CaseV ("IMPORT", [ module_name; item_name; externtype ]) ->
+    {
+      module_name = al_to_name module_name;
+      item_name = al_to_name item_name;
+      idesc = al_to_import_desc externtype;
+    }
+  | v -> fail "import" v
+let al_to_import: value -> import = al_to_phrase al_to_import'
 
 let al_to_export_desc': value -> export_desc' = function
   | CaseV ("FUNC", [ idx ]) -> FuncExport (al_to_idx idx)
@@ -998,12 +1011,11 @@ let al_to_export: value -> export = al_to_phrase al_to_export'
 
 let al_to_module': value -> module_' = function
   | CaseV ("MODULE", [
-    types; _imports; funcs; globals; tables; memories; elems; datas; start; exports
+    types; imports; funcs; globals; tables; memories; elems; datas; start; exports
   ]) ->
     {
       types = al_to_list al_to_type types;
-      (* TODO: imports = al_to_list (al_to_import module_) imports;*)
-      imports = [];
+      imports = al_to_list al_to_import imports;
       funcs = al_to_list al_to_func funcs;
       globals = al_to_list al_to_global globals;
       tables = al_to_list al_to_table tables;
@@ -1092,12 +1104,12 @@ let al_of_null = function
   | Null -> some "NULL"
 
 let al_of_final = function
-  | NoFinal -> some "FINAL"
-  | Final -> none "FINAL"
+  | NoFinal -> none "FINAL"
+  | Final -> some "FINAL"
 
 let al_of_mut = function
-  | Cons -> some "MUT"
-  | Var -> none "MUT"
+  | Cons -> none "MUT"
+  | Var -> some "MUT"
 
 let rec al_of_storage_type = function
   | ValStorageT vt -> al_of_val_type vt

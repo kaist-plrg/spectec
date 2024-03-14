@@ -87,10 +87,12 @@ let caseV (s, vl) = CaseV (s, vl)
 let optV v_opt = OptV v_opt
 let tupV vl = TupV vl
 let nullary s = CaseV (String.uppercase_ascii s, [])
+let unary s v = CaseV (String.uppercase_ascii s, [ v ])
 let listV a = ListV (ref a)
 let listV_of_list l = Array.of_list l |> listV
 let zero = numV Z.zero
 let one = numV Z.one
+let fzero = unary "POS" (unary "SUBNORM" zero)
 let empty_list = listV [||]
 let singleton v = listV [|v|]
 
@@ -132,7 +134,7 @@ let unwrap_textv: value -> string = function
   | v -> fail "text" v
 let unwrap_numv: value -> Z.t = function
   | NumV i -> i
-  | v -> fail "int64" v
+  | v -> fail "Z.t" v
 let unwrap_numv_to_int (v: value): int = unwrap_numv v |> Z.to_int
 let unwrap_boolv: value -> bool = function
   | BoolV b -> b

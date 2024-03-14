@@ -293,7 +293,7 @@ rule Instr_ok/ref.is_null:
 
 ;; Vector instructions
 
-rule Instr_ok/vvconst:
+rule Instr_ok/vconst:
   C |- VCONST V128 c : eps -> V128
 
 rule Instr_ok/vvunop:

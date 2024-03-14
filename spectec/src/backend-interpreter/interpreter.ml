@@ -27,6 +27,9 @@ let fail_on_path msg path =
     (structured_string_of_path path) (string_of_region path.at))
   |> failwith
 
+let cnt = ref 0
+let check_loop_cnt () = cnt := !cnt + 1; if !cnt > 10000 then raise Exception.Exhaustion
+let init_loop_cnt () = cnt := 0
 
 (* Expression *)
 
@@ -572,7 +575,9 @@ and step_wasm (ctx: AlContext.t) : value -> AlContext.t = function
   | CaseV ("CONST", _)
   | CaseV ("VCONST", _) as v -> WasmContext.push_value v; ctx
   | CaseV (name, []) when Builtin.is_builtin name -> Builtin.call name; ctx
-  | CaseV (fname, args) -> create_context fname args :: ctx
+  | CaseV (fname, args) ->
+    if fname = "LOOP" then check_loop_cnt ();
+    create_context fname args :: ctx
   | v ->
     string_of_value v
     |> sprintf "Executing invalid value: %s"
@@ -648,12 +653,14 @@ and call_func (fname: string) (args: value list) : value option =
 
 let instantiate (args: value list) : value =
   WasmContext.init_context ();
+  init_loop_cnt ();
   match call_func "instantiate" args with
   | Some module_inst -> module_inst
   | None -> failwith "Instantiation doesn't return module instance"
 
 let invoke (args: value list) : value =
   WasmContext.init_context ();
+  init_loop_cnt ();
   match call_func "invoke" args with
   | Some v -> v
   | None -> failwith "Invocation doesn't return any values"
