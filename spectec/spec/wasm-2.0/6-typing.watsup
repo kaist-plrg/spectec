@@ -97,13 +97,6 @@ rule Instrs_ok/frame:
   -- Instrs_ok: C |- instr* : t_1* -> t_2*
 
 
-
-
-;; Numeric instructions
-
-rule Instr_ok/const:
-  C |- CONST nt c_nt : eps -> nt
-
 rule Instr_ok/select-expl:
   C |- SELECT t : t t I32 -> t
 
@@ -112,6 +105,42 @@ rule Instr_ok/select-impl:
   -- Valtype_sub: |- t <: t'
   -- if t' = numtype \/ t' = vectype
 
+
+;; Numeric instructions
+
+rule Instr_ok/const:
+  C |- CONST nt c_nt : eps -> nt
+
+rule Instr_ok/unop:
+  C |- UNOP nt unop : nt -> nt
+
+rule Instr_ok/binop:
+  C |- BINOP nt binop : nt nt -> nt
+
+rule Instr_ok/testop:
+  C |- TESTOP nt testop : nt -> I32
+
+rule Instr_ok/relop:
+  C |- RELOP nt relop : nt nt -> I32
+
+
+rule Instr_ok/extend:
+  C |- EXTEND nt n : nt -> nt
+  -- if n <= $size(nt)
+
+rule Instr_ok/cvtop-reinterpret:
+  C |- CVTOP nt_1 REINTERPRET nt_2 : nt_2 -> nt_1
+  -- if nt_1 =/= nt_2
+  -- if $size(nt_1) = $size(nt_2)
+
+rule Instr_ok/cvtop-convert-i:
+  C |- CVTOP inn_1 CONVERT inn_2 sx? : inn_2 -> inn_1
+  -- if inn_1 =/= inn_2
+  -- if sx? = eps <=> $size(inn_1) > $size(inn_2)
+
+rule Instr_ok/cvtop-convert-f:
+  C |- CVTOP fnn_1 CONVERT fnn_2 : fnn_2 -> fnn_1
+  -- if fnn_1 =/= fnn_2
 
 
 ;; Vector instructions
