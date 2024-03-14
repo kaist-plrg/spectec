@@ -1053,7 +1053,10 @@ let gen_test el' il' al' =
     (* Conform test *)
     Conform_test.conform_test seed;
 
-    if (seed+1) mod 10000 = 0 then Log.info ("=== " ^ string_of_int (seed+1) ^ " wast file tested" ^ " ===")
+    if (seed+1) mod 10000 = 0 then (
+      Log.info ("=== " ^ string_of_int (seed+1) ^ " wast file tested" ^ " ===");
+      Sys.command "rm -rf ~/.cache/wasmtime"
+    )
 
   )
 
