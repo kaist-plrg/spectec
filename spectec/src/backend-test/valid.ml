@@ -62,12 +62,12 @@ let interesting_values =
   in
 
   Interesting.empty
-  |> Interesting.add "i8" i8
-  |> Interesting.add "i16" i16
-  |> Interesting.add "i32" i32
-  |> Interesting.add "f32" f32
-  |> Interesting.add "i64" i64
-  |> Interesting.add "f64" f64
+  |> Interesting.add "I8" i8
+  |> Interesting.add "I16" i16
+  |> Interesting.add "I32" i32
+  |> Interesting.add "F32" f32
+  |> Interesting.add "I64" i64
+  |> Interesting.add "F64" f64
 
 let rec string_of_vt = function
 | T v -> Al.Print.string_of_value v
@@ -147,9 +147,9 @@ let validate_shape = function
 let validate_instr case args const (rt1, rt2) =
   match case with
   | "CONST" ->
-    let ty = choose ["i"; "f"] ^ string_of_int (choose [32; 64]) in
-    let n = interesting_values |> Interesting.find ty |> choose |> numV in
-    Some [nullary ty; n]
+    let ty = List.hd args in
+    let n = interesting_values |> Interesting.find (casev_of_case ty) |> choose |> numV in
+    Some [ty; n]
   | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
     | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) -> Some args
     | _ -> None )

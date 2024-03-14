@@ -299,10 +299,10 @@ let gen_vector () =
     (fun _ ->
       let ivs =
         if lanewidth < 32 then
-          Interesting.find ("i" ^ string_of_int lanewidth) interesting_values
+          Interesting.find ("I" ^ string_of_int lanewidth) interesting_values
         else
-          Interesting.find ("i" ^ string_of_int lanewidth) interesting_values @
-          Interesting.find ("f" ^ string_of_int lanewidth) interesting_values
+          Interesting.find ("I" ^ string_of_int lanewidth) interesting_values @
+          Interesting.find ("F" ^ string_of_int lanewidth) interesting_values
       in
       choose (List.map (encode (lanewidth/2)) ivs)
     )
