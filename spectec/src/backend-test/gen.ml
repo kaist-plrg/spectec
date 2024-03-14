@@ -1055,7 +1055,7 @@ let gen_test el' il' al' =
 
     if (seed+1) mod 10000 = 0 then (
       Log.info ("=== " ^ string_of_int (seed+1) ^ " wast file tested" ^ " ===");
-      Sys.command "rm -rf ~/.cache/wasmtime"
+      Sys.command "rm -rf ~/.cache/wasmtime" |> ignore
     )
 
   )
