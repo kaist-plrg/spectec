@@ -104,6 +104,15 @@ rule Instrs_ok/frame:
 rule Instr_ok/const:
   C |- CONST nt c_nt : eps -> nt
 
+rule Instr_ok/select-expl:
+  C |- SELECT t : t t I32 -> t
+
+rule Instr_ok/select-impl:
+  C |- SELECT : t t I32 -> t
+  -- Valtype_sub: |- t <: t'
+  -- if t' = numtype \/ t' = vectype
+
+
 
 ;; Vector instructions
 

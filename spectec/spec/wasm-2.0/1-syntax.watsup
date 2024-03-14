@@ -198,6 +198,7 @@ var bt : blocktype
 
 syntax instr/numeric hint(desc "numeric instruction") =
   | CONST numtype c_numtype          hint(show %.CONST %)
+  | SELECT (valtype*)?
   | ...
 
 syntax lanetype hint(desc "lane type") = | packedtype | numtype
