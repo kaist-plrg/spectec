@@ -497,8 +497,6 @@ and gen_typ c typ =
     gen_typ c { typ with it = it }
   (* General types *)
   | VarT (id, _) -> gen c id.it
-  | NumT NatT when c.parent_case = "SPLAT" -> numV_of_int (choose [8; 16; 32])
-  | NumT NatT when c.parent_case = "ZERO" -> numV_of_int (choose [32; 64])
   | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
     let name = match typ'.it with VarT (id, _) -> id.it | _ -> "" in

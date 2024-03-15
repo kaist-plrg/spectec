@@ -16,6 +16,7 @@ let i32T = nullary "I32"
 let i64T = nullary "I64"
 let f32T = nullary "F32"
 let f64T = nullary "F64"
+let v128T = nullary "V128"
 
 (* Helper *)
 let make_ishape i = tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]
@@ -29,12 +30,21 @@ let rec string_of_vt = function
 | SeqT t -> (string_of_vt t) ^ "*"
 let string_of_rt vts = List.map string_of_vt vts |> String.concat " "
 
-let decompose_vloadop = function
-| OptV (Some (CaseV ("ZERO", [ n ])))
-| OptV (Some (CaseV ("SPLAT", [ n ]))) -> unwrap_numv_to_int n
-| OptV (Some (CaseV ("SHAPE", [ TupV [m; n]; _ ]))) -> unwrap_numv_to_int m * unwrap_numv_to_int n
-| OptV (None) -> 128
-| v -> failwith ("Invalid vloadop: " ^ Print.string_of_value v)
+let validate_vloadop vloadop =
+  let mk_vloadop name args = OptV (Some (CaseV (name, args))) in
+  match vloadop with
+  | OptV (Some (CaseV ("ZERO", _))) ->
+    let n = choose [32; 64] in
+    mk_vloadop "ZERO" [ numV_of_int n ], n
+  | OptV (Some (CaseV ("SPLAT", _))) ->
+    let n = choose [8; 16; 32; 64] in
+    mk_vloadop "SPLAT" [ numV_of_int n ], n
+  | OptV (Some (CaseV ("SHAPE", [_; _; sx]))) ->
+    let n1 = choose [8; 16; 32] in
+    let n2 = 64 / n1 in
+    mk_vloadop "SHAPE" [ numV_of_int n1; numV_of_int n2; sx ], 64
+  | OptV None -> OptV None, 128
+  | v -> failwith ("Invalid vloadop: " ^ Print.string_of_value v)
 
 let decompose_memop s = (
     s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
@@ -65,6 +75,7 @@ let nt_matches_n nt n = match nt, n with
 
 let is_inn nt = nt = i32T || nt = i64T
 let is_fnn nt = nt = f32T || nt = f64T
+let is_vnn nt = nt = v128T
 
 let default = function
 | T (CaseV ("I32", [])) -> caseV ("CONST", [nullary "I32"; zero])
@@ -124,15 +135,6 @@ let validate_instr case args const (rt1, rt2) =
   | "CALL_REF" | "RETURN_CALL_REF" -> ( match args with
     | [ OptV (Some _) ] -> Some args
     | _ -> None )
-  (* HACKS *)
-  | "VUNOP" | "VBINOP" | "VRELOP" | "VTESTOP" | "VCVTOP"
-  | "VEXTUNOP" | "VEXTBINOP"
-  | "VLOAD" | "VSTORE" -> None
-  | "CONST" -> (
-    match args with
-    | [ nt; n ] when nt_matches_n nt n -> Some args
-    | _ -> None
-  )
   (* special vbinop *)
   | "VSWIZZLE" -> Some [ make_ishape 8; ]
   | "VSHUFFLE" -> Some [ make_ishape 8; listV_of_list (List.init 16 (fun _ -> numV_of_int (Random.int 32))) ]
@@ -172,19 +174,18 @@ let validate_instr case args const (rt1, rt2) =
 
       Some [ nt; compose_opt is_some' m' s; compose_memop a' o ]
     | _ -> None)
-  (*
   | "SELECT" -> ( match args, rt2 with
-    | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t then Some args else None
+    | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t || is_vnn t then Some args else None
     | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
   | "VLOAD" ->
   (match args with
     | [ vloadop; memop; ] ->
-      let n = decompose_vloadop vloadop in
+      let vloadop', n = validate_vloadop vloadop in
       let (a, o) = decompose_memop memop in
       let a' = dec_align a (n / 8) in
 
-      Some [ vloadop; compose_memop a' o; ]
+      Some [ vloadop'; compose_memop a' o; ]
     | v -> failwith ("Invalid vec load op: " ^ Print.string_of_value (listV_of_list v))
     )
 | "VSTORE" ->
@@ -196,7 +197,6 @@ let validate_instr case args const (rt1, rt2) =
       Some [ compose_memop a' o; ]
     | v -> failwith ("Invalid vec store op: " ^ Print.string_of_value (listV_of_list v))
     )
-  *)
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
     | [ n; memop; _ ] ->
@@ -331,12 +331,13 @@ let validate_instr case args const (rt1, rt2) =
     let hl = choose [nullary "HIGH"; nullary "LOW"] in
     let ext = choose [nullary "S"; nullary "U"] in
     Some [ arg1; hl; arg2; ext ]
-  (* special vcvtop *)
-  | "VEXTADD_PAIRWISE" ->
-    let i = choose [16; 32] in
-    let arg1 = make_ishape i in
-    let arg2 = make_ishape (i/2) in
-    let ext = choose [nullary "S"; nullary "U"] in
-    Some [ arg1; arg2; ext ]
 *)
+  (* HACKS *)
+  | "VUNOP" | "VBINOP" | "VRELOP" | "VCVTOP"
+  | "VEXTUNOP" | "VEXTBINOP" -> None
+  | "CONST" -> (
+    match args with
+    | [ nt; n ] when nt_matches_n nt n -> Some args
+    | _ -> None
+  )
   | _ -> Some args
