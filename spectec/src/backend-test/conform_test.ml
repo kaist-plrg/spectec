@@ -28,16 +28,15 @@ let conform_test seed =
   let st_wt = test_engine "../../wasmtime/target/release/wasmtime wast" wast in
   let st_wr = test_engine "wasmer wast" wast in
   let st_we = test_engine "runtimes/wasmedge/wasmedge" wast in
-  if st_ref = 0 && st_wt = 0 && st_wr = 0 && st_we = 0 then (
-    Sys.command ("rm " ^ wast) |> ignore
-  )
-  else if st_ref = 0 && st_wt = st_wr && st_we = 0 then (
+  match st_ref, st_wt, st_wr, st_we with
+  | 0, 0, 0, 0 -> Sys.command ("rm " ^ wast) |> ignore
+  | 0, wt, wr, 0 when wt = wr ->
     Log.warn (wast ^ " may have nondeterministic behavior");
     Sys.command ("rm " ^ wast) |> ignore
-  )
-  else (
+  | ref, _, _, _ when ref != 0 ->
+    Log.warn (wast " may have wrong result")
+  | _ ->
     warn "../interpreter/wasm" wast st_ref;
     warn "wasmtime wast" wast st_wt;
     warn "wasmer wast" wast st_wr;
     warn "runtimes/wasmedge/wasmedge" wast st_we
-  )
