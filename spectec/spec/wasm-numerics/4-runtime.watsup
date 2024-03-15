@@ -1,0 +1,94 @@
+;;
+;; Addresses
+;;
+
+syntax addr hint(desc "address") = nat
+syntax funcaddr hint(desc "function address") = addr
+
+var a : addr
+var fa : funcaddr
+
+
+;;
+;; Values
+;;
+
+;; Basic values
+
+syntax num hint(desc "number") =
+  | CONST numtype c_numtype
+syntax val hint(desc "value") =
+  | num
+
+syntax result hint(desc "result") =
+  | _VALS val* | TRAP
+
+var v : val
+var res : result
+
+
+;; External values
+
+syntax externval hint(desc "external value") =
+  | FUNC funcaddr
+
+var xv : externval
+
+
+;;
+;; Configurations
+;;
+
+;; Instances
+
+syntax funcinst hint(desc "function instance") =
+  { TYPE functype,
+    MODULE moduleinst,
+    CODE func }
+syntax exportinst hint(desc "export instance") =
+  { NAME name,
+    VALUE externval }
+
+syntax moduleinst hint(desc "module instance") =
+  { TYPE functype*,
+    FUNC funcaddr*,
+    EXPORT exportinst* }
+
+var mm : moduleinst
+var fi : funcinst
+var xi : exportinst
+
+
+;; Configurations proper
+
+syntax store hint(desc "store") =
+  { FUNC funcinst* }
+
+syntax frame hint(desc "frame") =
+  { LOCAL val*,
+    MODULE moduleinst }
+
+syntax state hint(desc "state") = store; frame
+syntax config hint(desc "configuration") = state; admininstr*
+
+var s : store
+var f : frame
+var z : state
+
+
+;;
+;; Administrative Instructions
+;;
+
+syntax admininstr hint(show instr) hint(desc "administrative instruction") =
+  | instr
+  | REF.FUNC_ADDR funcaddr         hint(show REF.FUNC %)
+  | CALL_ADDR funcaddr             hint(show CALL %)
+  | LABEL_ n `{instr*} admininstr* hint(show LABEL_%#% %%)
+  | FRAME_ n `{frame} admininstr*  hint(show FRAME_%#% %%)
+  | TRAP
+
+syntax E hint(desc "evaluation context") =
+  | _HOLE `[ _ ]
+  | _SEQ val* E instr*
+  | LABEL_ n `{instr*} E

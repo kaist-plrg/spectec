@@ -1,0 +1,24 @@
+;;
+;; Auxiliary definitions on Values
+;;
+
+;; Bytes
+
+def $concat_bytes((byte*)*) : byte*  hint(show $concat(%))
+def $concat_bytes(eps) = eps
+def $concat_bytes((b*) (b'*)*) = b* $concat_bytes((b'*)*)
+
+;;
+;; Auxiliary Definitions on Types
+;;
+
+;; Size
+
+;; def |I n| = |F n| = |V n| = n        ;; ????
+
+def $size(valtype) : nat  hint(partial) hint(show |%|)
+def $size(I32) = 32
+def $size(I64) = 64
+def $size(F32) = 32
+def $size(F64) = 64
+def $size(V128) = 128
