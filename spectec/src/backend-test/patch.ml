@@ -23,17 +23,7 @@ let patch_types types =
   listV (Array.append [|type_|] (unwrap_listv_to_array types))
 
 (* import *)
-let patch_imports _imports =
-  let mk_import name kind t = caseV ("IMPORT", [ TextV "spectest_values"; TextV name; caseV (kind, [t])]) in
-  listV [|
-    (* mk_import "print" "FUNC" zero; *)
-    mk_import "global_i32" "GLOBAL" (TupV [none "MUT"; nullary "I32"]);
-    mk_import "global_i64" "GLOBAL" (TupV [none "MUT"; nullary "I64"]);
-    mk_import "global_f32" "GLOBAL" (TupV [none "MUT"; nullary "F32"]);
-    mk_import "global_f64" "GLOBAL" (TupV [none "MUT"; nullary "F64"]);
-    (* mk_import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; nullary "FUNCREF" ]); *)
-    (* mk_import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
-  |]
+let patch_imports _imports = listV [||]
 
 (* func *)
 let inc_type_idx = function (* Due to manually added 0th type, [] -> [] *)

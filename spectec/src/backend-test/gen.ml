@@ -494,19 +494,7 @@ and gen_typ c typ =
   match typ.it with
   (* HARDCODE: imported builtins *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "import" ->
-    let import name kind t =
-      Al.Ast.CaseV ("IMPORT", [ TextV "spectest_values"; TextV name; caseV (kind, [t])])
-    in
-    let const = none "MUT" in
-    listV_of_list [
-      (* import "print" "FUNC" zero; *)
-      import "global_i32" "GLOBAL" (TupV [const; nullary "I32"]);
-      import "global_i64" "GLOBAL" (TupV [const; nullary "I64"]);
-      import "global_f32" "GLOBAL" (TupV [const; nullary "F32"]);
-      import "global_f64" "GLOBAL" (TupV [const; nullary "F64"]);
-      import "table" "TABLE" (TupV [ TupV [ NumV 10L; NumV 20L ]; nullary "FUNCREF" ]);
-      (* import "memory" "MEM" (CaseV ("I8", [ TupV [ NumV 1L; NumV 2L ] ])); *)
-    ]
+    listV [||]
   (* HARDCODE: export functios *)
   | IterT ({ it = VarT id; _ }, List) when id.it = "export" ->
     let l =
@@ -880,41 +868,10 @@ let invoke_to_wast ((f, args), result) =
 let to_wast seed m result =
   let open Reference_interpreter2.Script in
 
-  let global ty value =
-    caseV ("GLOBAL", [ TupV ([ CaseV ("MUT", [ OptV None ]); nullary ty]);
-      listV_of_list [CaseV ("CONST", [ nullary ty; value])]])
-  in
-
-  let export name var =
-    caseV ("EXPORT", [ TextV name; CaseV ("GLOBAL", [ Construct2.al_of_int32 var ])])
-  in
-
-  let m_spectest = ("MODULE", [
-    empty_list; empty_list; empty_list;
-    listV_of_list [
-      global "I32" (Construct2.al_of_int32 666l);
-      global "I64" (Construct2.al_of_int64 666L);
-      global "F32" (0x4426a666l |> Construct2.al_of_int32);
-      global "F64" (0x4084d4cccccccccdL |> Construct2.al_of_int64);
-    ];
-    empty_list; empty_list; empty_list; empty_list; OptV None;
-    listV_of_list [
-      export "global_i32" 0l;
-      export "global_i64" 1l;
-      export "global_f32" 2l;
-      export "global_f64" 3l;
-    ];
-  ]) |> caseV |> Construct2.al_to_module in
-
   let m_r = Construct2.al_to_module m in
 
-  let spectest = Textual m_spectest |> to_phrase in
   let def = Textual m_r |> to_phrase in
-  let pre_script = [
-    (Module (Some (to_phrase "$spectest_values"), spectest) |> to_phrase);
-    (Register (Utf8.decode "spectest_values", Some (to_phrase "$spectest_values")) |> to_phrase)
-  ] in
-  let script = pre_script @ match result with
+  let script = match result with
     | Ok _ ->
       [ (Module (None, def) |> to_phrase) ]
     | Error Exception.Trap ->
@@ -959,7 +916,6 @@ let to_wast seed m result =
     else
       to_file (string_of_int seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions)
   | Error Exception.Exhaustion ->
-      to_file (string_of_int seed) pre_script;
       to_file (string_of_int seed ^ "-e") script
   | Error _ ->
       to_file (string_of_int seed) script
