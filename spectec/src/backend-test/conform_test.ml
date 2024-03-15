@@ -25,7 +25,7 @@ let warn engine wast status =
 let conform_test seed =
   let wast = Printf.sprintf "out/%d.wast" seed in
   let st_ref = test_engine "../interpreter/wasm" wast in
-  let st_wt = test_engine "../../wasmtime/target/release/wasmtime wast" wast in
+  let st_wt = test_engine "wasmtime wast" wast in
   let st_wr = test_engine "wasmer wast" wast in
   let st_we = test_engine "runtimes/wasmedge/wasmedge" wast in
   match st_ref, st_wt, st_wr, st_we with
