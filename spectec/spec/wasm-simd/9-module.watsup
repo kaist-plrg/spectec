@@ -1,0 +1,83 @@
+;;
+;; Projections
+;;
+
+def $funcs(externval*) : funcaddr*
+def $funcs(eps) = eps
+def $funcs((FUNC fa) externval'*) = fa $funcs(externval'*)
+def $funcs(externval externval'*) = $funcs(externval'*)
+  -- otherwise
+;;
+;; Allocation
+;;
+
+;; Definitions
+
+def $allocfunc(store, moduleinst, func) : (store, funcaddr)
+def $allocfunc(s, mm, func) = (s[.FUNC =.. fi], |s.FUNC|)
+  -- if fi = { TYPE mm.TYPE[x], MODULE mm, CODE func }
+  -- if func = FUNC x local* expr
+
+def $allocfuncs(store, moduleinst, func*) : (store, funcaddr*)
+def $allocfuncs(s, mm, eps) = (s, eps)
+def $allocfuncs(s, mm, func func'*) = (s_2, fa fa'*)
+  -- if (s_1, fa) = $allocfunc(s, mm, func)
+  -- if (s_2, fa'*) = $allocfuncs(s_1, mm, func'*)
+;; Modules
+
+def $instexport(funcaddr*, nat*, nat*, nat*, export) : exportinst
+def $instexport(fa*, eps, eps, eps, EXPORT name (FUNC x)) = { NAME name, VALUE (FUNC fa*[x]) }
+
+
+def $allocmodule(store, module, externval*) : (store, moduleinst)
+def $allocmodule(s, module, externval*) = (s', mm)
+  -- if module =
+    MODULE
+      (TYPE ft)*
+      eps
+      func^n_func
+      eps
+      eps
+      eps
+      eps
+      eps
+      eps
+      export*
+  -- if fa_ex* = $funcs(externval*)
+  -- if fa* = $(|s.FUNC|+i_func)^(i_func<n_func)
+  -- if xi* = $instexport(fa_ex* fa*, eps, eps, eps, export)*
+  -- if mm = {
+      TYPE ft*,
+      FUNC fa_ex* fa*,
+      EXPORT xi*
+    }
+  -- if (s', fa*) = $allocfuncs(s, mm, func^n_func)
+
+
+;;
+;; Instantiation
+;;
+
+def $instantiate(store, module, externval*) : config
+def $instantiate(s, module, externval*) = s'; f; eps
+  -- if module = MODULE type* eps func* eps eps eps eps eps eps export*
+  -- if type* = (TYPE functype)*
+  -- if n_F = |func*|
+  -- if mm_init = {
+       TYPE functype*,
+       FUNC $funcs(externval*) $(|s.FUNC|+i_F)^(i_F<n_F),
+     }
+  -- if f_init = { LOCAL eps, MODULE mm_init }
+  -- if z = s; f_init
+  -- if (s', mm) = $allocmodule(s, module, externval*)
+  -- if f = { LOCAL eps, MODULE mm }
+
+
+;;
+;; Invocation
+;;
+
+def $invoke(store, funcaddr, val*) : config
+def $invoke(s, fa, val^n) = s; f; val^n (CALL_ADDR fa)
+  -- if f = { LOCAL eps, MODULE {} }
+  -- if $funcinst((s; f))[fa].TYPE = t_1^n -> t_2*

@@ -1,0 +1,53 @@
+;;
+;; Auxiliary definitions on Values
+;;
+
+;; Default values
+
+def $vzero: c_vectype ;; HACK for algorithmic backend
+
+def $default(valtype) : val  hint(show $default_%)
+
+def $default(I32) = (CONST I32 0)
+def $default(I64) = (CONST I64 0)
+def $default(F32) = (CONST F32 0)
+def $default(F64) = (CONST F64 0)
+def $default(V128) = (VVCONST V128 $vzero)
+
+
+;;
+;; Auxiliary definitions on State
+;;
+
+;; Short-hands
+
+def $store(state) : store             hint(show %.STORE)
+def $frame(state) : frame             hint(show %.FRAME)
+
+def $store((s; f)) = s
+def $frame((s; f)) = f
+
+
+def $funcaddr(state) : funcaddr*      hint(show %.MODULE.FUNC)
+def $funcaddr((s; f)) = f.MODULE.FUNC
+
+def $funcinst(state) : funcinst*      hint(show %.FUNC)
+def $moduleinst(state) : moduleinst   hint(show %.MODULE)
+
+def $funcinst((s; f)) = s.FUNC
+def $moduleinst((s; f)) = f.MODULE
+
+def $type(state, typeidx) : functype        hint(show %.TYPE`[%])
+def $func(state, funcidx) : funcinst        hint(show %.FUNC#`[%])
+def $local(state, localidx) : val           hint(show %.LOCAL#`[%])
+
+def $type((s; f), x) = f.MODULE.TYPE[x]
+def $func((s; f), x) = s.FUNC[f.MODULE.FUNC[x]]
+def $local((s; f), x) = f.LOCAL[x]
+
+
+;; Update
+
+def $with_local(state, localidx, val) : state               hint(show %[.LOCAL[%] = %])
+
+def $with_local((s; f), x, v) = s; f[.LOCAL[x] = v]
