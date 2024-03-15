@@ -34,7 +34,7 @@ let conform_test seed =
     Log.warn (wast ^ " may have nondeterministic behavior");
     Sys.command ("rm " ^ wast) |> ignore
   | ref, _, _, _ when ref != 0 ->
-    Log.warn (wast " may have wrong result")
+    Log.warn (wast ^ " may have wrong result")
   | _ ->
     warn "../interpreter/wasm" wast st_ref;
     warn "wasmtime wast" wast st_wt;
