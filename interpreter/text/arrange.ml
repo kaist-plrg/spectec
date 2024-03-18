@@ -436,7 +436,8 @@ let num v = string_of_num v.it
 let vec v = string_of_vec v.it
 
 let memop name x typ {ty; align; offset; _} sz =
-  typ ty ^ "." ^ name ^ " " ^ var x ^
+  typ ty ^ "." ^ name ^
+  (if x.it = 0l then "" else " " ^ var x) ^
   (if offset = 0l then "" else " offset=" ^ nat32 offset) ^
   (if 1 lsl align = sz then "" else " align=" ^ nat (1 lsl align))
 
@@ -534,6 +535,11 @@ let rec instr e =
     | VecStore (x, op) -> vec_storeop x op, []
     | VecLoadLane (x, op, i) -> vec_laneop "load" x op i, []
     | VecStoreLane (x, op, i) -> vec_laneop "store" x op i, []
+    | MemorySize x when x.it = 0l -> "memory.size", []
+    | MemoryGrow x when x.it = 0l -> "memory.grow", []
+    | MemoryFill x when x.it = 0l -> "memory.fill", []
+    | MemoryCopy (x, y) when x.it = 0l && y.it = 0l -> "memory.copy", []
+    | MemoryInit (x, y) when x.it = 0l -> "memory.init " ^ var y, []
     | MemorySize x -> "memory.size " ^ var x, []
     | MemoryGrow x -> "memory.grow " ^ var x, []
     | MemoryFill x -> "memory.fill " ^ var x, []
