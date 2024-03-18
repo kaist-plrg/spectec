@@ -563,6 +563,22 @@ let al_to_special_vbinop = function
   | CaseV ("VDOT", [ TupV [ CaseV ("I32", []); NumV z1 ]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("S", []) ]) when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.DotS))
   | v -> fail "special vbinop" v
 
+let al_to_vextbinop = function
+  | [ TupV [ CaseV ("I16", []); NumV z1 ]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("HIGH", []) ]); CaseV ("S", []) ] when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtMulHighS))
+  | [ TupV [ CaseV ("I16", []); NumV z1 ]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("HIGH", []) ]); CaseV ("U", []) ] when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtMulHighU))
+  | [ TupV [ CaseV ("I16", []); NumV z1 ]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("LOW", []) ]); CaseV ("S", []) ] when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtMulLowS))
+  | [ TupV [ CaseV ("I16", []); NumV z1 ]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("LOW", []) ]); CaseV ("U", []) ] when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtMulLowU))
+  | [ TupV [ CaseV ("I32", []); NumV z1 ]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("HIGH", []) ]); CaseV ("S", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtMulHighS))
+  | [ TupV [ CaseV ("I32", []); NumV z1 ]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("HIGH", []) ]); CaseV ("U", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtMulHighU))
+  | [ TupV [ CaseV ("I32", []); NumV z1 ]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("LOW", []) ]);  CaseV ("S", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtMulLowS))
+  | [ TupV [ CaseV ("I32", []); NumV z1 ]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("LOW", []) ]);  CaseV ("U", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtMulLowU))
+  | [ TupV [ CaseV ("I64", []); NumV z1 ]; TupV [ CaseV ("I32", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("HIGH", []) ]); CaseV ("S", []) ] when z1 = two && z2 = four -> V128 (V128.I64x2 (V128Op.ExtMulHighS))
+  | [ TupV [ CaseV ("I64", []); NumV z1 ]; TupV [ CaseV ("I32", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("HIGH", []) ]); CaseV ("U", []) ] when z1 = two && z2 = four -> V128 (V128.I64x2 (V128Op.ExtMulHighU))
+  | [ TupV [ CaseV ("I64", []); NumV z1 ]; TupV [ CaseV ("I32", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("LOW", []) ]);  CaseV ("S", []) ] when z1 = two && z2 = four -> V128 (V128.I64x2 (V128Op.ExtMulLowS))
+  | [ TupV [ CaseV ("I64", []); NumV z1 ]; TupV [ CaseV ("I32", []); NumV z2 ]; CaseV ("EXTMUL", [ CaseV ("LOW", []) ]);  CaseV ("U", []) ] when z1 = two && z2 = four -> V128 (V128.I64x2 (V128Op.ExtMulLowU))
+  | [ TupV [ CaseV ("I32", []); NumV z1 ]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("DOT", []); CaseV ("S", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.DotS))
+  | v -> fail_list "vextbinop" v
+
 let al_to_int_vcvtop : value list -> V128Op.icvtop = function
   | [ CaseV (op, []); OptV half; sh; OptV ext; CaseV ("ZERO", [OptV _]) ] as l -> (
     match op with
@@ -610,12 +626,12 @@ let al_to_vcvtop : value list -> vec_cvtop = function
   | TupV [ CaseV ("F64", []); NumV z ] :: op when z = two -> V128 (V128.F64x2 (al_to_float_vcvtop op))
   | l -> fail_list "vcvtop" l
 
-let al_to_special_vcvtop = function
-  | CaseV ("VEXTADD_PAIRWISE", [ TupV [ CaseV ("I16", []); NumV z1]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("S", []) ]) when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtAddPairwiseS))
-  | CaseV ("VEXTADD_PAIRWISE", [ TupV [ CaseV ("I16", []); NumV z1]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("U", []) ]) when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtAddPairwiseU))
-  | CaseV ("VEXTADD_PAIRWISE", [ TupV [ CaseV ("I32", []); NumV z1]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("S", []) ]) when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtAddPairwiseS))
-  | CaseV ("VEXTADD_PAIRWISE", [ TupV [ CaseV ("I32", []); NumV z1]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("U", []) ]) when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtAddPairwiseU))
-  | v -> fail "special vcvtop" v
+let al_to_vextunop = function
+  | [ TupV [ CaseV ("I16", []); NumV z1]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("EXTADD_PAIRWISE", []); CaseV ("S", []) ] when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtAddPairwiseS))
+  | [ TupV [ CaseV ("I16", []); NumV z1]; TupV [ CaseV ("I8", []); NumV z2 ]; CaseV ("EXTADD_PAIRWISE", []); CaseV ("U", []) ] when z1 = eight && z2 = sixteen -> V128 (V128.I16x8 (V128Op.ExtAddPairwiseU))
+  | [ TupV [ CaseV ("I32", []); NumV z1]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("EXTADD_PAIRWISE", []); CaseV ("S", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtAddPairwiseS))
+  | [ TupV [ CaseV ("I32", []); NumV z1]; TupV [ CaseV ("I16", []); NumV z2 ]; CaseV ("EXTADD_PAIRWISE", []); CaseV ("U", []) ] when z1 = four && z2 = eight -> V128 (V128.I32x4 (V128Op.ExtAddPairwiseU))
+  | v -> fail_list "special vcvtop" v
 
 let al_to_int_vshiftop : value -> V128Op.ishiftop = function
   | CaseV ("SHL", []) -> V128Op.Shl
@@ -793,10 +809,11 @@ and al_to_instr': value -> Ast.instr' = function
   | CaseV ("VRELOP", vop) -> VecCompare (al_to_vrelop vop)
   | CaseV ("VUNOP", vop) -> VecUnary (al_to_vunop vop)
   | CaseV ("VBINOP", vop) -> VecBinary (al_to_vbinop vop)
-  | CaseV (("VSWIZZLE" | "VSHUFFLE" | "VNARROW" | "VEXTMUL" | "VDOT"), _) as v ->
+  | CaseV (("VSWIZZLE" | "VSHUFFLE" | "VNARROW"), _) as v ->
     VecBinary (al_to_special_vbinop v)
+  | CaseV ("VEXTBINOP", vop) -> VecBinary (al_to_vextbinop vop)
   | CaseV ("VCVTOP", vop) -> VecConvert (al_to_vcvtop vop)
-  | CaseV ("VEXTADD_PAIRWISE", _) as v -> VecConvert (al_to_special_vcvtop v)
+  | CaseV ("VEXTUNOP", vop) -> VecConvert (al_to_vextunop vop)
   | CaseV ("VSHIFTOP", vop) -> VecShift (al_to_vshiftop vop)
   | CaseV ("VBITMASK", vop) -> VecBitmask (al_to_vbitmaskop vop)
   | CaseV ("VVTESTOP", vop) -> VecTestBits (al_to_vvtestop vop)

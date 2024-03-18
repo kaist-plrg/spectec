@@ -142,14 +142,17 @@ let unwrap_boolv: value -> bool = function
 let unwrap_tupv: value -> value list = function
   | TupV l -> l
   | v -> fail "tuple" v
-let casev_of_case = function
+let casev_get_case = function
   | CaseV (s, _) -> s
+  | v -> fail "case" v
+let casev_get_args = function
+  | CaseV (_, args) -> args
   | v -> fail "case" v
 let casev_replace_nth_arg i v = function
   | CaseV (s, args) -> CaseV (s, List.mapi (fun index e -> if index = i then v else e) args)
   | v -> fail "case" v
 let casev_nth_arg n = function
-  | CaseV (_, l) when List.length l > n -> List.nth l n
+  | CaseV (_, args) when List.length args > n -> List.nth args n
   | v -> fail "case" v
 let unwrap_strv = function
   | StrV r -> r

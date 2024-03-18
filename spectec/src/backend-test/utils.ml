@@ -4,6 +4,7 @@ let choosei l =
   let i = Random.int n in
   i, List.nth l i
 let choose l = choosei l |> snd
+let (//) x y = choose [x; y]
 
 let find_index_all f l =
   let fi i x = if f x then Some i else None in

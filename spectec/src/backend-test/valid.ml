@@ -73,6 +73,37 @@ let nt_matches_n nt n = match nt, n with
 | CaseV (("F32" | "F64"), []), CaseV (("POS" | "NEG"), _) -> true
 | _ -> false
 
+let get_vunop_shape vop =
+  let name = casev_get_case vop in
+  match name with
+  | "ABS"
+  | "NEG"    -> make_ishape 8 // make_fshape (32 // 64)
+  | "POPCNT" -> make_ishape 8
+  | _        -> make_fshape (32 // 64)
+let get_vbinop_shape orig_shape vop =
+  let name = casev_get_case vop in
+  let has_arg = List.length (casev_get_args vop) > 0 in
+  match name with
+  | "ADD"
+  | "SUB"           -> orig_shape
+  | "MUL"           -> make_ishape (choose [16; 32; 64]) // make_fshape (32 // 64)
+  | "ADD_SAT"
+  | "SUB_SAT"
+  | "AVGR_U"        -> make_ishape (8 // 16)
+  | "Q15MULR_SAT_S" -> make_ishape 16
+  | ("MIN" | "MAX")
+    when has_arg    -> make_ishape (choose [8; 16; 32])
+  | _               -> make_fshape (32 // 64)
+let get_vrelop_shape orig_shape vop =
+  if List.length (casev_get_args vop) > 0 then
+    match casev_nth_arg 0 vop |> casev_get_case with
+    | "S" -> make_ishape (choose [8; 16; 32; 64])
+    | _   -> make_ishape (choose [8; 16; 32])
+  else
+    match casev_get_case vop with
+    | "EQ" | "NE" -> orig_shape
+    | _           -> make_fshape (32 // 64)
+
 let is_inn nt = nt = i32T || nt = i64T
 let is_fnn nt = nt = f32T || nt = f64T
 let is_vnn nt = nt = v128T
@@ -150,7 +181,7 @@ let validate_instr case args const (rt1, rt2) =
 
       let decompose_opt = function
       | OptV None -> false, n, ""
-      | OptV (Some (TupV [ m; s ])) -> true, unwrap_numv_to_int m, casev_of_case s
+      | OptV (Some (TupV [ m; s ])) -> true, unwrap_numv_to_int m, casev_get_case s
       | OptV (Some m) -> true, unwrap_numv_to_int m, ""
       | _ -> failwith "Unreachable" in
       let compose_opt is_some m s = match is_some, s with
@@ -178,8 +209,7 @@ let validate_instr case args const (rt1, rt2) =
     | [ OptV None ], [ T t ] -> if is_inn t || is_fnn t || is_vnn t then Some args else None
     | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
-  | "VLOAD" ->
-  (match args with
+  | "VLOAD" -> ( match args with
     | [ vloadop; memop; ] ->
       let vloadop', n = validate_vloadop vloadop in
       let (a, o) = decompose_memop memop in
@@ -188,15 +218,14 @@ let validate_instr case args const (rt1, rt2) =
       Some [ vloadop'; compose_memop a' o; ]
     | v -> failwith ("Invalid vec load op: " ^ Print.string_of_value (listV_of_list v))
     )
-| "VSTORE" ->
-  (match args with
-    | [ memop; ] ->
-      let (a, o) = decompose_memop memop in
-      let a' = dec_align a (128 / 8) in
+  | "VSTORE" -> ( match args with
+      | [ memop; ] ->
+        let (a, o) = decompose_memop memop in
+        let a' = dec_align a (128 / 8) in
 
-      Some [ compose_memop a' o; ]
-    | v -> failwith ("Invalid vec store op: " ^ Print.string_of_value (listV_of_list v))
-    )
+        Some [ compose_memop a' o; ]
+      | v -> failwith ("Invalid vec store op: " ^ Print.string_of_value (listV_of_list v))
+      )
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
     | [ n; memop; _ ] ->
@@ -208,33 +237,11 @@ let validate_instr case args const (rt1, rt2) =
       Some [ n; compose_memop a' o; numV_of_int j ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
     )
-  (*
-  | "VUNOP" | "VBINOP" | "VRELOP"->
-    let op = List.hd (List.tl args) in
-    (match op with
-    | CaseV ("_VI", [CaseV (opname, _)]) ->
-      (* popcnt *)
-      (match opname with
-      | "POPCNT" -> Some [ make_ishape 8; op ]
-      (* q15mulr_sat_s *)
-      | "Q15MULR_SAT_S" -> Some [ make_ishape 16; op ]
-      (* visatbinop & avgr_u *)
-      | "ADD_SAT" | "SUB_SAT" | "AVGR_U" -> Some [ make_ishape (choose [8; 16]); op ]
-      (* minmaxop *)
-      | "MIN" | "MAX" -> Some [ make_ishape (choose [8; 16; 32]); op ]
-      (* mul *)
-      | "MUL" -> Some [ make_ishape (choose [16; 32; 64]); op ]
-      (* lt_s, gt_s, le_s, ge_s *)
-      | "LT" | "GT" | "LE" | "GE" ->
-        let i = choose [8; 16; 32; 64] in
-        Some [ make_ishape i; caseV ("_VI", [caseV (opname, [nullary "S"])]) ]
-      | _ -> Some [ make_ishape (choose [8; 16; 32; 64]); op ]
-      )
-    | CaseV ("_VF", _) -> Some [ make_fshape (choose [32; 64]); op ]
-    | _ -> failwith "invalid op"
-    )
+  | "VUNOP"   -> let op = List.nth args 1 in Some [ get_vunop_shape op; op ]
+  | "VBINOP"  -> let op = List.nth args 1 in Some [ get_vbinop_shape (List.hd args) op; op ]
+  | "VTESTOP" -> let op = List.nth args 1 in Some [ make_ishape (choose [8; 16; 32; 64]); op ]
+  | "VRELOP"  -> let op = List.nth args 1 in Some [ get_vrelop_shape (List.hd args) op; op ]
   (* dynamic typing *)
-  *)
   | "VSPLAT" ->
     (match List.hd rt1 with
     | T (CaseV ("I32", [])) ->
@@ -278,18 +285,15 @@ let validate_instr case args const (rt1, rt2) =
       Some [ make_fshape 64; numV_of_int (Random.int (128/64)) ]
     | _ -> None
     )
-  | "VDOT" -> Some [ make_ishape 32; make_ishape 16; nullary "S" ]
-  | "VBITMASK" | "VALL_TRUE" -> Some [ make_ishape (choose [8; 16; 32; 64]) ]
   | "VNARROW" ->
     let i = choose [8; 16] in
     let arg1 = make_ishape i in
     let arg2 = make_ishape (i*2) in
     let ext = choose [nullary "S"; nullary "U"] in
     Some [ arg1; arg2; ext ]
-  (*
   (* cvtop *)
   | "VCVTOP" ->
-    (match casev_of_case (List.hd (List.tl args)) with
+    (match casev_get_case (List.nth args 1) with
     | "EXTEND" ->
       let i = choose [16; 32; 64] in
       let arg1 = make_ishape i in
@@ -321,20 +325,22 @@ let validate_instr case args const (rt1, rt2) =
       Some ([arg1; nullary "PROMOTE"; optV (Some (nullary "LOW")); arg2; optV None; none "ZERO"])
     | _ -> Some args
     )
-  | "VISHIFTOP" ->
-    let i = choose [8; 16; 32; 64] in
-    Some [ make_ishape i; List.hd (List.rev args) ]
-  | "VEXTMUL" ->
-    let i = choose [16; 32; 64] in
+  | "VEXTUNOP" ->
+    let i = 16 // 32 in
     let arg1 = make_ishape i in
     let arg2 = make_ishape (i/2) in
-    let hl = choose [nullary "HIGH"; nullary "LOW"] in
-    let ext = choose [nullary "S"; nullary "U"] in
-    Some [ arg1; hl; arg2; ext ]
-*)
+    let arg3 = List.nth args 2 in
+    let arg4 = List.nth args 3 in
+    Some [ arg1; arg2; arg3; arg4 ]
+  | "VEXTBINOP" ->
+    let is_dot = List.nth args 2 |> casev_get_case = "DOT" in
+    let i = if is_dot then 32 else choose [16; 32; 64] in
+    let arg1 = make_ishape i in
+    let arg2 = make_ishape (i/2) in
+    let arg3 = List.nth args 2 in
+    let arg4 = if is_dot then nullary "S" else List.nth args 3 in
+    Some [ arg1; arg2; arg3; arg4 ]
   (* HACKS *)
-  | "VUNOP" | "VBINOP" | "VRELOP" | "VCVTOP"
-  | "VEXTUNOP" | "VEXTBINOP" -> None
   | "CONST" -> (
     match args with
     | [ nt; n ] when nt_matches_n nt n -> Some args

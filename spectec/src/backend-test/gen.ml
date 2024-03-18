@@ -758,7 +758,7 @@ let get_instant_result m : instant_result =
       mm
       |> strv_access "EXPORT"
       |> unwrap_listv_to_list
-      |> List.filter (fun inst -> inst |> strv_access "VALUE" |> casev_of_case = "FUNC")
+      |> List.filter (fun inst -> inst |> strv_access "VALUE" |> casev_get_case = "FUNC")
     in
     Ok (List.map mk_assertion exported_funcs)
   with e -> Error e
