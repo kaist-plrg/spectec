@@ -227,3 +227,6 @@ if __name__ == '__main__':
         print(f'Total [{correct}/{total}] ({correct/total*100:.2f}%)')
     except ZeroDivisionError:
         print(f'Total [{correct}/{total}] (nan%)')
+
+    if total != correct:
+        sys.exit(1)
