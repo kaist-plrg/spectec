@@ -765,9 +765,9 @@ let al_to_pack_shape = function
   | vs -> fail "pack shape" (TupV vs)
 
 let pack_shape_to_pack_size = function
-  | Pack.Pack8x8 -> Pack.Pack8
-  | Pack.Pack16x4 -> Pack.Pack16
-  | Pack.Pack32x2 -> Pack.Pack32
+  | Pack.Pack8x8
+  | Pack.Pack16x4
+  | Pack.Pack32x2 -> Pack.Pack64
 
 let al_to_vloadop': value -> Pack.pack_size * Pack.vec_extension = function
   | CaseV ("SHAPE", [ v1; v2; ext ] ) ->
@@ -955,7 +955,9 @@ let al_to_table': value -> table' = function
   | CaseV ("TABLE", [ tt; const ]) when !version = 3 ->
     { ttype = al_to_table_type tt; tinit = al_to_const const }
   | CaseV ("TABLE", [ tt ]) when !version = 2 ->
-    { ttype = al_to_table_type tt; tinit = [] @@ no_region }
+    let ttype = al_to_table_type tt in
+    let TableT (_, (_, ht)) = ttype in
+    { ttype = ttype; tinit = [ RefNull ht @@ no_region ] @@ no_region }
   | v -> fail "table" v
 let al_to_table: value -> table = al_to_phrase al_to_table'
 
