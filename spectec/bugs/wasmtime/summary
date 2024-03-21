@@ -1,0 +1,13 @@
+New bugs
+1. splat + f.convert i
+  -- commit: d68c6ff1345fd087b34dfde647b8a0d0b28fb57b
+  -- seed: 9854, 12837
+
+Reproduced bugs
+1. i64x2.shr_s
+  -- commit: 5f4e9d071c139ba46c7eea244c72964c1bf64d17
+  -- seed: 6181, 25028
+
+Etc
+1. Spectest -> Is using 666.0 instead of 666.6
+2. Parsing wat -> Fail to parse empty data section

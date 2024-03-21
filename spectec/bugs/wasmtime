@@ -1,2 +1,0 @@
-1. Spectest -> Is using 666.0 instead of 666.6
-2. Parsing wat -> Fail to parse empty data section
