@@ -113,8 +113,8 @@ struct
      * pos_nan or neg_nan.
      *)
     let nan =
-      if is_nan x then x else
-      if is_nan y then y else Rep.neg_nan
+      if is_nan y then y else
+      if is_nan x then x else Rep.neg_nan
     in canonicalize_nan nan
 
   (*
