@@ -340,21 +340,16 @@ let validate_instr case args const (rt1, rt2) =
   | "CONST" -> (
     match args with
     | [ ty; _ ] when is_inn ty ->
-      let case = casev_get_case ty in
-
       let mask =
-        (match case with
-        | "I32" -> 32
-        | "I64" -> 64
-        | _ -> assert false
-        )
+        ty
+        |> get_bitwidth
         |> Z.shift_left Z.one
         |> Z.pred
       in
 
       let n =
         interesting_value_map
-        |> Interesting.find case
+        |> Interesting.find (get_bitwidth ty)
         |> IntSet.elements
         |> choose
         |> Z.logand mask

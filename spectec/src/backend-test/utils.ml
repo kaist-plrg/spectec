@@ -24,7 +24,7 @@ let groupi_by f xs =
 
 (* Interesting values *)
 module IntSet = Set.Make (Z)
-module Interesting = Map.Make (String)
+module Interesting = Map.Make (Int)
 let interesting_value_map =
 
   (* generating interesting values given number of bits *)
@@ -55,19 +55,10 @@ let interesting_value_map =
 
   let bit_widths = [ 8; 16; 32; 64 ] in
   List.fold_right
-    (fun i -> Interesting.add ("I" ^ string_of_int i) (gen_interesting_integers (i-1)))
+    (* TODO: Fix inconsistency *)
+    (fun i -> Interesting.add i (gen_interesting_integers (i-1)))
     bit_widths
     Interesting.empty
-
-let print_interesting_integers () =
-  Interesting.iter (fun k s ->
-    print_endline k;
-    IntSet.iter (fun z ->
-      print_string (Z.to_string z ^ " ")
-    ) s;
-    print_endline "";
-    print_endline "";
-  ) interesting_value_map
 
 let append_byte bs b = Z.(logor (shift_left bs 8) b)
 let gen_byte _ = Random.int 256 |> Z.of_int
@@ -75,6 +66,13 @@ let gen_bytes n = List.init n gen_byte |> List.fold_left append_byte Z.zero
 
 (* TODO: move this to al/walk.ml *)
 open Al.Ast
+
+let get_bitwidth = function
+  | CaseV ("I8", []) -> 8
+  | CaseV ("I16", []) -> 16
+  | CaseV (("I32"|"F32"), []) -> 32
+  | CaseV (("I64"|"F64"), []) -> 64
+  | _ -> failwith "Invalid type"
 
 let rec walk_value f v =
   let new_ = walk_value f in
