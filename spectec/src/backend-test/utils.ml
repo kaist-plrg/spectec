@@ -21,6 +21,54 @@ let groupi_by f xs =
     new_ groups
   ) [] ixs
 
+
+(* Interesting values *)
+module IntSet = Set.Make (Z)
+module Interesting = Map.Make (String)
+let interesting_value_map =
+
+  (* generating interesting values given number of bits *)
+  let gen_interesting_integers num_bits =
+    assert (num_bits > 0);
+
+    let rec aux num_bits acc =
+      if num_bits = 0 then acc
+      else if num_bits > 0 then
+        (* 2^(n-1) *)
+        let v = Z.shift_left Z.one (num_bits-1) in
+        (* 2^(n-1), 2^(n-1)+1, 2^n-1 *)
+        [ v; Z.succ v; Z.pred (Z.shift_left v 1) ]
+        |> IntSet.of_list
+        |> IntSet.union acc
+        |> aux (num_bits-1)
+      else assert false
+    in
+    let interesting_values = aux num_bits IntSet.empty in
+
+    interesting_values
+    (* Add negative interesting integers *)
+    |> IntSet.map Z.neg
+    (* Add min integer *)
+    |> IntSet.add (Z.shift_left Z.minus_one num_bits)
+    |> IntSet.union interesting_values
+  in
+
+  let bit_widths = [ 8; 16; 32; 64 ] in
+  List.fold_right
+    (fun i -> Interesting.add ("I" ^ string_of_int i) (gen_interesting_integers (i-1)))
+    bit_widths
+    Interesting.empty
+
+let print_interesting_integers () =
+  Interesting.iter (fun k s ->
+    print_endline k;
+    IntSet.iter (fun z ->
+      print_string (Z.to_string z ^ " ")
+    ) s;
+    print_endline "";
+    print_endline "";
+  ) interesting_value_map
+
 let append_byte bs b = Z.(logor (shift_left bs 8) b)
 let gen_byte _ = Random.int 256 |> Z.of_int
 let gen_bytes n = List.init n gen_byte |> List.fold_left append_byte Z.zero

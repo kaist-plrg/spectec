@@ -68,10 +68,6 @@ let nt_matches_op nt op = match nt, op with
     "ABS"; "NEG"; "SQRT"; "CEIL"; "FLOOR"; "TRUNC"; "NEAREST"; "ADD"; "SUB"; "MUL"; "DIV"; "MIN"; "MAX"; "COPYSIGN"; "EQ"; "NE"; "LT"; "GT"; "LE"; "GE"
   ]
 | _ -> false
-let nt_matches_n nt n = match nt, n with
-| CaseV (("I32" | "I64"), []), NumV _ -> true
-| CaseV (("F32" | "F64"), []), CaseV (("POS" | "NEG"), _) -> true
-| _ -> false
 
 let get_vunop_shape vop =
   let name = casev_get_case vop in
@@ -343,7 +339,30 @@ let validate_instr case args const (rt1, rt2) =
   (* HACKS *)
   | "CONST" -> (
     match args with
-    | [ nt; n ] when nt_matches_n nt n -> Some args
+    | [ ty; _ ] when is_inn ty ->
+      let case = casev_get_case ty in
+
+      let mask =
+        (match case with
+        | "I32" -> 32
+        | "I64" -> 64
+        | _ -> assert false
+        )
+        |> Z.shift_left Z.one
+        |> Z.pred
+      in
+
+      let n =
+        interesting_value_map
+        |> Interesting.find case
+        |> IntSet.elements
+        |> choose
+        |> Z.logand mask
+        |> numV
+      in
+
+      Some [ ty; n ]
+    | [ ty; CaseV (("POS"|"NEG"), _) ] when is_fnn ty -> Some args
     | _ -> None
   )
   | _ -> Some args
