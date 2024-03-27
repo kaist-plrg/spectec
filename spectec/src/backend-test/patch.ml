@@ -58,7 +58,14 @@ let patch_elem = function
 let patch_elems elems = listv_map patch_elem elems
 
 (* data *)
-let patch_data data = data
+let patch_data data =
+  let datamode = match casev_nth_arg 1 data with
+    | CaseV ("ACTIVE", [mid; _init]) when Random.int 50 > 0 ->
+      let int_to_const i = caseV ("CONST", [nullary "I32"; numV_of_int i]) in
+      CaseV ("ACTIVE", [mid; listV [| int_to_const (Random.int 3) |]])
+    | v -> v
+  in
+  casev_replace_nth_arg 1 datamode data
 let patch_datas datas = listv_map patch_data datas
 
 (* start *)
