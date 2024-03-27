@@ -1,6 +1,6 @@
 (library
   (name backend_test)
-  (libraries el il al util backend_interpreter)
+  (libraries el il al util backend_interpreter unix)
   (modules
     flag
     gen

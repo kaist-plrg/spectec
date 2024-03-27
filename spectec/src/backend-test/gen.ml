@@ -732,7 +732,7 @@ let mk_assertion funcinst =
     invoke, Error e
 
 let print_assertion ((f, args), result) =
-  Log.debug (match result with
+  Log.trace (match result with
   | Ok returns -> Printf.sprintf "(assert_return (invoke %s [%s]) [%s])"
     f
     (args |> List.map Al.Print.string_of_value |> String.concat " ")
@@ -771,9 +771,9 @@ type test = module_ * instant_result
 (** Output **)
 
 let print_module module_ =
-  Log.debug (string_of_module module_)
+  Log.trace (string_of_module module_)
 let print_result result =
-  let print = Log.debug in
+  let print = Log.trace in
   (match result with
   | Ok assertions ->
     print "Instantiation success";
