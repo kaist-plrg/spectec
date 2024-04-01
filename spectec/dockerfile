@@ -8,6 +8,9 @@ RUN apt install wget
 RUN apt-get install git make --yes
 RUN apt-get install python3 python3-pip --yes
 
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
 # Installing OCaml
 #   - opam v2.0.5
 #   - OCaml v5.0.0
@@ -58,6 +61,7 @@ ENV PATH="${PATH}:$WASMER_DIR/bin"
 
 # Install wasmtime
 
+RUN git clone https://github.com/bytecodealliance/wasmtime.git
 RUN curl https://wasmtime.dev/install.sh -sSf | bash
 
 

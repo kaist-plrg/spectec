@@ -12,14 +12,22 @@ let test_engine engine wast =
   Log.debug ("[Stdout]\n" ^ out);
   Log.debug ("[Stderr]\n " ^ err);
   let st = close_process_full (stdout, stdin, stderr) in
-  match st with
-  | WEXITED st when st > 0 -> Log.warn ("`" ^ cmd ^ "` failed")
+  (match st with
   | WEXITED _ -> ()
   | WSIGNALED _ -> kill 0 Sys.sigint
   | WSTOPPED _ -> kill 0 Sys.sigstop
+  );
+  st
 
 let conform_test seed =
   let wast = Printf.sprintf "out/%d.wast" seed in
 
-  test_engine "../interpreter/wasm" wast;
-  test_engine "wasmtime wast" wast;
+  if (
+    test_engine "/home/wasmtime/target/release/wasmtime wast" wast <>
+    test_engine "wasmtime wast" wast
+  ) then
+    Log.warn (wast ^ " failed")
+  else (
+    system ("rm " ^ wast ^ " 2> /dev/null") |> ignore;
+    system (Printf.sprintf "rm out/%d-* 2> /dev/null" seed) |> ignore
+  )
