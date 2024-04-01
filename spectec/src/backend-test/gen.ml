@@ -12,7 +12,6 @@ let il: Il.Ast.script ref = ref []
 let al: Al.Ast.script ref = ref []
 
 (* Helpers *)
-
 let hds xs = xs |> List.rev |> List.tl |> List.rev
 
 let option_flatmap f opt = Option.bind opt f
@@ -27,18 +26,78 @@ let flatten_rec =
     | _ -> [ def ]
   )
 
-let extract_deftyp inst =
-  match inst.it with
-  | Il.Ast.InstD (_binds, _args, deftyp) -> deftyp
-(* TODO: Extract deftyp with considering parameters *)
-let has_name name def =
-  match def.it with
-  | Il.Ast.TypD (id, _params, insts) when id.it = name -> Some (choose insts |> extract_deftyp)
-  | _ -> None
-let find_deftyp name =
-  match List.find_map (has_name name) !il with
-  | Some deftyp -> deftyp
-  | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
+let spf = Printf.sprintf
+
+(** Helpers to handle type-family-based generation **)
+  let has_name name def =
+    match def.it with
+    | Il.Ast.TypD (id, _params, insts) when id.it = name -> Some insts
+    | _ -> None
+  let type_of_arg a =
+    match a.it with
+    | Il.Ast.ExpA e -> e.note
+    | Il.Ast.TypA t -> t
+  let typ_of_bind bind =
+    match bind.it with
+    | Il.Ast.ExpB (_, t, _) -> t
+    | Il.Ast.TypB _ -> failwith "typ_of_bind"
+
+  let do_binds alist vlist =
+    let rec do_bind e v =
+      match e.it, v with
+      | Il.Ast.VarE id, _ -> [ id.it, v ]
+      | Il.Ast.SubE (e, _, _), _ -> do_bind e v
+      | Il.Ast.CaseE ([[];[]], { it = TupE [e]; _}), _ -> do_bind e v
+      | Il.Ast.CaseE (_, { it = TupE es; _}),
+        (Al.Ast.CaseV (_, vs) | Al.Ast.TupV vs) ->
+          List.map2 do_bind es vs |> List.concat
+      | _ -> failwith (spf "TODO: do_bind %s %s" (Il.Print.string_of_exp e) (Al.Print.string_of_value v))
+    in
+
+    let do_bind_arg a kv =
+      match a.it with
+      | Il.Ast.ExpA e -> do_bind e (snd kv)
+      | Il.Ast.TypA _ -> failwith "do_bind: arg is TypA"
+    in
+
+    List.map2 do_bind_arg alist vlist |> List.concat
+
+  let rec has_deftyp v dt =
+    (* print_endline (spf "has_deftype %s %s" (Al.Print.string_of_value v) (Il.Print.string_of_deftyp `H dt)); *)
+    match v, dt.it with
+    | Al.Ast.CaseV (name, []), Il.Ast.VariantT typcases ->
+      List.exists (fun (mixop, _, _) -> name = Il.Print.string_of_mixop mixop) typcases
+    | _, Il.Ast.AliasT t -> has_type v t
+    | _, Il.Ast.VariantT [ [[]; []], ([ bind ], _, _), _ ] -> has_type v (typ_of_bind bind)
+    (* HARDCODE: N x M *)
+    | Al.Ast.TupV vs, Il.Ast.VariantT [ typcase ] ->
+      let (_mixop, (binds, _, _), _) = typcase in
+      (* TODO: assert mixop = `%X%` *)
+      List.for_all2 has_type vs (List.map typ_of_bind binds)
+    | _ -> false
+  and has_type v t =
+    (* print_endline (spf "has_deftype %s %s" (Al.Print.string_of_value v) (Il.Print.string_of_typ t)); *)
+    match v, t.it with
+    | Al.Ast.NumV _, Il.Ast.(NumT NatT) -> true
+    | _, Il.Ast.VarT (name, []) -> has_deftyp v (dispatch_deftyp name.it [] |> fst)
+    | _ -> false
+  and has_argtype v a = has_type v (type_of_arg a)
+
+  and match_params args inst =
+    match inst.it with
+    | Il.Ast.InstD (_binds, params, deftyp) when (
+        List.for_all2 has_argtype (List.map snd args) params
+      ) -> Some (deftyp, do_binds params args)
+    | _ -> None
+  and dispatch_deftyp name args =
+    match List.find_map (has_name name) !il with
+    | Some insts ->
+      ( match List.find_map (match_params args) insts with
+        | Some matched -> matched
+        | None -> failwith ("Failed to match params and args for " ^ name ^ ".") )
+    | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
+(** End of Helpers to handle type-family-based generation **)
+
 
 let string_of_atom = Il.Atom.string_of_atom
 let string_of_mixop = Il.Atom.string_of_mixop
@@ -231,6 +290,7 @@ type context = {
   parent_name: string;  (* Denote name of most recent production *)
   depth_limit: int;     (* HARDCODE: Limit on block / loop / if depth *)
   is_func: bool;        (* HARDCODE: currently making function *)
+  args: (string * Al.Ast.value) list (* Arguments for syntax *)
 }
 let default_context = {
   i = 0;
@@ -238,6 +298,7 @@ let default_context = {
   parent_name = "";
   depth_limit = 3;
   is_func = false;
+  args = [];
 }
 
 let types_cache = ref []
@@ -295,6 +356,7 @@ exception OutOfLife
 let rec gen c name =
   let c' = { c with parent_name = name } in
   let c' = if name = "func" || name = "start" then { c' with is_func = true } else c' in
+  let c' = { c' with args = [] } in
 
   (* HARDCODE: Wasm expression *)
   match name with
@@ -318,7 +380,8 @@ let rec gen c name =
   (* HARDCODE: pack_size to be 8/16/32 *)
   | "packsize" -> numV_of_int (choose [8; 16; 32; 64])
   | _ ->
-    let deftyp = find_deftyp name in
+    let deftyp, bindings = dispatch_deftyp name c.args in
+    let c' = { c' with args = bindings } in
     let result =
       match deftyp.it with
       | AliasT typ -> gen_typ c' typ
@@ -496,7 +559,31 @@ and gen_typ c typ =
     let it = Il.Ast.IterT (typ', List) in
     gen_typ c { typ with it = it }
   (* General types *)
-  | VarT (id, _) -> gen c id.it
+  | VarT (id, args) ->
+    (* Helpers *)
+    let rec e2v e =
+      match e.it with
+      | Il.Ast.NatE z -> numV z
+      | Il.Ast.SubE (e, _, _) -> e2v e
+      | Il.Ast.VarE id -> List.assoc id.it c.args
+      (* HARDCODE *)
+      | Il.Ast.CallE (id, [ vt ]) when id.it = "size" ->
+        ( match casev_get_case (a2v vt) with
+        | "I32" -> 32
+        | "I64" -> 64
+        | "F32" -> 32
+        | "F64" -> 64
+        | "V128" -> 128
+        | _ -> failwith "Invalid size" ) |> numV_of_int
+      | _ -> failwith ("Can not convert ExpA " ^ (Il.Print.string_of_exp e) ^ " into value (yet)")
+    and a2v a =
+      match a.it with
+      | Il.Ast.ExpA e -> e2v e
+      | Il.Ast.TypA _ -> failwith "Can not convert TypA into value (yet)" in
+    (* End of helpers*)
+    let args' = List.map (fun a -> ("_arg", a2v a)) args in
+    let c' = { c with args = args' } in
+    gen c' id.it
   | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
     let name = match typ'.it with VarT (id, _) -> id.it | _ -> "" in
@@ -527,7 +614,12 @@ and gen_typ c typ =
 
 and gen_typs c typs =
   match typs.it with
-  | TupT typs' -> typs' |> List.map snd |> List.map (gen_typ c)
+  | TupT typs' ->
+      List.fold_left_map (fun c (exp, typ) ->
+        let v = (gen_typ c) typ in
+        let k = Il.Print.string_of_exp exp in
+        { c with args = (k, v) :: c.args }, v
+      ) c typs' |> snd
   | _ -> [ gen_typ c typs ]
 
 and fix_rts case const_required rt1 rt2 entangles =
