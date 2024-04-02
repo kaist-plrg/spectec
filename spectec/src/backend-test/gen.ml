@@ -33,9 +33,13 @@ let spf = Printf.sprintf
     match def.it with
     | Il.Ast.TypD (id, _params, insts) when id.it = name -> Some insts
     | _ -> None
+  let type_of_exp e =
+    match e.it with
+    | Il.Ast.SubE (_, t, _) -> t
+    | _ -> e.note
   let type_of_arg a =
     match a.it with
-    | Il.Ast.ExpA e -> e.note
+    | Il.Ast.ExpA e -> type_of_exp e
     | Il.Ast.TypA t -> t
   let typ_of_bind bind =
     match bind.it with
@@ -62,8 +66,10 @@ let spf = Printf.sprintf
 
     List.map2 do_bind_arg alist vlist |> List.concat
 
+  exception DispatchFail of string
+
   let rec has_deftyp v dt =
-    (* print_endline (spf "has_deftype %s %s" (Al.Print.string_of_value v) (Il.Print.string_of_deftyp `H dt)); *)
+    (* print_endline (spf "has_deftype %s %s ?" (Al.Print.string_of_value v) (Il.Print.string_of_deftyp `H dt)); *)
     match v, dt.it with
     | Al.Ast.CaseV (name, []), Il.Ast.VariantT typcases ->
       List.exists (fun (mixop, _, _) -> name = Il.Print.string_of_mixop mixop) typcases
@@ -76,12 +82,14 @@ let spf = Printf.sprintf
       List.for_all2 has_type vs (List.map typ_of_bind binds)
     | _ -> false
   and has_type v t =
-    (* print_endline (spf "has_deftype %s %s" (Al.Print.string_of_value v) (Il.Print.string_of_typ t)); *)
+    (* print_endline (spf "has_type %s %s ?" (Al.Print.string_of_value v) (Il.Print.string_of_typ t)); *)
     match v, t.it with
     | Al.Ast.NumV _, Il.Ast.(NumT NatT) -> true
     | _, Il.Ast.VarT (name, []) -> has_deftyp v (dispatch_deftyp name.it [] |> fst)
     | _ -> false
-  and has_argtype v a = has_type v (type_of_arg a)
+  and has_argtype v a =
+    (* print_endline (spf "has_argtype %s %s ?" (Al.Print.string_of_value v) (Il.Print.string_of_arg a)); *)
+    has_type v (type_of_arg a)
 
   and match_params args inst =
     match inst.it with
@@ -94,7 +102,7 @@ let spf = Printf.sprintf
     | Some insts ->
       ( match List.find_map (match_params args) insts with
         | Some matched -> matched
-        | None -> failwith ("Failed to match params and args for " ^ name ^ ".") )
+        | None -> raise (DispatchFail name) )
     | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 (** End of Helpers to handle type-family-based generation **)
 
@@ -423,7 +431,7 @@ let rec gen c name =
           else
             let rec try_args life' =
               if life' = 0 then try_instr (life - 1)
-              else (
+              else try (
                 let c'' = { c' with parent_case = case; depth_limit = c'.depth_limit - 1 } in
                 let args =
                   (match case with
@@ -434,7 +442,7 @@ let rec gen c name =
                     gen_wasm_expr c'' (hds rt1) rt2 rt2;
                     gen_wasm_expr c'' (hds rt1) rt2 rt2
                   ]
-                  | _ -> gen_typs c'' typs
+                  | _ -> gen_typs c'' ~fixed:induced_args typs
                   ) |> replace induced_args
                   in
                 match validate_instr case args const_required (rt1, rt2) with
@@ -445,7 +453,7 @@ let rec gen c name =
                   if List.mem name ["RETURN"; "BR"; "BR_TABLE"; "UNREACHABLE"] then
                     nullify_target ();
                   Al.Ast.CaseV (case, args')
-              )
+              ) with DispatchFail "testop_" -> try_args (life' - 1) (* Unhabite testop for TESTOP Fxx _ *)
             in
             try_args 100
         in
@@ -612,14 +620,18 @@ and gen_typ c typ =
     else optV (Some (gen_typ c typ'))
   | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
 
-and gen_typs c typs =
+and gen_typs c ?(fixed = []) typs =
   match typs.it with
   | TupT typs' ->
-      List.fold_left_map (fun c (exp, typ) ->
-        let v = (gen_typ c) typ in
+      List.fold_left_map (fun (c, i) (exp, typ) ->
         let k = Il.Print.string_of_exp exp in
-        { c with args = (k, v) :: c.args }, v
-      ) c typs' |> snd
+        let v =
+          match List.assoc_opt i fixed with
+          | Some v -> v
+          | None -> (gen_typ c) typ
+        in
+        ({ c with args = (k, v) :: c.args }, i+1), v
+      ) (c, 0) typs' |> snd
   | _ -> [ gen_typ c typs ]
 
 and fix_rts case const_required rt1 rt2 entangles =

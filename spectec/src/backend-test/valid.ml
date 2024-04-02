@@ -56,19 +56,6 @@ let rec dec_align a n =
   if 1 lsl a <= n then a else
   dec_align (a-1) n
 
-(* TODO: This eventually should be removed *)
-let nt_matches_op nt op = match nt, op with
-| CaseV (("I32" | "I64"), []), CaseV (op, []) ->
-  List.mem op [
-    "CLZ"; "CTZ"; "POPCNT"; "ADD"; "SUB"; "MUL"; "AND"; "OR"; "XOR"; "SHL"; "SHR"; "ROTL"; "ROTR"; "EQZ"; "EQ"; "NE"
-  ]
-| CaseV (("I32" | "I64"), []), CaseV (_, [_]) -> true
-| CaseV (("F32" | "F64"), []), CaseV (op, []) ->
-  List.mem op [
-    "ABS"; "NEG"; "SQRT"; "CEIL"; "FLOOR"; "TRUNC"; "NEAREST"; "ADD"; "SUB"; "MUL"; "DIV"; "MIN"; "MAX"; "COPYSIGN"; "EQ"; "NE"; "LT"; "GT"; "LE"; "GE"
-  ]
-| _ -> false
-
 let get_vunop_shape vop =
   let name = casev_get_case vop in
   match name with
@@ -132,7 +119,7 @@ let correct_cvtop = function
     | "F", "I" -> sx
     | _ -> false )
   | "REINTERPRET" -> n1 = n2 && not sx
-  | _ -> false )
+  | _ -> failwith "Unreachable" )
 | _ -> false
 
 let validate_if_extend = function
@@ -153,8 +140,8 @@ let validate_shape = function
 (* TODO: Perhaps some of these can be automated? *)
 let validate_instr case args const (rt1, rt2) =
   match case with
-  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match args, rt2 with
-    | [ nt; op ], [ T t ] when nt_matches_op nt op && (not const || is_inn t) ->
+  | "UNOP" | "BINOP" | "TESTOP" | "RELOP" -> ( match rt2 with
+    | [ T t ] when (not const || is_inn t) ->
       let args' = validate_if_extend args in
       Some args'
     | _ -> None )
