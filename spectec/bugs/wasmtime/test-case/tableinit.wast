@@ -1,0 +1,11 @@
+(module
+  (table 0 0 externref)
+  (func (export "tableinit")
+    (i32.const 0)
+    (i32.const 0)
+    (i32.const 0)
+    (table.init 0 0)
+  )
+  (elem declare externref)
+)
+(invoke "tableinit")
