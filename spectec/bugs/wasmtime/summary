@@ -15,7 +15,7 @@ New bugs
     - seed: 615469, 615648
   * bug info
     - wasmtime version: 19.0.0
-    - Arch: ???
+    - Arch: any
     - test-case: tableinit.wast
 
 Reproduced bugs
