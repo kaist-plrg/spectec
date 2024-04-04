@@ -1,6 +1,6 @@
 FROM ubuntu:20.04
 
-RUN apt-get update
+RUN apt-get update --fix-missing
 RUN apt-get upgrade --yes
 RUN apt install cmake --yes
 RUN apt install curl --yes
@@ -83,6 +83,30 @@ WORKDIR /home/spectec/spectec/runtimes/wasmedge
 RUN curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | bash -s -- -p .
 RUN /bin/bash -c "source ./env && make"
 # TODO
+
+
+# Install V8
+
+WORKDIR /home
+RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+ENV PATH=/home/depot_tools:$PATH
+RUN gclient
+RUN mkdir /root/v8
+WORKDIR /root/v8
+ENV TAR_OPTIONS=--no-same-owner
+RUN fetch v8
+WORKDIR /root/v8/v8
+RUN gclient sync
+RUN apt-get install lsb-release sudo pkg-config -y
+RUN tools/dev/gm.py x64.release
+
+RUN opam install ocamlbuild --yes
+WORKDIR /root
+RUN git clone https://github.com/WebAssembly/spec
+WORKDIR /root/spec/interpreter
+RUN eval $(opam env) && make distclean wasm
+RUN mkdir -p /home/spectec/spectec/runtimes/v8
+RUN cp /root/spec/interpreter/wasm /home/spectec/spectec/runtimes/v8
 
 
 WORKDIR /home/spectec/spectec
