@@ -24,10 +24,20 @@ if [ $# -ne 1 ] ; then
     exit 0
 fi
 
-JS_PATH=./temp/test
-OUTPUT_PATH=./temp/output
-LOG_PATH=./temp/log
-mkdir -p $JS_PATH $OUTPUT_PATH $LOG_PATH
+RESULT_PATH=./result
+
+if [[ "$o" = false ]]; then
+   TEMP_PATH=$(mktemp -d)
+else 
+   TEMP_PATH=$RESULT_PATH
+fi
+
+JS_PATH=$TEMP_PATH/test
+OUTPUT_PATH=$TEMP_PATH/output
+FAIL_PATH=$RESULT_PATH/failed
+COMPILE_FAIL_PATH=$FAIL_PATH/compile
+TEST_FAIL_PATH=$FAIL_PATH/test
+mkdir -p $JS_PATH $OUTPUT_PATH $FAIL_PATH $COMPILE_FAIL_PATH $TEST_FAIL_PATH
 
 I=0
 J=0
@@ -51,17 +61,21 @@ run_test() {
    if [ $compiled = false ]; then
    # if [ true ]; then
       echo "compilation failed."
-      :> $LOG_PATH/$filename
+      :> $COMPILE_FAIL_PATH/$filename
       for interpreter in ${interpreters}; do
-         echo "${interpreter}> " >> $LOG_PATH/$filename
-         ./interpreter/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2>> $LOG_PATH/$filename
+         echo "${interpreter}> " >> $COMPILE_FAIL_PATH/$filename
+         ./interpreter/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2>> $COMPILE_FAIL_PATH/$filename
       done
+      cp $TEST_PATH/$FILE $COMPILE_FAIL_PATH
       let K=K+1
    else
       # print in file
       /root/v8/v8/out/x64.release/d8 $JS_PATH/$filename.js >$OUTPUT_PATH/$filename
       # ./print-result.py $OUTPUT_PATH/$filename.txt $v
       if [[ $? == 1 ]]; then 
+            cp $OUTPUT_PATH/$filename $TEST_FAIL_PATH
+            cp $JS_PATH/$filename.js $TEST_FAIL_PATH
+            cp $TEST_PATH/$filename.wast $TEST_FAIL_PATH
             echo "test failed."
             let J=J+1
       fi
@@ -96,5 +110,5 @@ fi
 
 
 if [[ "$o" = false ]]; then
-   rm -r ./temp
+   rm -r $TEMP_PATH
 fi
