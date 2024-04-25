@@ -4,7 +4,7 @@ o=false
 w=false
 v=false
 
-D8_PATH="/home/v8/v8/out/x64.release/d8"
+JSC_PATH="/home/spectec/spectec/runtimes/javascriptcore/WebKit/WebKitBuild/JSCOnly/Release/bin/jsc"
 
 while getopts "ow:v" option; do
    case $option in
@@ -51,7 +51,7 @@ run_test() {
    echo "==== $I.$FILE ====="
    compiled=false
    for interpreter in ${interpreters}; do
-      ./interpreter/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2> /dev/null
+      ../v8/interpreter/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2> /dev/null
       if [[ $? == 0 ]]; then
             # echo "compilation success with ${interpreter}."
             compiled=true
@@ -59,7 +59,6 @@ run_test() {
       fi
    done
    if [ $compiled = false ]; then
-   # if [ true ]; then
       echo "compilation failed."
       :> $COMPILE_FAIL_PATH/$filename
       for interpreter in ${interpreters}; do
@@ -69,10 +68,10 @@ run_test() {
       cp $TEST_PATH/$FILE $COMPILE_FAIL_PATH
       let K=K+1
    else
-      # print in file
-      $D8_PATH $JS_PATH/$filename.js >$OUTPUT_PATH/$filename
+      sed '1 i\var Console = function () {\n  this.log = function(msg){ debug(msg) };\n};\nvar console = new Console();' -i $JS_PATH/$filename.js
+      $JSC_PATH $JS_PATH/$filename.js >$OUTPUT_PATH/$filename
       # ./print-result.py $OUTPUT_PATH/$filename.txt $v
-      if [[ $? == 1 ]]; then 
+      if [ $? != 0 ]; then 
             cp $OUTPUT_PATH/$filename $TEST_FAIL_PATH
             cp $JS_PATH/$filename.js $TEST_FAIL_PATH
             cp $TEST_PATH/$filename.wast $TEST_FAIL_PATH

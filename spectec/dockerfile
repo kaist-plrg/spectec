@@ -91,24 +91,40 @@ WORKDIR /home
 RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
 ENV PATH=/home/depot_tools:$PATH
 RUN gclient
-RUN mkdir /root/v8
-WORKDIR /root/v8
+RUN mkdir /home/v8
+WORKDIR /home/v8
 ENV TAR_OPTIONS=--no-same-owner
 RUN fetch v8
-WORKDIR /root/v8/v8
+WORKDIR /home/v8/v8
 RUN gclient sync
 RUN apt-get install lsb-release sudo pkg-config -y
 RUN tools/dev/gm.py x64.release
 
-# Install reference interpreter
+
+# Install JavaScriptCore
+
+WORKDIR /home
+RUN git config --global http.postBuffer 1000000000
+RUN git clone https://github.com/WebKit/WebKit.git WebKit --progress
+# cloning takes too long (about 1hr)
+RUN apt-get install libicu-dev python ruby bison flex cmake build-essential ninja-build git gperf -y
+RUN apt-get install software-properties-common -y
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test
+RUN apt-get update
+RUN apt-get install gcc-11 g++-11 -y
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+RUN update-alternatives --config gcc
+RUN /home/WebKit/Tools/Scripts/build-webkit --jsc-only
+# ENV PATH=/home/depot_tools:$PATH
+
+
+# Install reference interpreters
 
 RUN opam install ocamlbuild --yes
-WORKDIR /root
-RUN git clone https://github.com/WebAssembly/spec
-WORKDIR /root/spec/interpreter
-RUN eval $(opam env) && make distclean wasm
-RUN mkdir -p /home/spectec/spectec/runtimes/v8
-RUN cp /root/spec/interpreter/wasm /home/spectec/spectec/runtimes/v8
+RUN git pull
+WORKDIR /home/spectec/spectec/runtimes/util
+RUN ./install_wasm.sh
+
 
 WORKDIR /home/spectec/spectec
 

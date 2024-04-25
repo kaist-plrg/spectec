@@ -4,14 +4,18 @@
 # Install wasm
 ###############################################################################
 
-mkdir -p /root/WebAssembly
-cd /root/WebAssembly
+CURRENT_DIR=$(dirname $0)
+echo $CURRENT_DIR
+
+mkdir -p /home/WebAssembly
+cd /home/WebAssembly
 git clone https://github.com/WebAssembly/spec
 cd spec/interpreter
 eval $(opam env)
 make distclean wasm
-mkdir -p /home/spectec/spectec/runtimes/v8/interpreter
-cp /root/WebAssembly/spec/interpreter/wasm /home/spectec/spectec/runtimes/v8/interpreter
+INTERPRETER_DIR=$CURRENT_DIR/interpreter
+mkdir -p $INTERPRETER_DIR
+cp /home/WebAssembly/spec/interpreter/wasm $INTERPRETER_DIR
 
 ###############################################################################
 # Install wasm with proposal support.
@@ -21,9 +25,9 @@ cp /root/WebAssembly/spec/interpreter/wasm /home/spectec/spectec/runtimes/v8/int
 repos='tail-call extended-const function-references gc multi-memory threads relaxed-simd'
 
 for repo in ${repos}; do
-  cd /root/WebAssembly
+  cd /home/WebAssembly
   git clone https://github.com/WebAssembly/${repo}
   cd ${repo}/interpreter
   make clean wasm
-  cp /root/WebAssembly/${repo}/interpreter/wasm /home/spectec/spectec/runtimes/v8/interpreter/wasm-${repo}
+  cp /home/WebAssembly/${repo}/interpreter/wasm $INTERPRETER_DIR/wasm-${repo}
 done
