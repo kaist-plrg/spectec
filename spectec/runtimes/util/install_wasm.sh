@@ -1,11 +1,13 @@
 #!/bin/bash
 
+CURRENT_DIR=$PWD
+echo $CURRENT_DIR
+INTERPRETER_DIR=$CURRENT_DIR/interpreter
+mkdir -p $INTERPRETER_DIR
+
 ###############################################################################
 # Install wasm
 ###############################################################################
-
-CURRENT_DIR=$(dirname $0)
-echo $CURRENT_DIR
 
 mkdir -p /home/WebAssembly
 cd /home/WebAssembly
@@ -13,8 +15,6 @@ git clone https://github.com/WebAssembly/spec
 cd spec/interpreter
 eval $(opam env)
 make distclean wasm
-INTERPRETER_DIR=$CURRENT_DIR/interpreter
-mkdir -p $INTERPRETER_DIR
 cp /home/WebAssembly/spec/interpreter/wasm $INTERPRETER_DIR
 
 ###############################################################################

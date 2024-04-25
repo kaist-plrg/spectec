@@ -121,6 +121,7 @@ RUN /home/WebKit/Tools/Scripts/build-webkit --jsc-only
 # Install reference interpreters
 
 RUN opam install ocamlbuild --yes
+WORKDIR /home/spectec/spectec/runtimes
 RUN git pull
 WORKDIR /home/spectec/spectec/runtimes/util
 RUN ./install_wasm.sh
