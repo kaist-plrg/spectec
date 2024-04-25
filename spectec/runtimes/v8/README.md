@@ -1,11 +1,12 @@
 # V8
 
 ## Prerequisites
-Running V8 with .wast file requires reference interpreter and ``d8``(V8’s own developer shell).
+Running V8 with .wast file requires reference interpreter and installation of ``d8``(V8’s own developer shell).
 
 ### Reference interpreter
-Clone and build [Wasm reference interpreter](https://github.com/WebAssembly/spec) referring to [document](https://github.com/WebAssembly/spec/tree/main/interpreter).
-Locate the interpreter ``wasm``, which is generally built inside ``spec/interpreter``, into this directory.
+The shell script ``run.sh`` refers to reference interpreters in the directory ``../util/interpreter`` to convert the input ``.wast`` file into ``.js`` file. [This document](https://github.com/kaist-plrg/spectec/blob/west/spectec/runtimes/util/interpreter/README.md) explains how to install Wasm reference interpreters.
+
+You may modify the variable ``interpreters`` in ``run.sh`` to decide which versions of reference interpreters will be used for conversion of ``.wast`` files.
 
 ### d8
 Clone and build [V8](https://v8.dev/), referring to V8 documents([Checking out the V8 source code](https://v8.dev/docs/source-code), [Building V8 from source](https://v8.dev/docs/build)).

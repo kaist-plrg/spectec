@@ -1,15 +1,16 @@
 # JavaScriptCore
 
 ## Prerequisites
-Running JavaScriptCore with .wast file requires reference interpreter and ``JavaScriptCore``.
+Running JavaScriptCore with .wast file requires reference interpreter and installation of ``JavaScriptCore``.
 
 ### Reference interpreter
-Clone and build [Wasm reference interpreter](https://github.com/WebAssembly/spec) referring to [document](https://github.com/WebAssembly/spec/tree/main/interpreter).
-Locate the interpreter ``wasm``, which is generally built inside ``spec/interpreter``, into this directory.
+The shell script ``run.sh`` refers to every reference interpreter in the directory ``../util/interpreter`` to convert the input ``.wast`` file into ``.js`` file. [This document](https://github.com/kaist-plrg/spectec/blob/west/spectec/runtimes/util/interpreter/README.md) explains how to install Wasm reference interpreters.
 
-### d8
-Clone and build [V8](https://v8.dev/), referring to V8 documents([Checking out the V8 source code](https://v8.dev/docs/source-code), [Building V8 from source](https://v8.dev/docs/build)).
-In ``run.sh``, set the variable ``D8_PATH`` as the path to ``d8`` file.
+You may modify the variable ``interpreters`` in ``run.sh`` to decide which versions of reference interpreters will be used for conversion of ``.wast`` files.
+
+### JavaScriptCore
+Clone and build [JavaScriptCore](https://trac.webkit.org/wiki/JSCOnly) referring to [document](https://trac.webkit.org/wiki/JSCOnly).
+In ``run.sh``, set the variable ``JSC_PATH`` as the path to ``jsc`` file.
 
 ## Running
 Usage: ``./run.sh [-o] [-w {WORD}] [-v] {PATH_TO_WAST_DIRECTORY}``

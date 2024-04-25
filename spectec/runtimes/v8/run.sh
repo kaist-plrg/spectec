@@ -4,6 +4,7 @@ o=false
 w=false
 v=false
 
+CURRENT_DIR=$PWD/$(dirname $0)
 D8_PATH="/home/v8/v8/out/x64.release/d8"
 
 while getopts "ow:v" option; do
@@ -24,7 +25,7 @@ if [ $# -ne 1 ] ; then
     exit 0
 fi
 
-RESULT_PATH=./result
+RESULT_PATH=$CURRENT_DIR/result
 
 if [[ "$o" = false ]]; then
    TEMP_PATH=$(mktemp -d)
@@ -38,6 +39,7 @@ FAIL_PATH=$RESULT_PATH/failed
 COMPILE_FAIL_PATH=$FAIL_PATH/compile
 TEST_FAIL_PATH=$FAIL_PATH/test
 mkdir -p $JS_PATH $OUTPUT_PATH $FAIL_PATH $COMPILE_FAIL_PATH $TEST_FAIL_PATH
+INTERPRETER_PATH=$CURRENT_DIR/../util/interpreter
 
 I=0
 J=0
@@ -51,7 +53,7 @@ run_test() {
    echo "==== $I.$FILE ====="
    compiled=false
    for interpreter in ${interpreters}; do
-      ./interpreter/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2> /dev/null
+      $INTERPRETER_PATH/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2> /dev/null
       if [[ $? == 0 ]]; then
             # echo "compilation success with ${interpreter}."
             compiled=true
@@ -64,7 +66,7 @@ run_test() {
       :> $COMPILE_FAIL_PATH/$filename
       for interpreter in ${interpreters}; do
          echo "${interpreter}> " >> $COMPILE_FAIL_PATH/$filename
-         ./interpreter/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2>> $COMPILE_FAIL_PATH/$filename
+         $INTERPRETER_PATH/${interpreter} -d $TEST_PATH/$FILE -o $JS_PATH/$filename.js 2>> $COMPILE_FAIL_PATH/$filename
       done
       cp $TEST_PATH/$FILE $COMPILE_FAIL_PATH
       let K=K+1

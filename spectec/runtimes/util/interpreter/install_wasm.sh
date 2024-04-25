@@ -1,9 +1,6 @@
 #!/bin/bash
 
-CURRENT_DIR=$PWD
-echo $CURRENT_DIR
-INTERPRETER_DIR=$CURRENT_DIR/interpreter
-mkdir -p $INTERPRETER_DIR
+INTERPRETER_DIR=$PWD/$(dirname $0)
 
 ###############################################################################
 # Install wasm
