@@ -1053,6 +1053,8 @@ let gen_test el' il' al' =
   (* Initialize *)
   rts := List.map get_rt (get_typing_rules !il);
   estimate_const ();
+  let st = Sys.time () in
+  let times = ref [] in
 
   List.init !Flag.n (fun i -> !Flag.seed + i)
   |> List.iter (fun seed ->
@@ -1087,8 +1089,16 @@ let gen_test el' il' al' =
     to_wast seed module_ result;
 
     (* Conform test *)
-    Conform_test.conform_test seed;
-  )
+    (* Conform_test.conform_test seed; *)
+
+    times := Sys.time () -. st :: !times;
+  );
 
   (* Print Coverage *)
   (* Ds.(Info.print (InfoMap.uncovered !info_map)) *)
+
+  (* Print time *)
+  let file = Filename.concat !Flag.out "time.txt" in
+  let oc = open_out file in
+  output_string oc (List.rev !times |> List.map string_of_float |> String.concat "\n");
+  close_out oc
