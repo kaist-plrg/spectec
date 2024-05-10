@@ -9,5 +9,6 @@
     valid
     conform_test
     log
+    prune
     )
 )

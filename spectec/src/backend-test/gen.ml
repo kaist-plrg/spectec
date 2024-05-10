@@ -1,5 +1,6 @@
 open Utils
 open Valid
+open Prune
 
 open Util.Source
 open Util
@@ -10,6 +11,8 @@ open Al.Al_util
 let el: El.Ast.script ref = ref []
 let il: Il.Ast.script ref = ref []
 let al: Al.Ast.script ref = ref []
+
+let orig_il: Il.Ast.script ref = ref []
 
 (* Helpers *)
 let hds xs = xs |> List.rev |> List.tl |> List.rev
@@ -1050,6 +1053,8 @@ let gen_test el' il' al' =
   il := flatten_rec il';
   al := al';
 
+  orig_il := !il;
+
   (* Initialize *)
   rts := List.map get_rt (get_typing_rules !il);
   estimate_const ();
@@ -1062,6 +1067,9 @@ let gen_test el' il' al' =
 
     (* Set random seed *)
     Random.init seed;
+
+    (* Prune production grammar for swarm testing *)
+    il := if !Flag.swarm then prune_il !orig_il else !orig_il;
 
     (* Generate test *)
     init_cache ();

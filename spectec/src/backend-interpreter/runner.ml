@@ -192,6 +192,8 @@ let run_wast name script =
     else script
   in
 
+  Ds.Store.init();
+
   (* Intialize builtin *)
   Register.add "spectest" (Builtin.builtin ());
 
@@ -200,7 +202,8 @@ let run_wast name script =
     |> List.map run_command
     |> sum_results_with_time
   in
-  print_runner_result name result; result
+  (* print_runner_result name result; *)
+  result
 
 
 (** Wasm runner **)
@@ -238,7 +241,7 @@ let run_wat = run_wasm
 (** Parse **)
 
 let parse_file name parser_ file =
-  Printf.printf "===== %s =====\n%!" name;
+  (* Printf.printf "===== %s =====\n%!" name; *)
   Printf.eprintf "===========================\n\n%s\n\n" name;
 
   try
@@ -279,7 +282,14 @@ and run_dir path =
   |> Sys.readdir
   |> Array.to_list
   |> List.sort compare
-  |> List.map (fun filename -> run_file (Filename.concat path filename) [])
+  |> List.mapi (fun i filename ->
+    if i mod 100 = 0 then (
+      (* Print Coverage *)
+      let covered, total = Ds.Info.get_coverage () in
+      Printf.printf "[%d] Coverage: %d / %d (%.2f%%)\n%!" i covered total (float_of_int covered /. float_of_int total *. 100.0)
+    );
+    run_file (Filename.concat path filename) []
+  )
   |> sum_results_with_time
 
 
@@ -294,5 +304,11 @@ let run = function
       if !num_parse_fail <> 0 then
         print_endline ((string_of_int !num_parse_fail) ^ " parsing fail");
       print_runner_result "Total" result;
-    )
+    );
+      
+    (* Print Coverage *)
+    let covered, total = Ds.Info.get_coverage () in
+    Printf.printf "[Total] Coverage: %d / %d (%.2f%%)\n" covered total (float_of_int covered /. float_of_int total *. 100.0);
+
+    Ds.Info.print_uncovered();
   | _ -> failwith "Cannot find file to run"

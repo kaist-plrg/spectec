@@ -10,6 +10,7 @@ type env = value Env.t
 val lookup_env : string -> env -> value
 
 module Store : sig
+  val init: unit -> unit
   val get : unit -> value
   val access : string -> value
   val set : value -> unit
@@ -18,7 +19,9 @@ end
 module Info : sig
   type info = { algo_name: string; instr: instr; mutable covered: bool }
   val make_info : string -> instr -> info
-  val print : unit -> unit
+  val print_all : unit -> unit
+  val print_uncovered : unit -> unit
+  val get_coverage : unit -> int * int
   val add : int -> info -> unit
   val find : int -> info
 end

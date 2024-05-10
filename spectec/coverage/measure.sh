@@ -23,6 +23,7 @@ rm -f $graph
 touch $graph
 
 for i in `seq 0 $(($groups-1))`; do
+  # Measure coverge of one group of tests
   for j in `seq 0 $(($stride-1))`; do
     k=$(($stride*$i+$j))
     printf "\r%d" $k
@@ -32,9 +33,11 @@ for i in `seq 0 $(($groups-1))`; do
     LLVM_PROFILE_FILE="cov$j.profraw" $exe wast -C cache=n $tests/$k.wast
   done
 
+  # Merge group into single profdata
   llvm-profdata merge --sparse cov*.profraw -o cov-stride.profdata
   rm cov*.profraw
   
+  # Merge with existing prodata
   if [ $i -eq 0 ]; then
     mv cov-stride.profdata cov.profdata
   else
@@ -42,10 +45,13 @@ for i in `seq 0 $(($groups-1))`; do
     rm cov-stride.profdata
   fi
   
+  # Record coverage summary
   llvm-cov report $exe --instr-profile=cov.profdata | tail -n 1 | sed 's/^..... *//' >> $graph
 done
+rm cov.profdata
 printf "\r"
 
+# Merge with time data for graphing
 header="
   Time
   Regions
