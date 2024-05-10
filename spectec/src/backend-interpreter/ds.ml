@@ -105,8 +105,8 @@ module Info = struct
       let im1, im2 = InfoMap.partition f info_map in
       im1 :: partition_by_algo im2
 
-  let print () =
-    partition_by_algo !info_map
+  let print im =
+    partition_by_algo im
     |> List.iter
       (fun im ->
         let _, v = InfoMap.choose im in
@@ -116,6 +116,10 @@ module Info = struct
             Al.Print.string_of_instr v'.instr
             |> print_endline)
           im)
+
+  let print_all () = print !info_map
+  let print_uncovered () = print (InfoMap.filter (fun _ v -> not v.covered) !info_map)
+  let get_coverage () = InfoMap.(cardinal (filter (fun _ v -> v.covered) !info_map), cardinal !info_map)
 
   let add k i = info_map := InfoMap.add k i !info_map
 
