@@ -469,7 +469,7 @@ since the instruction form is already a <a class="reference internal" href="runt
 <li><p>Let <span class="math notranslate nohighlight">\(f\)</span> be the current frame.</p></li>
 <li><p>Assert: Due to validation, a value is on the top of the stack.</p></li>
 <li><p>Pop the value <span class="math notranslate nohighlight">\({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}\)</span> from the stack.</p></li>
-<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}'}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{ref}}_{{\mathit{type}}_{\mathit{of}}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
+<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}'}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{Ref}}_{\mathit{type}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
 <li><p>If <span class="math notranslate nohighlight">\({\mathit{rt}'}\)</span> matches <span class="math notranslate nohighlight">\({{\href{../exec/types.html#type-inst}{\mathrm{clos}}}}_{f{.}\href{../exec/runtime.html#syntax-frame}{\mathsf{module}}}({\mathit{rt}})\)</span>, then:</p>
 <ol class="loweralpha simple">
 <li><p>Push the value <span class="math notranslate nohighlight">\((\href{../syntax/types.html#syntax-numtype}{\mathsf{i\scriptstyle32}}{.}\href{../syntax/instructions.html#syntax-instr-numeric}{\mathsf{const}}~1)\)</span> to the stack.</p></li>
@@ -521,7 +521,7 @@ since the instruction form is already a <a class="reference internal" href="runt
 <li><p>Let <span class="math notranslate nohighlight">\(f\)</span> be the current frame.</p></li>
 <li><p>Assert: Due to validation, a value is on the top of the stack.</p></li>
 <li><p>Pop the value <span class="math notranslate nohighlight">\({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}\)</span> from the stack.</p></li>
-<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}'}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{ref}}_{{\mathit{type}}_{\mathit{of}}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
+<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}'}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{Ref}}_{\mathit{type}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
 <li><p>If <span class="math notranslate nohighlight">\({\mathit{rt}'}\)</span> does not match <span class="math notranslate nohighlight">\({{\href{../exec/types.html#type-inst}{\mathrm{clos}}}}_{f{.}\href{../exec/runtime.html#syntax-frame}{\mathsf{module}}}({\mathit{rt}})\)</span>, then:</p>
 <ol class="loweralpha simple">
 <li><p>Trap.</p></li>
@@ -3883,7 +3883,7 @@ In practice, the choice depends on the <a class="reference internal" href="../ap
 <li><p>Let <span class="math notranslate nohighlight">\(f\)</span> be the current frame.</p></li>
 <li><p>Assert: Due to validation, a value is on the top of the stack.</p></li>
 <li><p>Pop the value <span class="math notranslate nohighlight">\({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}\)</span> from the stack.</p></li>
-<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{ref}}_{{\mathit{type}}_{\mathit{of}}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
+<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{Ref}}_{\mathit{type}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
 <li><p>If <span class="math notranslate nohighlight">\({\mathit{rt}}\)</span> does not match <span class="math notranslate nohighlight">\({{\href{../exec/types.html#type-inst}{\mathrm{clos}}}}_{f{.}\href{../exec/runtime.html#syntax-frame}{\mathsf{module}}}({\mathit{rt}}_2)\)</span>, then:</p>
 <ol class="loweralpha simple">
 <li><p>Push the value <span class="math notranslate nohighlight">\({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}\)</span> to the stack.</p></li>
@@ -3932,7 +3932,7 @@ In practice, the choice depends on the <a class="reference internal" href="../ap
 <li><p>Let <span class="math notranslate nohighlight">\(f\)</span> be the current frame.</p></li>
 <li><p>Assert: Due to validation, a value is on the top of the stack.</p></li>
 <li><p>Pop the value <span class="math notranslate nohighlight">\({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}\)</span> from the stack.</p></li>
-<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{ref}}_{{\mathit{type}}_{\mathit{of}}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
+<li><p>Let <span class="math notranslate nohighlight">\({\mathit{rt}}\)</span> be <span class="math notranslate nohighlight">\({\mathrm{Ref}}_{\mathit{type}}({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}})\)</span>.</p></li>
 <li><p>If <span class="math notranslate nohighlight">\({\mathit{rt}}\)</span> matches <span class="math notranslate nohighlight">\({{\href{../exec/types.html#type-inst}{\mathrm{clos}}}}_{f{.}\href{../exec/runtime.html#syntax-frame}{\mathsf{module}}}({\mathit{rt}}_2)\)</span>, then:</p>
 <ol class="loweralpha simple">
 <li><p>Push the value <span class="math notranslate nohighlight">\({\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}\)</span> to the stack.</p></li>
