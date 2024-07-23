@@ -1020,7 +1020,8 @@ since the instruction form is already a <a class="reference internal" href="runt
 <li><p>Trap.</p></li>
 </ol>
 </li>
-<li><p>Let <span class="math notranslate nohighlight">\({{\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}^{n}}\)</span> be <span class="math notranslate nohighlight">\(z{.}\href{../exec/runtime.html#syntax-store}{\mathsf{elems}}{}[y]{.}\href{../exec/runtime.html#syntax-eleminst}{\mathsf{elem}}{}[i : n]\)</span>.</p></li>
+<li><p>Assert: Due to validation, <span class="math notranslate nohighlight">\({|z{.}\href{../exec/runtime.html#syntax-store}{\mathsf{elems}}{}[y]{.}\href{../exec/runtime.html#syntax-eleminst}{\mathsf{elem}}{}[i : n]|}\)</span> is <span class="math notranslate nohighlight">\(n\)</span>.</p></li>
+<li><p>Let <span class="math notranslate nohighlight">\({{\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}^\ast}\)</span> be <span class="math notranslate nohighlight">\(z{.}\href{../exec/runtime.html#syntax-store}{\mathsf{elems}}{}[y]{.}\href{../exec/runtime.html#syntax-eleminst}{\mathsf{elem}}{}[i : n]\)</span>.</p></li>
 <li><p>Push the values <span class="math notranslate nohighlight">\({{\href{../exec/runtime.html#syntax-ref}{\mathit{ref}}}^{n}}\)</span> to the stack.</p></li>
 <li><p>Execute the instruction <span class="math notranslate nohighlight">\((\href{../syntax/instructions.html#syntax-instr-array}{\mathsf{array{.}new\_fixed}}~x~n)\)</span>.</p></li>
 </ol>
