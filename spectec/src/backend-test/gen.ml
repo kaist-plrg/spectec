@@ -1006,7 +1006,10 @@ let to_wast seed m result =
   in
 
   let to_file name script =
-    let file = Filename.concat !Flag.out (name ^ ".wast") in
+    let dir = !Flag.out in
+    if not (Sys.file_exists dir && Sys.is_directory dir) then
+      Sys.mkdir dir 0o755;
+    let file = Filename.concat dir (name ^ ".wast") in
     let oc = open_out file in
     Reference_interpreter.Print.script oc 80 `Textual script;
     close_out oc
