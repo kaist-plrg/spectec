@@ -12,6 +12,15 @@ sig
   val last : 'a list -> 'a (* raises Failure *)
   val nub : ('a -> 'a -> bool) -> 'a list -> 'a list
   val filter_not : ('a -> bool) -> 'a list -> 'a list
+  val flatten_opt : 'a option list -> 'a list option
+end
+
+module Char :
+sig
+  val is_digit_ascii : char -> bool
+  val is_uppercase_ascii : char -> bool
+  val is_lowercase_ascii : char -> bool
+  val is_letter_ascii : char -> bool
 end
 
 module String :

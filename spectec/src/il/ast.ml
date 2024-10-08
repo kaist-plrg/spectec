@@ -1,16 +1,13 @@
 open Util.Source
 
 
-(* TODO: annotate types on nodes *)
-
-
 (* Terminals *)
 
 type nat = Z.t
 type text = string
 type id = string phrase
-type atom = Atom.atom
-type mixop = Atom.mixop
+type atom = El.Atom.atom
+type mixop = Mixop.mixop
 
 
 (* Iteration *)
@@ -32,7 +29,7 @@ and numtyp =
 
 and typ = typ' phrase
 and typ' =
-  | VarT of id * arg list        (* varid( arg* ) *)
+  | VarT of id * arg list        (* typid( arg* ) *)
   | BoolT                        (* `bool` *)
   | NumT of numtyp               (* numtyp *)
   | TextT                        (* `text` *)
@@ -67,6 +64,7 @@ and binop =
   | SubOp of numtyp  (* `-` *)
   | MulOp of numtyp  (* `*` *)
   | DivOp of numtyp  (* `/` *)
+  | ModOp of numtyp  (* `\` *)
   | ExpOp of numtyp  (* `^` *)
 
 and cmpop =
@@ -96,6 +94,7 @@ and exp' =
   | DotE of exp * atom           (* exp.atom *)
   | CompE of exp * exp           (* exp @ exp *)
   | ListE of exp list            (* [exp ... exp] *)
+  | MemE of exp * exp            (* exp `<-` exp *)
   | LenE of exp                  (* |exp| *)
   | CatE of exp * exp            (* exp :: exp *)
   | IdxE of exp * exp            (* exp[exp]` *)
@@ -115,7 +114,22 @@ and path' =
   | SliceP of path * exp * exp   (* path `[` exp `:` exp `]` *)
   | DotP of path * atom          (* path `.` atom *)
 
-and iterexp = iter * (id * typ) list
+and iterexp = iter * (id * exp) list
+
+
+(* Grammars *)
+
+and sym = sym' phrase
+and sym' =
+  | VarG of id * arg list                    (* gramid (`(` arg,* `)`)? *)
+  | NatG of int                              (* nat *)
+  | TextG of string                          (* `"`text`"` *)
+  | EpsG                                     (* `eps` *)
+  | SeqG of sym list                         (* sym sym *)
+  | AltG of sym list                         (* sym `|` sym *)
+  | RangeG of sym * sym                      (* sym `|` `...` `|` sym *)
+  | IterG of sym * iterexp                   (* sym iter *)
+  | AttrG of exp * sym                       (* exp `:` sym *)
 
 
 (* Definitions *)
@@ -124,22 +138,29 @@ and arg = arg' phrase
 and arg' =
   | ExpA of exp                                       (* exp *)
   | TypA of typ                                       (* `syntax` typ *)
+  | DefA of id                                        (* `def` defid *)
+  | GramA of sym                                      (* `grammar` sym *)
 
 and bind = bind' phrase
 and bind' =
-  | ExpB of id * typ * iter list
+  | ExpB of id * typ
   | TypB of id
+  | DefB of id * param list * typ
+  | GramB of id * param list * typ
 
 and param = param' phrase
 and param' =
   | ExpP of id * typ                                  (* varid `:` typ *)
   | TypP of id                                        (* `syntax` varid *)
+  | DefP of id * param list * typ                     (* `def` defid params `:` typ *)
+  | GramP of id * typ                                 (* `grammar` gramid params `:` typ *)
 
 and def = def' phrase
 and def' =
   | TypD of id * param list * inst list               (* syntax type (family) *)
   | RelD of id * mixop * typ * rule list              (* relation *)
   | DecD of id * param list * typ * clause list       (* definition *)
+  | GramD of id * param list * typ * prod list        (* grammar *)
   | RecD of def list                                  (* recursive *)
   | HintD of hintdef
 
@@ -155,11 +176,15 @@ and clause = clause' phrase
 and clause' =
   | DefD of bind list * arg list * exp * prem list    (* definition clause *)
 
+and prod = prod' phrase
+and prod' =
+  | ProdD of bind list * sym * exp * prem list        (* grammar production *)
+
 and prem = prem' phrase
 and prem' =
   | RulePr of id * mixop * exp                        (* premise *)
   | IfPr of exp                                       (* side condition *)
-  | LetPr of exp * exp * id list                      (* assignment *)
+  | LetPr of exp * exp * string list                  (* binding *)
   | ElsePr                                            (* otherwise *)
   | IterPr of prem * iterexp                          (* iteration *)
 
@@ -168,8 +193,9 @@ and hintdef' =
   | TypH of id * hint list
   | RelH of id * hint list
   | DecH of id * hint list
+  | GramH of id * hint list
 
-and hint = {hintid : id; hintexp : string list}       (* hint *)
+and hint = {hintid : id; hintexp : El.Ast.exp}        (* hint *)
 
 
 (* Scripts *)

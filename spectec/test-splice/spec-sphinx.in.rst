@@ -40,14 +40,14 @@ $${rule+: Instr_ok/loop}
 $${rule+: Instr_ok/if}
 
 
-$${rule-ignore: Instr_ok/cvtop-*}
+$${rule-ignore: Instr_ok/memory.grow}
 
 
 **Runtime**
 
 $${definition: default_}
 
-$${definition: {funcaddr funcinst} {func table}}
+$${definition: {funcinst} {func table}}
 
 
 **Reduction** ${relation: Step_pure}

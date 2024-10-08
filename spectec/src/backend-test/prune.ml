@@ -1,10 +1,9 @@
 open Util.Source
 open Il.Ast
-open Il.Atom
 
 (* HARDCODE: Never drop CONST, REF.NULL, types *)
 let removable x = match x with
-  | (mixop, _, _) when List.mem (string_of_mixop mixop) ["CONST"; "VCONST"; "REF.NULL"; "I32"; "I64"; "F32"; "F64"; "FUNCREF"; "EXTERNREF"] -> false
+  | (mixop, _, _) when List.mem (Il.Mixop.to_string mixop) ["CONST"; "VCONST"; "REF.NULL"; "I32"; "I64"; "F32"; "F64"; "FUNCREF"; "EXTERNREF"] -> false
   | _ -> true
 
 (* Drop random elements from a list,

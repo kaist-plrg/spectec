@@ -6,6 +6,18 @@ open Construct
 open Util
 open Ds
 
+
+(* Errors *)
+
+module Assert = Reference_interpreter.Error.Make ()
+let error_interpret at msg = Error.error at "interpreter" msg
+
+(* Logging *)
+
+let logging = ref false
+
+let log fmt = Printf.(if !logging then fprintf stderr fmt else ifprintf stderr fmt)
+
 (* Result *)
 
 let success = 1, 1
@@ -45,7 +57,11 @@ let try_run runner target =
   let result =
     try
       runner target
-    with e ->
+    with
+    | Exception.Error (at, msg, step) ->
+      let msg' = msg ^ " (interpreting " ^ step ^ ")" in
+      error_interpret at msg'
+    | e ->
       prerr_endline (Printexc.to_string e); fail
   in
   result, Sys.time () -. start_time
@@ -61,70 +77,72 @@ let print_runner_result name result =
     Printf.printf "Total [%d/%d] (%.2f%%)\n\n" num_success total percentage
   else
     Printf.printf "- %d/%d (%.2f%%)\n\n" num_success total percentage;
-  Printf.eprintf "%s took %f ms.\n" name (execution_time *. 1000.)
+  log "%s took %f ms.\n" name (execution_time *. 1000.)
 
 let get_export name modulename =
   modulename
   |> Register.find
-  |> strv_access "EXPORT"
+  |> strv_access "EXPORTS"
   |> listv_find
     (fun export -> al_to_string (strv_access "NAME" export) = name)
 
-let get_externval import =
+let get_externaddr import =
   import.it.module_name
   |> Utf8.encode
   |> get_export (Utf8.encode import.it.Ast.item_name)
-  |> strv_access "VALUE"
+  |> strv_access "ADDR"
 
 let textual_to_module textual =
   match (snd textual).it with
-  | Script.Textual m -> m
+  | Script.Textual (m, _) -> m
   | _ -> assert false
 
+let get_export_addr name modulename =
+  let vl =
+    modulename
+    |> get_export name
+    |> strv_access "ADDR"
+    |> args_of_casev
+  in
+  try List.hd vl with Failure _ ->
+    failwith ("Function export doesn't contains function address")
 
 (** Main functions **)
 
 let invoke module_name funcname args =
-  Printf.eprintf "[Invoking %s %s...]\n" funcname (Value.string_of_values args);
+  log "[Invoking %s %s...]\n" funcname (Value.string_of_values args);
 
-  let funcaddr =
-    module_name
-    |> get_export funcname
-    |> strv_access "VALUE"
-    |> casev_nth_arg 0
-  in
-
+  let funcaddr = get_export_addr funcname module_name in
   Interpreter.invoke [funcaddr; al_of_list al_of_value args]
 
-let get_global_value module_name globalname =
-  Printf.eprintf "[Getting %s...]\n" globalname;
 
-  module_name
-  |> get_export globalname
-  |> strv_access "VALUE"
-  |> casev_nth_arg 0
+let get_global_value module_name globalname =
+  log "[Getting %s...]\n" globalname;
+
+  let index = get_export_addr globalname module_name in
+  index
   |> al_to_int
-  |> listv_nth (Store.access "GLOBAL")
+  |> listv_nth (Store.access "GLOBALS")
   |> strv_access "VALUE"
   |> Array.make 1
   |> listV
 
 let instantiate module_ =
-  Printf.eprintf "[Instantiating module...]\n";
+  log "[Instantiating module...]\n";
 
-  let al_module = al_of_module module_ in
-  let externvals = List.map get_externval module_.it.imports in
-
-  Interpreter.instantiate [ al_module; listV_of_list externvals ]
+  match al_of_module module_, List.map get_externaddr module_.it.imports with
+  | exception _ -> raise Exception.Invalid
+  | al_module, externaddrs ->
+    Interpreter.instantiate [ al_module; listV_of_list externaddrs ]
 
 
 (** Wast runner **)
 
 let module_of_def def =
   match def.it with
-  | Textual m -> m
-  | Encoded (name, bs) -> Decode.decode name bs
-  | Quoted (_, s) -> Parse.Module.parse_string s |> textual_to_module
+  | Textual (m, _) -> m
+  | Encoded (name, bs) -> Decode.decode name bs.it
+  | Quoted (_, s) -> Parse.Module.parse_string s.it |> textual_to_module
 
 let run_action action =
   match action.it with
@@ -146,13 +164,32 @@ let test_assertion assertion =
       fail
     with Exception.Trap -> success
   )
-  | AssertUninstantiable (def, re) -> (
+  | AssertUninstantiable (var_opt, re) -> (
     try
-      def |> module_of_def |> instantiate |> ignore;
+      Modules.find (Modules.get_module_name var_opt) |> instantiate |> ignore;
       Run.assert_message assertion.at "instantiation" "module instance" re;
       fail
     with Exception.Trap -> success
   )
+  | AssertException action ->
+    (match run_action action with
+    | exception Exception.Throw -> success
+    | _ -> Assert.error assertion.at "expected exception"
+    )
+  | AssertInvalid (def, re) when !Construct.version = 3 ->
+    (match def |> module_of_def |> instantiate |> ignore with
+    | exception Exception.Invalid -> success
+    | _ ->
+      Run.assert_message assertion.at "validation" "module instance" re;
+      fail
+    )
+  | AssertInvalidCustom (def, re) when !Construct.version = 3 ->
+    (match def |> module_of_def |> instantiate |> ignore with
+    | exception Exception.Invalid -> success
+    | _ ->
+      Run.assert_message assertion.at "validation" "module instance" re;
+      fail
+    )
   (* ignore other kinds of assertions *)
   | _ -> pass
 
@@ -161,8 +198,12 @@ let run_command' command =
   | Module (var_opt, def) ->
     def
     |> module_of_def
+    |> Modules.add_with_var var_opt;
+    success
+  | Instance (var1_opt, var2_opt) ->
+    Modules.find (Modules.get_module_name var2_opt)
     |> instantiate
-    |> Register.add_with_var var_opt;
+    |> Register.add_with_var var1_opt;
     success
   | Register (modulename, var_opt) ->
     let moduleinst = Register.find (Register.get_module_name var_opt) in
@@ -178,9 +219,15 @@ let run_command command =
   let result =
     try
       run_command' command
-    with e ->
+    with
+    | Exception.Error (at, msg, step) ->
+      let msg' = msg ^ " (interpreting " ^ step ^ ")" in
+      command.at |> string_of_region |> print_endline;
+      error_interpret at msg'
+    | e ->
       print_endline ("- Test failed at " ^ string_of_region command.at ^
         " (" ^ Printexc.to_string e ^ ")");
+      Printexc.print_backtrace stdout;
       fail
   in
   result, Sys.time () -. start_time
@@ -242,15 +289,16 @@ let run_wat = run_wasm
 
 let parse_file name parser_ file =
   (* Printf.printf "===== %s =====\n%!" name; *)
-  Printf.eprintf "===========================\n\n%s\n\n" name;
+  log "===========================\n\n%s\n\n" name;
 
   try
     parser_ file
   with e ->
+    let bt = Printexc.get_raw_backtrace () in
     print_endline ("- Failed to parse " ^ name ^ "\n");
-    prerr_endline ("- Failed to parse " ^ name ^ "\n");
+    log ("- Failed to parse %s\n") name;
     num_parse_fail := !num_parse_fail + 1;
-    raise e
+    Printexc.raise_with_backtrace e bt
 
 
 (** Runner **)

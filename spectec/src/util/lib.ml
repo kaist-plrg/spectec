@@ -41,6 +41,21 @@ struct
 
   let filter_not pred = List.filter (fun x -> not (pred x))
 
+  let rec flatten_opt = function
+    | [] -> Some []
+    | None::_ -> None
+    | (Some x)::xos ->
+      match flatten_opt xos with
+      | Some xs -> Some (x::xs)
+      | None -> None
+end
+
+module Char =
+struct
+  let is_digit_ascii c = '0' <= c && c <= '9'
+  let is_uppercase_ascii c = 'A' <= c && c <= 'Z'
+  let is_lowercase_ascii c = 'a' <= c && c <= 'z'
+  let is_letter_ascii c = is_uppercase_ascii c || is_lowercase_ascii c
 end
 
 module String =

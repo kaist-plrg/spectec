@@ -80,8 +80,7 @@ let rec walk_value f v =
   | NumV _
   | BoolV _
   | TextV _
-  | FrameV _
-  | LabelV _ -> v
+  | FnameV _ -> v
   | ListV a -> ListV (ref (Array.map new_ !a))
   | StrV r -> StrV (Util.Record.map Fun.id new_ r)
   | CaseV (c, vl) -> CaseV (c, List.map new_ vl)

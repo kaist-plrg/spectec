@@ -27,7 +27,7 @@ def $size(F32) = 32
 def $size(F64) = 64
 def $size(V128) = 128
 
-def $isize(inn) = $size(inn)
+def $isize(Inn) = $size(Inn)
 
 def $psize(I8) = 8
 def $psize(I16) = 16
@@ -46,13 +46,16 @@ def $unpack(packtype) = I32
 ;; Shapes
 
 ;;def $lanetype(shape) : lanetype
-def $lanetype(lnn X N) = lnn
+def $lanetype(Lnn X N) = Lnn
 
 ;;def $dim(shape) : nat
-def $dim(lnn X N) = N
+def $dim(Lnn X N) = N
 
 ;;def $shsize(shape) : nat
-def $shsize(lnn X N) = $($lsize(lnn) * N)
+def $shsize(Lnn X N) = $($lsize(Lnn) * N)
+
+def $shunpack(shape) : numtype  hint(show $unpack(%))
+def $shunpack(Lnn X N) = $unpack(Lnn)
 
 
 ;; Projections
@@ -87,24 +90,24 @@ def $memsxt(externtype xt*) = $memsxt(xt*)  -- otherwise
 
 ;; Free indices
 
-def $free_dataidx_instr(instr) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_instr(MEMORY.INIT x) = x
-def $free_dataidx_instr(DATA.DROP x) = x
-def $free_dataidx_instr(in) = eps
+def $dataidx_instr(instr) : dataidx*  hint(show $dataidx(%))
+def $dataidx_instr(MEMORY.INIT x) = x
+def $dataidx_instr(DATA.DROP x) = x
+def $dataidx_instr(in) = eps
 
-def $free_dataidx_instrs(instr*) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_instrs(eps) = eps
-def $free_dataidx_instrs(instr instr'*) = $free_dataidx_instr(instr) $free_dataidx_instrs(instr'*)
+def $dataidx_instrs(instr*) : dataidx*  hint(show $dataidx(%))
+def $dataidx_instrs(eps) = eps
+def $dataidx_instrs(instr instr'*) = $dataidx_instr(instr) $dataidx_instrs(instr'*)
 
-def $free_dataidx_expr(expr) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_expr(in*) = $free_dataidx_instrs(in*)
+def $dataidx_expr(expr) : dataidx*  hint(show $dataidx(%))
+def $dataidx_expr(in*) = $dataidx_instrs(in*)
 
-def $free_dataidx_func(func) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_func(FUNC x loc* e) = $free_dataidx_expr(e)
+def $dataidx_func(func) : dataidx*  hint(show $dataidx(%))
+def $dataidx_func(FUNC x loc* e) = $dataidx_expr(e)
 
-def $free_dataidx_funcs(func*) : dataidx*  hint(show $free_dataidx(%))
-def $free_dataidx_funcs(eps) = eps
-def $free_dataidx_funcs(func func'*) = $free_dataidx_func(func) $free_dataidx_funcs(func'*)
+def $dataidx_funcs(func*) : dataidx*  hint(show $dataidx(%))
+def $dataidx_funcs(eps) = eps
+def $dataidx_funcs(func func'*) = $dataidx_func(func) $dataidx_funcs(func'*)
 
 
 ;;
@@ -113,5 +116,5 @@ def $free_dataidx_funcs(func func'*) = $free_dataidx_func(func) $free_dataidx_fu
 
 ;; Shorthands for Instructions
 
-def $memop0 : memop  hint(show )
-def $memop0 = {ALIGN 0, OFFSET 0}
+def $memarg0 : memarg  hint(show )
+def $memarg0 = {ALIGN 0, OFFSET 0}

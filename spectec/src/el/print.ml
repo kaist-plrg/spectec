@@ -23,7 +23,7 @@ let string_of_gramid id = id.it
 
 (* Operators *)
 
-let string_of_atom = Il.Atom.string_of_atom
+let string_of_atom = Atom.to_string
 
 let string_of_unop = function
   | NotOp -> "~"
@@ -41,6 +41,7 @@ let string_of_binop = function
   | SubOp -> "-"
   | MulOp -> "*"
   | DivOp -> "/"
+  | ModOp -> "\\"
   | ExpOp -> "^"
 
 let string_of_cmpop = function
@@ -149,14 +150,16 @@ and string_of_exp e =
       "[" ^ string_of_path p ^ " = " ^ string_of_exp e2 ^ "]"
   | ExtE (e1, p, e2) ->
     string_of_exp e1 ^
-      "[" ^ string_of_path p ^ " =.. " ^ string_of_exp e2 ^ "]"
+      "[" ^ string_of_path p ^ " =++ " ^ string_of_exp e2 ^ "]"
   | StrE efs -> "{" ^ concat ", " (map_filter_nl_list string_of_expfield efs) ^ "}"
   | DotE (e1, atom) -> string_of_exp e1 ^ "." ^ string_of_atom atom
   | CommaE (e1, e2) -> string_of_exp e1 ^ ", " ^ string_of_exp e2
-  | CompE (e1, e2) -> string_of_exp e1 ^ " ++ " ^ string_of_exp e2
+  | CatE (e1, e2) -> string_of_exp e1 ^ " ++ " ^ string_of_exp e2
+  | MemE (e1, e2) -> string_of_exp e1 ^ " <- " ^ string_of_exp e2
   | LenE e1 -> "|" ^ string_of_exp e1 ^ "|"
   | SizeE id -> "||" ^ string_of_gramid id ^ "||"
-  | ParenE (e, signif) -> "(" ^ string_of_exp e ^ ")" ^ (if signif then "!" else "")
+  | ParenE (e, signif) ->
+    "(" ^ string_of_exp e ^ ")" ^ (match signif with `Sig -> "!" | `Insig -> "")
   | TupE es -> "(" ^ string_of_exps ", " es ^ ")"
   | InfixE (e1, atom, e2) ->
     string_of_exp e1 ^ space string_of_atom atom ^ string_of_exp e2
@@ -165,11 +168,14 @@ and string_of_exp e =
   | CallE (id, args) -> string_of_defid id ^ string_of_args args
   | IterE (e1, iter) -> string_of_exp e1 ^ string_of_iter iter
   | TypE (e1, t) -> string_of_exp e1 ^ " : " ^ string_of_typ t
+  | ArithE e1 -> "$(" ^ string_of_exp e1 ^ ")"
   | HoleE (`Num i) -> "%" ^ string_of_int i
   | HoleE `Next -> "%"
   | HoleE `Rest -> "%%"
   | HoleE `None -> "!%"
   | FuseE (e1, e2) -> string_of_exp e1 ^ "#" ^ string_of_exp e2
+  | UnparenE e1 -> "##" ^ string_of_exp e1
+  | LatexE s -> "latex(" ^ String.escaped s ^ ")"
 
 and string_of_exps sep es =
   concat sep (List.map string_of_exp es)
@@ -185,20 +191,6 @@ and string_of_path p =
     string_of_path p1 ^ "[" ^ string_of_exp e1 ^ " : " ^ string_of_exp e2 ^ "]"
   | DotP ({it = RootP; _}, atom) -> string_of_atom atom
   | DotP (p1, atom) -> string_of_path p1 ^ "." ^ string_of_atom atom
-
-
-(* Premises *)
-
-and string_of_prem prem =
-  match prem.it with
-  | VarPr (id, t) -> "var " ^ string_of_varid id ^ ": " ^ string_of_typ t
-  | RulePr (id, e) -> string_of_relid id ^ ": " ^ string_of_exp e
-  | IfPr e -> "if " ^ string_of_exp e
-  | ElsePr -> "otherwise"
-  | IterPr ({it = IterPr _; _} as prem', iter) ->
-    string_of_prem prem' ^ string_of_iter iter
-  | IterPr (prem', iter) ->
-    "(" ^ string_of_prem prem' ^ ")" ^ string_of_iter iter
 
 
 (* Grammars *)
@@ -221,6 +213,7 @@ and string_of_sym g =
   | ArithG e -> string_of_exp e
   | AttrG (e, g1) -> string_of_exp e ^ ":" ^ string_of_sym g1
   | FuseG (g1, g2) -> string_of_sym g1 ^ "#" ^ string_of_sym g2
+  | UnparenG g1 -> "##" ^ string_of_sym g1
 
 and string_of_prod prod =
   let (g, e, prems) = prod.it in
@@ -234,6 +227,20 @@ and string_of_gram gram =
       strings_of_dots dots2)
 
 
+(* Premises *)
+
+and string_of_prem prem =
+  match prem.it with
+  | VarPr (id, t) -> "var " ^ string_of_varid id ^ ": " ^ string_of_typ t
+  | RulePr (id, e) -> string_of_relid id ^ ": " ^ string_of_exp e
+  | IfPr e -> "if " ^ string_of_exp e
+  | ElsePr -> "otherwise"
+  | IterPr ({it = IterPr _; _} as prem', iter) ->
+    string_of_prem prem' ^ string_of_iter iter
+  | IterPr (prem', iter) ->
+    "(" ^ string_of_prem prem' ^ ")" ^ string_of_iter iter
+
+
 (* Definitions *)
 
 and string_of_arg a =
@@ -241,18 +248,20 @@ and string_of_arg a =
   | ExpA e -> string_of_exp e
   | TypA t -> "syntax " ^ string_of_typ t
   | GramA g -> "grammar " ^ string_of_sym g
+  | DefA id -> "def " ^ string_of_defid id
 
 and string_of_args = function
   | [] -> ""
   | args -> "(" ^ concat ", " (List.map string_of_arg args) ^ ")"
 
-let string_of_param p =
+let rec string_of_param p =
   match p.it with
   | ExpP (id, t) -> (if id.it = "_" then "" else string_of_varid id ^ " : ") ^ string_of_typ t
   | TypP id -> "syntax " ^ string_of_typid id
   | GramP (id, t) -> "grammar " ^ string_of_gramid id ^ " : " ^ string_of_typ t
+  | DefP (id, ps, t) -> "def " ^ string_of_defid id ^ string_of_params ps ^ " : " ^ string_of_typ t
 
-let string_of_params = function
+and string_of_params = function
   | [] -> ""
   | ps -> "(" ^ concat ", " (List.map string_of_param ps) ^ ")"
 

@@ -25,14 +25,6 @@ Injection
 
 $${syntax: typevar}
 
-.. _def-idx:
-
-$${definition-prose: idx}
-
-\
-
-$${definition: idx}
-
 .. _syntax-deftype:
 .. _valid-conventions-defined-types:
 
@@ -274,10 +266,6 @@ $${definition: unrolldt}
 
 .. _def-unrollht:
 
-$${definition-prose: unrollht}
-
-\
-
 $${definition: unrollht}
 
 .. _def-expanddt:
@@ -317,18 +305,10 @@ Contexts
 
 $${syntax: context}
 
-.. _def-clostype:
+.. _def-clos_deftype:
 
-$${definition-prose: clostype}
+$${definition: clos_deftype}
 
-\
+.. _def-clos_deftypes:
 
-$${definition: clostype}
-
-.. _def-clostypes:
-
-$${definition-prose: clostypes}
-
-\
-
-$${definition: clostypes}
+$${definition: clos_deftypes}

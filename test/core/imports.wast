@@ -16,6 +16,10 @@
   (memory (export "memory-2-inf") 2)
   ;; Multiple memories are not yet supported
   ;; (memory (export "memory-2-4") 2 4)
+  (tag (export "tag"))
+  (tag $tag-i32 (param i32))
+  (export "tag-i32" (tag $tag-i32))
+  (tag (export "tag-f32") (param f32))
 )
 
 (register "test")
@@ -40,6 +44,9 @@
   (func $print_i32-2 (import "spectest" "print_i32") (param i32))
   (func $print_f64-2 (import "spectest" "print_f64") (param f64))
   (import "test" "func-i64->i64" (func $i64->i64 (param i64) (result i64)))
+
+  (tag (import "test" "tag-i32") (param i32))
+  (import "test" "tag-f32" (tag (param f32)))
 
   (func (export "p1") (import "spectest" "print_i32") (param i32))
   (func $p (export "p2") (import "spectest" "print_i32") (param i32))
@@ -208,6 +215,10 @@
   "incompatible import type"
 )
 (assert_unlinkable
+  (module (import "test" "tag" (func)))
+  "incompatible import type"
+)
+(assert_unlinkable
   (module (import "spectest" "global_i32" (func)))
   "incompatible import type"
 )
@@ -217,6 +228,27 @@
 )
 (assert_unlinkable
   (module (import "spectest" "memory" (func)))
+  "incompatible import type"
+)
+
+(assert_unlinkable
+  (module (tag (import "test" "unknown")))
+  "unknown import"
+)
+(assert_unlinkable
+  (module (tag (import "test" "tag") (param f32)))
+  "incompatible import type"
+)
+(assert_unlinkable
+  (module (tag (import "test" "tag-i32")))
+  "incompatible import type"
+)
+(assert_unlinkable
+  (module (tag (import "test" "tag-i32") (param f32)))
+  "incompatible import type"
+)
+(assert_unlinkable
+  (module (tag (import "test" "func-i32") (param f32)))
   "incompatible import type"
 )
 
@@ -377,7 +409,6 @@
 (assert_return (invoke "call" (i32.const 2)) (i32.const 22))
 (assert_trap (invoke "call" (i32.const 3)) "uninitialized element")
 (assert_trap (invoke "call" (i32.const 100)) "undefined element")
-
 
 (module
   (import "spectest" "table" (table 0 funcref))
@@ -564,26 +595,6 @@
 (assert_return (invoke "grow" (i32.const 0)) (i32.const 2))
 (assert_return (invoke "grow" (i32.const 1)) (i32.const -1))
 (assert_return (invoke "grow" (i32.const 0)) (i32.const 2))
-
-(module $Mgm
-  (memory (export "memory") 1) ;; initial size is 1
-  (func (export "grow") (result i32) (memory.grow (i32.const 1)))
-)
-(register "grown-memory" $Mgm)
-(assert_return (invoke $Mgm "grow") (i32.const 1)) ;; now size is 2
-(module $Mgim1
-  ;; imported memory limits should match, because external memory size is 2 now
-  (memory (export "memory") (import "grown-memory" "memory") 2) 
-  (func (export "grow") (result i32) (memory.grow (i32.const 1)))
-)
-(register "grown-imported-memory" $Mgim1)
-(assert_return (invoke $Mgim1 "grow") (i32.const 2)) ;; now size is 3
-(module $Mgim2
-  ;; imported memory limits should match, because external memory size is 3 now
-  (import "grown-imported-memory" "memory" (memory 3))
-  (func (export "size") (result i32) (memory.size))
-)
-(assert_return (invoke $Mgim2 "size") (i32.const 3))
 
 
 ;; Syntax errors

@@ -14,7 +14,7 @@ let region lexbuf =
   let right = convert_pos (Lexing.lexeme_end_p lexbuf) in
   Source.{left = left; right = right}
 
-let error lexbuf msg = raise (Source.Error (region lexbuf, msg))
+let error lexbuf msg = raise (Error.Error (region lexbuf, msg))
 let error_nest start lexbuf msg =
   lexbuf.Lexing.lex_start_p <- start;
   error lexbuf msg
@@ -121,10 +121,9 @@ rule after_nl = parse
 
 and after_nl_nl = parse
   | indent* "|"[' ''\t'] { NL_BAR }
-  | indent* "--" { NL_NL_DASH }
   | indent* '\n' { Lexing.new_line lexbuf; NL_NL_NL }
   | indent* line_comment '\n' { Lexing.new_line lexbuf; after_nl_nl lexbuf }
-  | "" { token lexbuf }
+  | "" { NL_NL }
 
 and token = parse
   | "(" { LPAREN }
@@ -149,8 +148,6 @@ and token = parse
 (*
   | line_comment? '\n' indent* "|"[' ''\t']
     { Lexing.new_line lexbuf; NL_BAR }
-  | line_comment? '\n' indent* '\n' (indent* line_comment '\n')* indent* "--"
-    { Lexing.new_line lexbuf; Lexing.new_line lexbuf; NL_NL_DASH }
   | line_comment? '\n' indent* '\n' indent* '\n'
     { Lexing.new_line lexbuf; Lexing.new_line lexbuf; Lexing.new_line lexbuf;
       NL_NL_NL }
@@ -167,14 +164,16 @@ and token = parse
   | ":>" { SUP }
   | ":=" { ASSIGN }
   | "==" { EQUIV }
-  | "=.." { EQDOT2 }
+  | "=++" { EQCAT }
 
   | "~" { NOT }
   | "/\\" { AND }
   | "\\/" { OR }
-  | "(++)" { BIGCOMP }
   | "(/\\)" { BIGAND }
   | "(\\/)" { BIGOR }
+  | "(+)" { BIGADD }
+  | "(*)" { BIGMUL }
+  | "(++)" { BIGCAT }
 
   | "?" { QUEST }
   | "+" { PLUS }
@@ -183,11 +182,11 @@ and token = parse
   | "/" { SLASH }
   | "\\" { BACKSLASH }
   | "^" { UP }
-  | "++" { COMPOSE }
+  | "++" { CAT }
   | "+-" { PLUSMINUS }
   | "-+" { MINUSPLUS }
 
-  | "<-" { IN }
+  | "<-" { MEM }
   | "->" { ARROW }
   | "=>" { ARROW2 }
   | "->_" { ARROWSUB }
@@ -209,6 +208,8 @@ and token = parse
   | "%%" { MULTIHOLE }
   | "!%" { NOTHING }
   | "#" { FUSE }
+  | "##" { FUSEFUSE }
+  | "%latex" { LATEX }
 
   | "`" { TICK }
 

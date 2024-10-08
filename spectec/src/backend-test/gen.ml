@@ -44,10 +44,14 @@ let spf = Printf.sprintf
     match a.it with
     | Il.Ast.ExpA e -> type_of_exp e
     | Il.Ast.TypA t -> t
+    | Il.Ast.DefA _ -> failwith "TODO"
+    | Il.Ast.GramA _ -> failwith "TODO"
   let typ_of_bind bind =
     match bind.it with
-    | Il.Ast.ExpB (_, t, _) -> t
-    | Il.Ast.TypB _ -> failwith "typ_of_bind"
+    | Il.Ast.ExpB (_, t) -> t
+    | Il.Ast.TypB _
+    | Il.Ast.DefB _
+    | Il.Ast.GramB _ -> failwith "typ_of_bind"
 
   let do_binds alist vlist =
     let rec do_bind e v =
@@ -65,6 +69,8 @@ let spf = Printf.sprintf
       match a.it with
       | Il.Ast.ExpA e -> do_bind e (snd kv)
       | Il.Ast.TypA _ -> failwith "do_bind: arg is TypA"
+      | Il.Ast.DefA _ -> failwith "do_bind: arg is DefA"
+      | Il.Ast.GramA _ -> failwith "do_bind: arg is GramA"
     in
 
     List.map2 do_bind_arg alist vlist |> List.concat
@@ -110,8 +116,8 @@ let spf = Printf.sprintf
 (** End of Helpers to handle type-family-based generation **)
 
 
-let string_of_atom = Il.Atom.string_of_atom
-let string_of_mixop = Il.Atom.string_of_mixop
+let string_of_atom = El.Atom.to_string
+let string_of_mixop = Il.Mixop.to_string
 let string_of_module m = match m with
 | Al.Ast.CaseV ("MODULE", args) ->
   "(MODULE\n  " ^ (List.map Al.Print.string_of_value args |> String.concat "\n  ") ^ "\n)"
@@ -475,7 +481,7 @@ let rec gen c name =
     |> append_cache_if (name = "funcidx" && not c.is_func) refs_cache
 
 and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
-  let open Il.Atom in
+  let open El.Atom in
   match mixop with
     (* Propagation *)
     | [[]; []] -> gen_typs c typs |> List.hd
@@ -578,7 +584,7 @@ and gen_typ c typ =
       | Il.Ast.SubE (e, _, _) -> e2v e
       | Il.Ast.VarE id -> List.assoc id.it c.args
       (* HARDCODE *)
-      | Il.Ast.CallE (id, [ vt ]) when id.it = "size" ->
+      | Il.Ast.CallE (id, [ vt ]) when List.mem id.it ["size"; "sizenn"] ->
         ( match casev_get_case (a2v vt) with
         | "I32" -> 32
         | "I64" -> 64
@@ -590,7 +596,9 @@ and gen_typ c typ =
     and a2v a =
       match a.it with
       | Il.Ast.ExpA e -> e2v e
-      | Il.Ast.TypA _ -> failwith "Can not convert TypA into value (yet)" in
+      | Il.Ast.TypA _ -> failwith "Can not convert TypA into value (yet)"
+      | Il.Ast.DefA _ -> failwith "Can not convert DefA into value (yet)"
+      | Il.Ast.GramA _ -> failwith "Can not convert GramA into value (yet)" in
     (* End of helpers*)
     let args' = List.map (fun a -> ("_arg", a2v a)) args in
     let c' = { c with args = args' } in
@@ -982,22 +990,25 @@ let to_wast seed m result =
 
   let m_r = Construct.al_to_module m in
 
-  let spectest = Textual m_spectest |> to_phrase in
-  let def = Textual m_r |> to_phrase in
+  let spectest = Textual (m_spectest, []) |> to_phrase in
+  let def = Textual (m_r, []) |> to_phrase in
   let pre_script = [
     (Module (Some (to_phrase "$spectest_values"), spectest) |> to_phrase);
     (Register (Utf8.decode "spectest_values", Some (to_phrase "$spectest_values")) |> to_phrase)
   ] in
-  let script = pre_script @ match result with
-    | Ok _ ->
-      [ (Module (None, def) |> to_phrase) ]
-    | Error Exception.Trap ->
-      [ Assertion (AssertUninstantiable (def, "") |> to_phrase) |> to_phrase ]
-    | Error Exception.Exhaustion ->
-      [ Module (None, def) |> to_phrase ]
-    | Error e ->
-      Printf.sprintf "Unexpected error in instantiating module: %s" (Printexc.to_string e) |> prerr_endline;
-      []
+  let script =
+    pre_script
+    @ [ Module (None, def) |> to_phrase ]
+    @ match result with
+      | Ok _ ->
+        [ Instance (None, None) |> to_phrase ]
+      | Error Exception.Trap ->
+        [ Assertion (AssertUninstantiable (None, "") |> to_phrase) |> to_phrase ]
+      | Error Exception.Exhaustion ->
+        [ (* TODO: Exhaustion *) ]
+      | Error e ->
+        Printf.sprintf "Unexpected error in instantiating module: %s" (Printexc.to_string e) |> prerr_endline;
+        []
   in
 
   let is_exhaustion = function

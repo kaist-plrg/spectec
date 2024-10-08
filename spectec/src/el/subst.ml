@@ -10,6 +10,7 @@ type subst =
   { varid : exp Map.t;
     typid : typ Map.t;
     gramid : sym Map.t;
+    defid : id Map.t;
   }
 
 type t = subst
@@ -18,20 +19,24 @@ let empty =
   { varid = Map.empty;
     typid = Map.empty;
     gramid = Map.empty;
+    defid = Map.empty;
   }
 
 let mem_varid s id = Map.mem id.it s.varid
 let mem_typid s id = Map.mem id.it s.typid
 let mem_gramid s id = Map.mem id.it s.gramid
+let mem_defid s id = Map.mem id.it s.defid
 
 let add_varid s id e = if id.it = "_" then s else {s with varid = Map.add id.it e s.varid}
 let add_typid s id t = if id.it = "_" then s else {s with typid = Map.add id.it t s.typid}
 let add_gramid s id g = if id.it = "_" then s else {s with gramid = Map.add id.it g s.gramid}
+let add_defid s id id' = if id.it = "_" then s else {s with defid = Map.add id.it id' s.defid}
 
 let union s1 s2 =
   { varid = Map.union (fun _ _e1 e2 -> Some e2) s1.varid s2.varid;
     typid = Map.union (fun _ _t1 t2 -> Some t2) s1.typid s2.typid;
     gramid = Map.union (fun _ _g1 g2 -> Some g2) s1.gramid s2.gramid;
+    defid = Map.union (fun _ _id1 id2 -> Some id2) s1.defid s2.defid;
   }
 
 
@@ -58,6 +63,11 @@ let subst_gramid s id =
   | Some {it = VarG (id', []); _} -> id'
   | Some _ -> raise (Invalid_argument "subst_gramid")
 
+let subst_defid s id =
+  match Map.find_opt id.it s.defid with
+  | None -> id
+  | Some id' -> id'
+
 
 (* Iterations *)
 
@@ -77,7 +87,7 @@ and subst_typ s t =
     | None -> VarT (id, List.map (subst_arg s) args)
     | Some t' ->
       if id'.it <> id.it then
-        Util.Source.error id.at "syntax" "identifer suffix encountered during substitution";
+        Util.Error.error id.at "syntax" "identifer suffix encountered during substitution";
       assert (args = []); t'.it  (* We do not support higher-order substitutions yet *)
     )
   | BoolT | NumT _ | TextT | AtomT _ -> t.it
@@ -127,18 +137,22 @@ and subst_exp s e =
   | StrE efs -> StrE (subst_nl_list subst_expfield s efs)
   | DotE (e1, atom) -> DotE (subst_exp s e1, atom)
   | CommaE (e1, e2) -> CommaE (subst_exp s e1, subst_exp s e2)
-  | CompE (e1, e2) -> CompE (subst_exp s e1, subst_exp s e2)
+  | CatE (e1, e2) -> CatE (subst_exp s e1, subst_exp s e2)
+  | MemE (e1, e2) -> MemE (subst_exp s e1, subst_exp s e2)
   | LenE e1 -> LenE (subst_exp s e1)
   | SizeE id -> SizeE (subst_gramid s id)
   | ParenE (e1, b) -> ParenE (subst_exp s e1, b)
   | TupE es -> TupE (subst_list subst_exp s es)
   | InfixE (e1, atom, e2) -> InfixE (subst_exp s e1, atom, subst_exp s e2)
   | BrackE (l, e1, r) -> BrackE (l, subst_exp s e1, r)
-  | CallE (id, args) -> CallE (id, subst_list subst_arg s args)
+  | CallE (id, args) -> CallE (subst_defid s id, subst_list subst_arg s args)
   | IterE (e1, iter) -> IterE (subst_exp s e1, subst_iter s iter)
   | TypE (e1, t) -> TypE (subst_exp s e1, subst_typ s t)
+  | ArithE e1 -> ArithE (subst_exp s e1)
   | HoleE h -> HoleE h
   | FuseE (e1, e2) -> FuseE (subst_exp s e1, subst_exp s e2)
+  | UnparenE e1 -> UnparenE (subst_exp s e1)
+  | LatexE s -> LatexE s
   ) $ e.at
 
 and subst_expfield s (atom, e) = (atom, subst_exp s e)
@@ -151,18 +165,6 @@ and subst_path s p =
     SliceP (subst_path s p1, subst_exp s e1, subst_exp s e2)
   | DotP (p1, atom) -> DotP (subst_path s p1, atom)
   ) $ p.at
-
-
-(* Premises *)
-
-and subst_prem s prem =
-  (match prem.it with
-  | VarPr (id, t) -> VarPr (id, subst_typ s t)
-  | RulePr (id, e) -> RulePr (id, subst_exp s e)
-  | IfPr e -> IfPr (subst_exp s e)
-  | ElsePr -> ElsePr
-  | IterPr (prem1, iter) -> IterPr (subst_prem s prem1, subst_iter s iter)
-  ) $ prem.at
 
 
 (* Grammars *)
@@ -185,6 +187,7 @@ and subst_sym s g =
   | ArithG e -> ArithG (subst_exp s e)
   | AttrG (e, g1) -> AttrG (subst_exp s e, subst_sym s g1)
   | FuseG (g1, g2) -> FuseG (subst_sym s g1, subst_sym s g2)
+  | UnparenG g1 -> UnparenG (subst_sym s g1)
   ) $ g.at
 
 (*
@@ -198,6 +201,18 @@ and subst_gram s gram =
 *)
 
 
+(* Premises *)
+
+and subst_prem s prem =
+  (match prem.it with
+  | VarPr (id, t) -> VarPr (id, subst_typ s t)
+  | RulePr (id, e) -> RulePr (id, subst_exp s e)
+  | IfPr e -> IfPr (subst_exp s e)
+  | ElsePr -> ElsePr
+  | IterPr (prem1, iter) -> IterPr (subst_prem s prem1, subst_iter s iter)
+  ) $ prem.at
+
+
 (* Definitions *)
 
 and subst_arg s a =
@@ -206,6 +221,7 @@ and subst_arg s a =
   | ExpA e -> ExpA (subst_exp s e)
   | TypA t -> TypA (subst_typ s t)
   | GramA g -> GramA (subst_sym s g)
+  | DefA id -> DefA (subst_defid s id)
   ) $ a.at
 
 and subst_param s p =
@@ -213,4 +229,5 @@ and subst_param s p =
   | ExpP (id, t) -> ExpP (id, subst_typ s t)
   | TypP id -> TypP id
   | GramP (id, t) -> GramP (id, subst_typ s t)
+  | DefP (id, ps, t) -> DefP (id, List.map (subst_param s) ps, subst_typ s t)
   ) $ p.at

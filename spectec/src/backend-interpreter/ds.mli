@@ -8,6 +8,7 @@ val lookup_algo : string -> algorithm
 
 type env = value Env.t
 val lookup_env : string -> env -> value
+val lookup_env_opt : string -> env -> value option
 
 module Store : sig
   val init: unit -> unit
@@ -33,23 +34,31 @@ module Register : sig
   val get_module_name : Reference_interpreter.Script.var option -> string
 end
 
+module Modules : sig
+  val add : string -> Reference_interpreter.Ast.module_ -> unit
+  val add_with_var : Reference_interpreter.Script.var option -> Reference_interpreter.Ast.module_ -> unit
+  val find : string -> Reference_interpreter.Ast.module_
+  val get_module_name : Reference_interpreter.Script.var option -> string
+end
+
 module AlContext : sig
   type mode =
     (* Al context *)
-    | Al of string * instr list * env
+    | Al of string * arg list * instr list * env
     (* Wasm context *)
     | Wasm of int
     (* Special context for enter/execute *)
-    | Enter of instr list * env
+    | Enter of string * instr list * env
     | Execute of value
     (* Return register *)
     | Return of value
-  val al : string * instr list * env -> mode
+  val al : string * arg list * instr list * env -> mode
   val wasm : int -> mode
-  val enter : instr list * env -> mode
+  val enter : string * instr list * env -> mode
   val execute : value -> mode
   val return : value -> mode
   type t = mode list
+  val string_of_context : mode -> string
   val tl : t -> t
   val is_reducible : t -> bool
   val can_tail_call : instr -> bool
@@ -72,10 +81,9 @@ module WasmContext : sig
   val string_of_context : t -> string
   val string_of_context_stack : unit -> string
 
-  val get_current_context : unit -> value
-  val get_current_frame : unit -> value
+  val get_top_context : unit -> value
+  val get_current_context : id -> value
   val get_module_instance : unit -> value
-  val get_current_label : unit -> value
 
   val get_value_stack : unit -> value list
   val pop_value_stack : unit -> value list

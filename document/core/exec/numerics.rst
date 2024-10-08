@@ -72,15 +72,14 @@ Conventions:
 
 * The notation :math:`f^{-1}` denotes the inverse of a bijective function :math:`f`.
 
-* Truncation of rational values is written :math:`\trunc(\pm q)`, with the usual mathematical definition:
+* Truncation of rational values is written :math:`\truncz(\pm q)`, with the usual mathematical definition:
 
   .. math::
      \begin{array}{lll@{\qquad}l}
-     \trunc(\pm q) &=& \pm i & (\iff i \in \mathbb{N} \wedge +q - 1 < i \leq +q) \\
+     \truncz(\pm q) &=& \pm i & (\iff i \in \mathbb{N} \wedge +q - 1 < i \leq +q) \\
      \end{array}
 
-.. _aux-sat_u:
-.. _aux-sat_s:
+.. _aux-sat:
 
 * Saturation of integers is written :math:`\satu_N(i)` and :math:`\sats_N(i)`. The arguments to these two functions range over arbitrary signed integers.
 
@@ -119,7 +118,7 @@ Numbers and numeric vectors have an underlying binary representation as a sequen
    \bits_{\VN}(i) &=& \ibits_N(i) \\
    \end{array}
 
-The first case of these applies to representations of both integer :ref:`value types <syntax-valtype>` and :ref:`packed types <syntax-packedtype>`.
+The first case of these applies to representations of both integer :ref:`value types <syntax-valtype>` and :ref:`packed types <syntax-packtype>`.
 
 Each of these functions is a bijection, hence they are invertible.
 
@@ -161,11 +160,13 @@ Floating-Point
    \fsign({-}) &=& 1 \\
    \end{array}
 
-where :math:`M = \significand(N)` and :math:`E = \exponent(N)`.
+where :math:`M = \signif(N)` and :math:`E = \expon(N)`.
 
 
 .. index:: numeric vector, shape, lane
 .. _aux-lanes:
+.. _aux-packnum:
+.. _aux-unpacknum:
 .. _syntax-i128:
 
 Vectors
@@ -190,6 +191,8 @@ provided that :math:`N = |t|\cdot M`.
    \end{array}
 
 This function is a bijection on |IN|, hence it is invertible.
+
+.. todo:: pack/unpacknum
 
 
 .. index:: byte, little endian, memory
@@ -286,7 +289,8 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \imul_N(i_1, i_2) &=& (i_1 \cdot i_2) \mod 2^N
    \end{array}
 
-.. _op-idiv_u:
+
+.. _op-idiv:
 
 :math:`\idivu_N(i_1, i_2)`
 ..........................
@@ -298,13 +302,11 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
 .. math::
    \begin{array}{@{}lcll}
    \idivu_N(i_1, 0) &=& \{\} \\
-   \idivu_N(i_1, i_2) &=& \trunc(i_1 / i_2) \\
+   \idivu_N(i_1, i_2) &=& \truncz(i_1 / i_2) \\
    \end{array}
 
 .. note::
    This operator is :ref:`partial <exec-op-partial>`.
-
-.. _op-idiv_s:
 
 :math:`\idivs_N(i_1, i_2)`
 ..........................
@@ -323,7 +325,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{@{}lcll}
    \idivs_N(i_1, 0) &=& \{\} \\
    \idivs_N(i_1, i_2) &=& \{\} \qquad\qquad (\iff \signed_N(i_1) / \signed_N(i_2) = 2^{N-1}) \\
-   \idivs_N(i_1, i_2) &=& \signed_N^{-1}(\trunc(\signed_N(i_1) / \signed_N(i_2))) \\
+   \idivs_N(i_1, i_2) &=& \signed_N^{-1}(\truncz(\signed_N(i_1) / \signed_N(i_2))) \\
    \end{array}
 
 .. note::
@@ -331,7 +333,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    Besides division by :math:`0`, the result of :math:`(-2^{N-1})/(-1) = +2^{N-1}` is not representable as an :math:`N`-bit signed integer.
 
 
-.. _op-irem_u:
+.. _op-irem:
 
 :math:`\iremu_N(i_1, i_2)`
 ..........................
@@ -343,7 +345,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
 .. math::
    \begin{array}{@{}lcll}
    \iremu_N(i_1, 0) &=& \{\} \\
-   \iremu_N(i_1, i_2) &=& i_1 - i_2 \cdot \trunc(i_1 / i_2) \\
+   \iremu_N(i_1, i_2) &=& i_1 - i_2 \cdot \truncz(i_1 / i_2) \\
    \end{array}
 
 .. note::
@@ -351,8 +353,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
 
    As long as both operators are defined,
    it holds that :math:`i_1 = i_2\cdot\idivu(i_1, i_2) + \iremu(i_1, i_2)`.
-
-.. _op-irem_s:
 
 :math:`\irems_N(i_1, i_2)`
 ..........................
@@ -368,7 +368,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
 .. math::
    \begin{array}{@{}lcll}
    \irems_N(i_1, 0) &=& \{\} \\
-   \irems_N(i_1, i_2) &=& \signed_N^{-1}(j_1 - j_2 \cdot \trunc(j_1 / j_2)) \\
+   \irems_N(i_1, i_2) &=& \signed_N^{-1}(j_1 - j_2 \cdot \truncz(j_1 / j_2)) \\
      && (\where j_1 = \signed_N(i_1) \wedge j_2 = \signed_N(i_2)) \\
    \end{array}
 
@@ -454,7 +454,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
      & (\iff \ibits_N(i_1) = d_1^k~d_2^{N-k} \wedge k = i_2 \mod N)
    \end{array}
 
-.. _op-ishr_u:
+.. _op-ishr:
 
 :math:`\ishru_N(i_1, i_2)`
 ..........................
@@ -468,8 +468,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \ishru_N(i_1, i_2) &=& \ibits_N^{-1}(0^k~d_1^{N-k})
      & (\iff \ibits_N(i_1) = d_1^{N-k}~d_2^k \wedge k = i_2 \mod N)
    \end{array}
-
-.. _op-ishr_s:
 
 :math:`\ishrs_N(i_1, i_2)`
 ..........................
@@ -593,7 +591,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-ilt_u:
+.. _op-ilt:
 
 :math:`\iltu_N(i_1, i_2)`
 .........................
@@ -604,9 +602,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{@{}lcll}
    \iltu_N(i_1, i_2) &=& \tobool(i_1 < i_2)
    \end{array}
-
-
-.. _op-ilt_s:
 
 :math:`\ilts_N(i_1, i_2)`
 .........................
@@ -623,7 +618,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-igt_u:
+.. _op-igt:
 
 :math:`\igtu_N(i_1, i_2)`
 .........................
@@ -634,9 +629,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{@{}lcll}
    \igtu_N(i_1, i_2) &=& \tobool(i_1 > i_2)
    \end{array}
-
-
-.. _op-igt_s:
 
 :math:`\igts_N(i_1, i_2)`
 .........................
@@ -653,7 +645,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-ile_u:
+.. _op-ile:
 
 :math:`\ileu_N(i_1, i_2)`
 .........................
@@ -664,9 +656,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{@{}lcll}
    \ileu_N(i_1, i_2) &=& \tobool(i_1 \leq i_2)
    \end{array}
-
-
-.. _op-ile_s:
 
 :math:`\iles_N(i_1, i_2)`
 .........................
@@ -683,7 +672,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-ige_u:
+.. _op-ige:
 
 :math:`\igeu_N(i_1, i_2)`
 .........................
@@ -694,9 +683,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{@{}lcll}
    \igeu_N(i_1, i_2) &=& \tobool(i_1 \geq i_2)
    \end{array}
-
-
-.. _op-ige_s:
 
 :math:`\iges_N(i_1, i_2)`
 .........................
@@ -713,7 +699,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-iextendn_s:
+.. _op-iextendn:
 
 :math:`\iextendMs_N(i)`
 .......................
@@ -778,7 +764,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-imin_u:
+.. _op-imin:
 
 :math:`\iminu_N(i_1, i_2)`
 ..........................
@@ -790,9 +776,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \iminu_N(i_1, i_2) &=& i_1 & (\iff \iltu_N(i_1, i_2) = 1)\\
    \iminu_N(i_1, i_2) &=& i_2 & (\otherwise)
    \end{array}
-
-
-.. _op-imin_s:
 
 :math:`\imins_N(i_1, i_2)`
 ..........................
@@ -806,7 +789,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-imax_u:
+.. _op-imax:
 
 :math:`\imaxu_N(i_1, i_2)`
 ..........................
@@ -818,9 +801,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \imaxu_N(i_1, i_2) &=& i_1 & (\iff \igtu_N(i_1, i_2) = 1)\\
    \imaxu_N(i_1, i_2) &=& i_2 & (\otherwise)
    \end{array}
-
-
-.. _op-imax_s:
 
 :math:`\imaxs_N(i_1, i_2)`
 ..........................
@@ -834,7 +814,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-iadd_sat_u:
+.. _op-iadd_sat:
 
 :math:`\iaddsatu_N(i_1, i_2)`
 .............................
@@ -847,9 +827,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{lll@{\qquad}l}
    \iaddsatu_N(i_1, i_2) &=& \satu_N(i_1 + i_2)
    \end{array}
-
-
-.. _op-iadd_sat_s:
 
 :math:`\iaddsats_N(i_1, i_2)`
 .............................
@@ -868,7 +845,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-isub_sat_u:
+.. _op-isub_sat:
 
 :math:`\isubsatu_N(i_1, i_2)`
 .............................
@@ -881,9 +858,6 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \begin{array}{lll@{\qquad}l}
    \isubsatu_N(i_1, i_2) &=& \satu_N(i_1 - i_2)
    \end{array}
-
-
-.. _op-isub_sat_s:
 
 :math:`\isubsats_N(i_1, i_2)`
 .............................
@@ -902,7 +876,7 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
    \end{array}
 
 
-.. _op-iavgr_u:
+.. _op-iavgr:
 
 :math:`\iavgru_N(i_1, i_2)`
 ...........................
@@ -913,11 +887,11 @@ The integer result of predicates -- i.e., :ref:`tests <syntax-testop>` and :ref:
 
 .. math::
    \begin{array}{lll@{\qquad}l}
-   \iavgru_N(i_1, i_2) &=& \trunc((i_1 + i_2 + 1) / 2)
+   \iavgru_N(i_1, i_2) &=& \truncz((i_1 + i_2 + 1) / 2)
    \end{array}
 
 
-.. _op-iq15mulrsat_s:
+.. _op-iq15mulrsat:
 
 :math:`\iq15mulrsats_N(i_1, i_2)`
 .................................
@@ -1025,7 +999,7 @@ where:
 .. math::
    \begin{array}{lll@{\qquad}l}
    \F{exact}_N &=& \fN \cap \mathbb{Q} \\
-   \F{limit}_N &=& 2^{2^{\exponent(N)-1}} \\
+   \F{limit}_N &=& 2^{2^{\expon(N)-1}} \\
    \F{candidate}_N &=& \F{exact}_N \cup \{+\F{limit}_N, -\F{limit}_N\} \\
    \F{candidatepair}_N &=& \{ (z_1, z_2) \in \F{candidate}_N^2 ~|~ z_1 < z_2 \wedge \forall z \in \F{candidate}_N, z \leq z_1 \vee z \geq z_2\} \\[1ex]
    \F{even}_N((d + m\cdot 2^{-M}) \cdot 2^e) &\Leftrightarrow& m \mod 2 = 0 \\
@@ -1720,7 +1694,10 @@ This non-deterministic result is expressed by the following auxiliary function p
 Conversions
 ~~~~~~~~~~~
 
-.. _op-extend_u:
+.. _op-ext:
+.. _op-extend:
+
+.. todo:: ext or extend?
 
 :math:`\extendu_{M,N}(i)`
 .........................
@@ -1734,9 +1711,6 @@ Conversions
 
 .. note::
    In the abstract syntax, unsigned extension just reinterprets the same value.
-
-
-.. _op-extend_s:
 
 :math:`\extends_{M,N}(i)`
 .........................
@@ -1764,7 +1738,7 @@ Conversions
    \end{array}
 
 
-.. _op-trunc_u:
+.. _op-trunc:
 
 :math:`\truncu_{M,N}(z)`
 ........................
@@ -1773,7 +1747,7 @@ Conversions
 
 * Else if :math:`z` is an infinity, then the result is undefined. 
 
-* Else if :math:`z` is a number and :math:`\trunc(z)` is a value within range of the target type, then return that value.
+* Else if :math:`z` is a number and :math:`\truncz(z)` is a value within range of the target type, then return that value.
 
 * Else the result is undefined.
 
@@ -1781,16 +1755,13 @@ Conversions
    \begin{array}{lll@{\qquad}l}
    \truncu_{M,N}(\pm \NAN(n)) &=& \{\} \\
    \truncu_{M,N}(\pm \infty) &=& \{\} \\
-   \truncu_{M,N}(\pm q) &=& \trunc(\pm q) & (\iff -1 < \trunc(\pm q) < 2^N) \\
+   \truncu_{M,N}(\pm q) &=& \truncz(\pm q) & (\iff -1 < \truncz(\pm q) < 2^N) \\
    \truncu_{M,N}(\pm q) &=& \{\} & (\otherwise) \\
    \end{array}
 
 .. note::
    This operator is :ref:`partial <exec-op-partial>`.
    It is not defined for NaNs, infinities, or values for which the result is out of range.
-
-
-.. _op-trunc_s:
 
 :math:`\truncs_{M,N}(z)`
 ........................
@@ -1799,7 +1770,7 @@ Conversions
 
 * Else if :math:`z` is an infinity, then the result is undefined. 
 
-* If :math:`z` is a number and :math:`\trunc(z)` is a value within range of the target type, then return that value.
+* If :math:`z` is a number and :math:`\truncz(z)` is a value within range of the target type, then return that value.
 
 * Else the result is undefined.
 
@@ -1807,7 +1778,7 @@ Conversions
    \begin{array}{lll@{\qquad}l}
    \truncs_{M,N}(\pm \NAN(n)) &=& \{\} \\
    \truncs_{M,N}(\pm \infty) &=& \{\} \\
-   \truncs_{M,N}(\pm q) &=& \trunc(\pm q) & (\iff -2^{N-1} - 1 < \trunc(\pm q) < 2^{N-1}) \\
+   \truncs_{M,N}(\pm q) &=& \truncz(\pm q) & (\iff -2^{N-1} - 1 < \truncz(\pm q) < 2^{N-1}) \\
    \truncs_{M,N}(\pm q) &=& \{\} & (\otherwise) \\
    \end{array}
 
@@ -1816,7 +1787,7 @@ Conversions
    It is not defined for NaNs, infinities, or values for which the result is out of range.
 
 
-.. _op-trunc_sat_u:
+.. _op-trunc_sat:
 
 :math:`\truncsatu_{M,N}(z)`
 ...........................
@@ -1827,18 +1798,15 @@ Conversions
 
 * Else if :math:`z` is positive infinity, then return :math:`2^N - 1`.
 
-* Else, return :math:`\satu_N(\trunc(z))`.
+* Else, return :math:`\satu_N(\truncz(z))`.
 
 .. math::
    \begin{array}{lll@{\qquad}l}
    \truncsatu_{M,N}(\pm \NAN(n)) &=& 0 \\
    \truncsatu_{M,N}(- \infty) &=& 0 \\
    \truncsatu_{M,N}(+ \infty) &=& 2^N - 1 \\
-   \truncsatu_{M,N}(z) &=& \satu_N(\trunc(z)) \\
+   \truncsatu_{M,N}(z) &=& \satu_N(\truncz(z)) \\
    \end{array}
-
-
-.. _op-trunc_sat_s:
 
 :math:`\truncsats_{M,N}(z)`
 ...........................
@@ -1849,14 +1817,14 @@ Conversions
 
 * Else if :math:`z` is positive infinity, then return :math:`2^{N-1} - 1`.
 
-* Else, return :math:`\sats_N(\trunc(z))`.
+* Else, return :math:`\sats_N(\truncz(z))`.
 
 .. math::
    \begin{array}{lll@{\qquad}l}
    \truncsats_{M,N}(\pm \NAN(n)) &=& 0 \\
    \truncsats_{M,N}(- \infty) &=& -2^{N-1} \\
    \truncsats_{M,N}(+ \infty) &=& 2^{N-1}-1 \\
-   \truncsats_{M,N}(z) &=& \sats_N(\trunc(z)) \\
+   \truncsats_{M,N}(z) &=& \sats_N(\truncz(z)) \\
    \end{array}
 
 
@@ -1904,7 +1872,7 @@ Conversions
    \end{array}
 
 
-.. _op-convert_u:
+.. _op-convert:
 
 :math:`\convertu_{M,N}(i)`
 ..........................
@@ -1915,9 +1883,6 @@ Conversions
    \begin{array}{lll@{\qquad}l}
    \convertu_{M,N}(i) &=& \ieee_N(i) \\
    \end{array}
-
-
-.. _op-convert_s:
 
 :math:`\converts_{M,N}(i)`
 ..........................
@@ -1947,7 +1912,7 @@ Conversions
    \end{array}
 
 
-.. _op-narrow_s:
+.. _op-narrow:
 
 :math:`\narrows_{M,N}(i)`
 .........................
@@ -1960,9 +1925,6 @@ Conversions
    \begin{array}{lll@{\qquad}l}
    \narrows_{M,N}(i) &=& \sats_N(\signed_M(i))
    \end{array}
-
-
-.. _op-narrow_u:
 
 :math:`\narrowu_{M,N}(i)`
 .........................

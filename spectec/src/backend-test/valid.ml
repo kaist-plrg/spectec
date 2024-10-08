@@ -277,7 +277,7 @@ let validate_instr case args const (rt1, rt2) =
   (* cvtop *)
   | "VCVTOP" ->
     (match casev_get_case (List.nth args 1) with
-    | "EXTEND" ->
+    | "EXTEND" -> (* TODO: remove *)
       let i = choose [16; 32; 64] in
       let arg1 = make_ishape i in
       let arg2 = make_ishape (i/2) in

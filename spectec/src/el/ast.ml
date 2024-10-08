@@ -15,7 +15,7 @@ type 'a nl_list = 'a nl_elem list
 type nat = Z.t
 type text = string
 type id = string phrase
-type atom = Il.Atom.atom
+type atom = Atom.atom
 
 
 (* Iteration *)
@@ -86,6 +86,7 @@ and binop =
   | SubOp  (* `-` *)
   | MulOp  (* `*` *)
   | DivOp  (* `/` *)
+  | ModOp  (* `\` *)
   | ExpOp  (* `^` *)
 
 and cmpop =
@@ -114,19 +115,23 @@ and exp' =
   | ExtE of exp * path * exp     (* exp `[` path `=..` exp `]` *)
   | StrE of expfield nl_list     (* `{` list(expfield, `,`) `}` *)
   | DotE of exp * atom           (* exp `.` atom *)
-  | CommaE of exp * exp          (* exp `,` exp *)
-  | CompE of exp * exp           (* exp `++` exp *)
+  | CommaE of exp * exp          (* exp `,` exp *)  (* TODO(3, rossberg): Remove? *)
+  | CatE of exp * exp            (* exp `++` exp *)
+  | MemE of exp * exp            (* exp `<-` exp *)
   | LenE of exp                  (* `|` exp `|` *)
   | SizeE of id                  (* `||` exp `||` *)
-  | ParenE of exp * bool         (* `(` exp `)` *)
+  | ParenE of exp * [`Sig | `Insig]  (* `(` exp `)` *)
   | TupE of exp list             (* `(` list2(exp, `,`) `)` *)
   | InfixE of exp * atom * exp   (* exp atom exp *)
   | BrackE of atom * exp * atom  (* ``` ([{ exp }]) *)
   | CallE of id * arg list       (* `$` defid (`(` arg,* `)`)? *)
   | IterE of exp * iter          (* exp iter *)
   | TypE of exp * typ            (* exp `:` typ *)
+  | ArithE of exp                (* `$(` exp `)` *)
   | HoleE of [`Num of int | `Next | `Rest | `None]  (* `%N` or `%` or `%%` or `!%` *)
   | FuseE of exp * exp           (* exp `#` exp *)
+  | UnparenE of exp              (* `##` exp *)
+  | LatexE of string             (* `latex` `(` `"..."`* `)` *)
 
 and expfield = atom * exp        (* atom exp *)
 
@@ -155,6 +160,7 @@ and sym' =
   | ArithG of exp                            (* `$(` exp `)` *)
   | AttrG of exp * sym                       (* exp `:` sym *)
   | FuseG of sym * sym                       (* sym `#` sym *)
+  | UnparenG of sym                          (* `##` sym *)
 
 and prod = prod' phrase
 and prod' = sym * exp * prem nl_list         (* `|` sym `=>` exp (`--` prem)* *)
@@ -170,12 +176,14 @@ and param' =
   | ExpP of id * typ                         (* varid `:` typ *)
   | TypP of id                               (* `syntax` varid *)
   | GramP of id * typ                        (* `grammar` gramid `:` typ *)
+  | DefP of id * param list * typ            (* `def` `$` defid params `:` typ *)
 
 and arg = arg' ref phrase
 and arg' =
   | ExpA of exp                              (* exp *)
   | TypA of typ                              (* `syntax` typ *)
   | GramA of sym                             (* `grammar` sym *)
+  | DefA of id                               (* `def` defid *)
 
 and def = def' phrase
 and def' =
@@ -200,7 +208,7 @@ and prem' =
 
 and hintdef = hintdef' phrase
 and hintdef' =
-  | AtomH of id * hint list
+  | AtomH of id * atom * hint list
   | TypH of id * id * hint list
   | GramH of id * id * hint list
   | RelH of id * hint list

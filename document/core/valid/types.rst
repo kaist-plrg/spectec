@@ -1,5 +1,3 @@
-.. _valid-type:
-
 Types
 -----
 
@@ -43,7 +41,8 @@ $${rule: Vectype_ok}
 Heap Types
 ~~~~~~~~~~
 
-Concrete :ref:`Heap types <syntax-heaptype>` are only valid when the :ref:`type index <syntax-typeidx>` is.
+Concrete :ref:`heap types <syntax-heaptype>` are only valid when the :ref:`type index <syntax-typeidx>` is,
+while abstract ones are vacuously valid.
 
 :math:`\absheaptype`
 ....................
@@ -244,7 +243,7 @@ $${rule: Comptype_ok/array}
    single: abstract syntax; value type
 .. _valid-fieldtype:
 .. _valid-storagetype:
-.. _valid-packedtype:
+.. _valid-packtype:
 
 Field Types
 ~~~~~~~~~~~
@@ -259,8 +258,8 @@ Field Types
 $${rule: Fieldtype_ok}
 
 
-:math:`\packedtype`
-...................
+:math:`\packtype`
+.................
 
 * The packed type is valid.
 
@@ -411,6 +410,26 @@ Memory Types
 $${rule: Memtype_ok}
 
 
+.. index:: tag type, function type, exception tag
+   pair: validation; tag type
+   single: abstract syntax; tag type
+.. _valid-tagtype:
+
+Tag Types
+~~~~~~~~~
+
+:math:`[t_1^n] \to [t_2^m]`
+...........................
+
+* The :ref:`function type <syntax-functype>` :math:`[t_1^n] \to [t_2^m]` must be :ref:`valid <valid-functype>`.
+
+* The type sequence :math:`t_2^m` must be empty.
+
+* Then the tag type is valid.
+
+$${rule: Tagtype_ok}
+
+
 .. index:: global type, value type, mutability
    pair: validation; global type
    single: abstract syntax; global type
@@ -437,7 +456,7 @@ $${rule: Globaltype_ok}
 External Types
 ~~~~~~~~~~~~~~
 
-:math:`\ETFUNC~\deftype`
+:math:`\XTFUNC~\deftype`
 ........................
 
 * The :ref:`defined type <syntax-deftype>` :math:`\deftype` must be :ref:`valid <valid-deftype>`.
@@ -449,7 +468,7 @@ External Types
 $${rule: Externtype_ok/func}
 
 
-:math:`\ETTABLE~\tabletype`
+:math:`\XTTABLE~\tabletype`
 ...........................
 
 * The :ref:`table type <syntax-tabletype>` :math:`\tabletype` must be :ref:`valid <valid-tabletype>`.
@@ -459,7 +478,7 @@ $${rule: Externtype_ok/func}
 $${rule: Externtype_ok/table}
 
 
-:math:`\ETMEM~\memtype`
+:math:`\XTMEM~\memtype`
 .......................
 
 * The :ref:`memory type <syntax-memtype>` :math:`\memtype` must be :ref:`valid <valid-memtype>`.
@@ -469,7 +488,17 @@ $${rule: Externtype_ok/table}
 $${rule: Externtype_ok/mem}
 
 
-:math:`\ETGLOBAL~\globaltype`
+:math:`\XTTAG~\tagtype`
+.......................
+
+* The :ref:`tag type <syntax-tagtype>` :math:`\tagtype` must be :ref:`valid <valid-tagtype>`.
+
+* Then the external type is valid.
+
+$${rule: Externtype_ok/tag}
+
+
+:math:`\XTGLOBAL~\globaltype`
 .............................
 
 * The :ref:`global type <syntax-globaltype>` :math:`\globaltype` must be :ref:`valid <valid-globaltype>`.
