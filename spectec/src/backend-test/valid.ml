@@ -19,8 +19,8 @@ let f64T = nullary "F64"
 let v128T = nullary "V128"
 
 (* Helper *)
-let make_ishape i = tupV [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ]
-let make_fshape i = tupV [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ]
+let make_ishape i = CaseV ("X", [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ])
+let make_fshape i = CaseV ("X", [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ])
 
 let rec string_of_vt = function
 | T v -> Al.Print.string_of_value v
@@ -128,12 +128,18 @@ let validate_if_extend = function
 | args -> args
 
 let validate_shape = function
-  | TupV [ CaseV ("I8", []); NumV _ ] -> tupV [ caseV ("I8", []); numV_of_int 16 ]
-  | TupV [ CaseV ("I16", []); NumV _ ] -> tupV [ caseV ("I16", []); numV_of_int 8 ]
-  | TupV [ CaseV ("I32", []); NumV _ ] -> tupV [ caseV ("I32", []); numV_of_int 4 ]
-  | TupV [ CaseV ("I64", []); NumV _ ] -> tupV [ caseV ("I64", []); numV_of_int 2 ]
-  | TupV [ CaseV ("F32", []); NumV _ ] -> tupV [ caseV ("F32", []); numV_of_int 4 ]
-  | TupV [ CaseV ("F64", []); NumV _ ] -> tupV [ caseV ("F64", []); numV_of_int 2 ]
+  | CaseV ("X", [CaseV (t, []); NumV _]) ->
+    let n =
+      match t with
+      | "I8" -> 16
+      | "I16" -> 8
+      | "I32" -> 4
+      | "I64" -> 2
+      | "F32" -> 4
+      | "F64" -> 2
+      | _ -> failwith ("Invalid lane type: " ^ t)
+    in 
+    CaseV ("X", [CaseV (t, []); numV_of_int n])
   | v -> failwith ("Invalid shape: " ^ Print.string_of_value v)
 
 (* Estimate if given instruction is valid with expected type, rt1* -> rt2* *)
@@ -193,31 +199,31 @@ let validate_instr case args const (rt1, rt2) =
     | [ OptV _ ], [ T t ] -> Some [ OptV (Some (singleton t)) ]
     | _ -> None )
   | "VLOAD" -> ( match args with
-    | [ vloadop; memop; ] ->
+    | [ vt; vloadop; memop; ] ->
       let vloadop', n = validate_vloadop vloadop in
       let (a, o) = decompose_memop memop in
       let a' = dec_align a (n / 8) in
 
-      Some [ vloadop'; compose_memop a' o; ]
+      Some [ vt; vloadop'; compose_memop a' o; ]
     | v -> failwith ("Invalid vec load op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VSTORE" -> ( match args with
-      | [ memop; ] ->
+      | [ vt; memop; ] ->
         let (a, o) = decompose_memop memop in
         let a' = dec_align a (128 / 8) in
 
-        Some [ compose_memop a' o; ]
+        Some [ vt; compose_memop a' o; ]
       | v -> failwith ("Invalid vec store op: " ^ Print.string_of_value (listV_of_list v))
       )
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
-    | [ n; memop; _ ] ->
+    | [ vt; n; memop; _ ] ->
       let i = unwrap_numv_to_int n in
       let (a, o) = decompose_memop memop in
       let a' = dec_align a (i / 8) in
       let j = Random.int (128 / i) in
 
-      Some [ n; compose_memop a' o; numV_of_int j ]
+      Some [ vt; n; compose_memop a' o; numV_of_int j ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VUNOP"   -> let op = List.nth args 1 in Some [ get_vunop_shape op; op ]
@@ -276,36 +282,28 @@ let validate_instr case args const (rt1, rt2) =
     Some [ arg1; arg2; ext ]
   (* cvtop *)
   | "VCVTOP" ->
-    (match casev_get_case (List.nth args 1) with
-    | "EXTEND" -> (* TODO: remove *)
-      let i = choose [16; 32; 64] in
-      let arg1 = make_ishape i in
-      let arg2 = make_ishape (i/2) in
-      let half = choose [nullary "HIGH"; nullary "LOW"] in
-      let ext = choose [nullary "S"; nullary "U"] in
-      Some ([arg1; nullary "EXTEND"; optV (Some half); arg2; optV (Some ext); none "ZERO"])
+    let op = List.nth args 2 in
+    (match casev_get_case op with
     | "TRUNC_SAT" ->
       let i = choose [32; 64] in
       let arg1 = make_ishape 32 in
       let arg2 = make_fshape i in
-      let ext = choose [nullary "S"; nullary "U"] in
-      let zero = if i = 32 then none "ZERO" else some "ZERO" in
-      Some ([arg1; nullary "TRUNC_SAT"; optV None; arg2; optV (Some ext); zero])
+      let zero = if i = 32 then None else Some (nullary "ZERO") in
+      Some ([arg1; arg2; op; optV None; optV zero])
     | "CONVERT" ->
       let i = choose [32; 64] in
       let arg1 = make_fshape i in
       let arg2 = make_ishape 32 in
       let half = if i = 32 then None else Some (nullary "LOW") in
-      let ext = choose [nullary "S"; nullary "U"] in
-      Some ([arg1; nullary "CONVERT"; optV half; arg2; optV (Some ext); none "ZERO"])
+      Some ([arg1; arg2; op; optV half; optV None])
     | "DEMOTE" ->
       let arg1 = make_fshape 32 in
       let arg2 = make_fshape 64 in
-      Some ([arg1; nullary "DEMOTE"; optV None; arg2; optV None; some "ZERO"])
+      Some ([arg1; arg2; op; optV None; optV (Some (nullary "ZERO"))])
     | "PROMOTE" ->
       let arg1 = make_fshape 64 in
       let arg2 = make_fshape 32 in
-      Some ([arg1; nullary "PROMOTE"; optV (Some (nullary "LOW")); arg2; optV None; none "ZERO"])
+      Some ([arg1; arg2; op; optV (Some (nullary "LOW")); optV None])
     | _ -> Some args
     )
   | "VEXTUNOP" ->
@@ -313,16 +311,14 @@ let validate_instr case args const (rt1, rt2) =
     let arg1 = make_ishape i in
     let arg2 = make_ishape (i/2) in
     let arg3 = List.nth args 2 in
-    let arg4 = List.nth args 3 in
-    Some [ arg1; arg2; arg3; arg4 ]
+    Some [ arg1; arg2; arg3 ]
   | "VEXTBINOP" ->
     let is_dot = List.nth args 2 |> casev_get_case = "DOT" in
     let i = if is_dot then 32 else choose [16; 32; 64] in
     let arg1 = make_ishape i in
     let arg2 = make_ishape (i/2) in
-    let arg3 = List.nth args 2 in
-    let arg4 = if is_dot then nullary "S" else List.nth args 3 in
-    Some [ arg1; arg2; arg3; arg4 ]
+    let arg3 = if is_dot then List.nth args 2 |> casev_replace_nth_arg 0 (nullary "S") else List.nth args 2 in
+    Some [ arg1; arg2; arg3 ]
   (* HACKS *)
   | "CONST" -> (
     match args with

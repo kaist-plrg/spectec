@@ -85,7 +85,7 @@ let spf = Printf.sprintf
     | _, Il.Ast.AliasT t -> has_type v t
     | _, Il.Ast.VariantT [ [[]; []], ([ bind ], _, _), _ ] -> has_type v (typ_of_bind bind)
     (* HARDCODE: N x M *)
-    | Al.Ast.TupV vs, Il.Ast.VariantT [ typcase ] ->
+    | Al.Ast.CaseV ("X", vs), Il.Ast.VariantT [ typcase ] ->
       let (_mixop, (binds, _, _), _) = typcase in
       (* TODO: assert mixop = `%X%` *)
       List.for_all2 has_type vs (List.map typ_of_bind binds)
@@ -346,8 +346,7 @@ let append_cache_if cond ref v = if cond then ref := v :: !ref; v
 let get_type types tid =
   let arrow = List.nth types tid |> casev_nth_arg 0 in
   let f i =
-    i
-    |> List.nth (unwrap_tupv arrow)
+    casev_nth_arg i arrow
     |> unwrap_listv_to_list
     |> List.map (fun v -> T v) in
   f 0, f 1
@@ -394,8 +393,8 @@ let rec gen c name =
     List.nth !tids_cache c.i |> numV_of_int |> do_cache type_cache
   (* HARDCODE: vN to be 16 bytes (128 bits) *)
   | "vN" -> numV (gen_bytes 16)
-  (* HARDCODE: pack_size to be 8/16/32 *)
-  | "packsize" -> numV_of_int (choose [8; 16; 32; 64])
+  (* HARDCODE: pack_size to be 8/16/32/64 *) (* TODO: Generalize this *)
+  | "sz" -> numV_of_int (choose [8; 16; 32; 64])
   | _ ->
     let deftyp, bindings = dispatch_deftyp name c.args in
     let c' = { c' with args = bindings } in
@@ -486,9 +485,7 @@ and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
     (* Propagation *)
     | [[]; []] -> gen_typs c typs |> List.hd
     (* TupV *)
-    | [[]; []; []]
-    | [[]; [{it = Arrow; _}]; []]
-    | [[]; [{it = Star; _}; {it = Arrow; _}]; [{it = Star; _}]] ->
+    | [[]; []; []] ->
       Al.Ast.TupV (gen_typs c typs)
     (* limits *)
     | [[{ it = LBrack; _}]; [{ it = Dot2; _}]; [{it = RBrack; _}]] ->
@@ -497,10 +494,10 @@ and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
       let snd = List.hd (List.tl pair) in
       (* Make snd larger than fst *)
       let new_snd = map2 unwrap_numv numV Z.add fst snd in
-      Al.Ast.TupV [ fst; new_snd ]
+      Al.Ast.CaseV ("[", [ fst; new_snd ])
     (* Shape *)
     | [[]; [{it = Atom "X"; _}]; []] ->
-      let shape = Al.Ast.TupV (gen_typs c typs) in
+      let shape = Al.Ast.CaseV ("X", (gen_typs c typs)) in
       validate_shape shape
     (* CaseV *)
     | ({it = Atom atomid; _} :: _) :: _
@@ -514,7 +511,7 @@ and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
       in
       Al.Ast.CaseV (atomid, args)
     | _ ->
-      let case = string_of_mixop mixop in
+      let case = mixop |> Al.Al_util.get_atom |> Option.get |> string_of_atom in
       let args = gen_typs { c with parent_case = case } typs in
       Al.Ast.CaseV (case, args)
 
