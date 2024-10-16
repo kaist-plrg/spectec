@@ -344,12 +344,31 @@ let cache_if cond ref v = if cond then ref := v; v
 let append_cache_if cond ref v = if cond then ref := v :: !ref; v
 
 let get_type types tid =
-  let arrow = List.nth types tid |> casev_nth_arg 0 in
-  let f i =
-    casev_nth_arg i arrow
-    |> unwrap_listv_to_list
-    |> List.map (fun v -> T v) in
-  f 0, f 1
+  match !Backend_interpreter.Construct.version with
+  | 2 ->
+    let arrow = List.nth types tid |> casev_nth_arg 0 in
+    let f i =
+      casev_nth_arg i arrow
+      |> unwrap_listv_to_list
+      |> List.map (fun v -> T v) in
+    f 0, f 1
+  | 3 ->
+    let flattened = types |> List.concat_map (fun rectype ->
+      rectype
+      |> casev_nth_arg 0
+      |> casev_nth_arg 0
+      |> unwrap_listv_to_list
+    ) in
+    let subtype = List.nth flattened tid in
+    let comptype = casev_nth_arg 2 subtype in
+    (* print_endline (Al.Print.string_of_value comptype); *) (*TODO : What if not FUNC? *)
+    let arrow = comptype |> casev_nth_arg 0 in
+    let f i =
+      casev_nth_arg i arrow
+      |> unwrap_listv_to_list
+      |> List.map (fun v -> T v) in
+    f 0, f 1
+  | _ -> failwith "Unsupported version"
 
 (* get output type of t *)
 let estimate_out t types =
@@ -581,7 +600,7 @@ and gen_typ c typ =
       | Il.Ast.SubE (e, _, _) -> e2v e
       | Il.Ast.VarE id -> List.assoc id.it c.args
       (* HARDCODE *)
-      | Il.Ast.CallE (id, [ vt ]) when List.mem id.it ["size"; "sizenn"] ->
+      | Il.Ast.CallE (id, [ vt ]) when List.mem id.it ["size"; "sizenn"; "vsize"] ->
         ( match casev_get_case (a2v vt) with
         | "I32" -> 32
         | "I64" -> 64
@@ -812,13 +831,13 @@ type instant_result = (assertion list, exn) result
 
 let mk_assertion funcinst =
   let name = strv_access "NAME" funcinst |> unwrap_textv in
-  let addr = strv_access "VALUE" funcinst |> casev_nth_arg 0 in
+  let addr = strv_access "ADDR" funcinst |> casev_nth_arg 0 in
   let arg_types =
-    Ds.Store.access "FUNC"
+    Ds.Store.access "FUNCS"
     |> unwrap_listv_to_list
     |> (fun l -> List.nth l (unwrap_numv_to_int addr))
     |> strv_access "TYPE"
-    |> unwrap_tupv
+    |> casev_get_args
     |> (fun l -> List.nth l 0)
     |> unwrap_listv_to_list
   in
@@ -868,9 +887,9 @@ let get_instant_result m : instant_result =
     let mm = Interpreter.instantiate [ m; externvals ] in
     let exported_funcs =
       mm
-      |> strv_access "EXPORT"
+      |> strv_access "EXPORTS"
       |> unwrap_listv_to_list
-      |> List.filter (fun inst -> inst |> strv_access "VALUE" |> casev_get_case = "FUNC")
+      |> List.filter (fun inst -> inst |> strv_access "ADDR" |> casev_get_case = "FUNC")
     in
     Ok (List.map mk_assertion exported_funcs)
   with e -> Error e
@@ -989,9 +1008,11 @@ let to_wast seed m result =
 
   let spectest = Textual (m_spectest, []) |> to_phrase in
   let def = Textual (m_r, []) |> to_phrase in
+  let spectest_values = to_phrase "spectest_values" in
   let pre_script = [
-    (Module (Some (to_phrase "$spectest_values"), spectest) |> to_phrase);
-    (Register (Utf8.decode "spectest_values", Some (to_phrase "$spectest_values")) |> to_phrase)
+    (Module (Some spectest_values, spectest) |> to_phrase);
+    (Instance (Some spectest_values, Some spectest_values) |> to_phrase);
+    (Register (Utf8.decode "spectest_values", Some spectest_values) |> to_phrase)
   ] in
   let script =
     pre_script
@@ -1108,7 +1129,7 @@ let gen_test el' il' al' =
     to_wast seed module_ result;
 
     (* Conform test *)
-    (* Conform_test.conform_test seed; *)
+    Conform_test.conform_test seed;
 
     times := Sys.time () -. st :: !times;
   );

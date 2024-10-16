@@ -72,8 +72,8 @@ let get_vbinop_shape orig_shape vop =
   | "MUL"           -> make_ishape (choose [16; 32; 64]) // make_fshape (32 // 64)
   | "ADD_SAT"
   | "SUB_SAT"
-  | "AVGR_U"        -> make_ishape (8 // 16)
-  | "Q15MULR_SAT_S" -> make_ishape 16
+  | "AVGR"        -> make_ishape (8 // 16)
+  | "Q15MULR_SAT" -> make_ishape 16
   | ("MIN" | "MAX")
     when has_arg    -> make_ishape (choose [8; 16; 32])
   | _               -> make_fshape (32 // 64)
@@ -284,6 +284,12 @@ let validate_instr case args const (rt1, rt2) =
   | "VCVTOP" ->
     let op = List.nth args 2 in
     (match casev_get_case op with
+    | "EXTEND" -> (* TODO: remove *)
+      let i = choose [16; 32; 64] in
+      let arg1 = make_ishape i in
+      let arg2 = make_ishape (i/2) in
+      let half = choose [nullary "HIGH"; nullary "LOW"] in
+      Some ([arg1; arg2; op; optV (Some half); optV None])
     | "TRUNC_SAT" ->
       let i = choose [32; 64] in
       let arg1 = make_ishape 32 in
