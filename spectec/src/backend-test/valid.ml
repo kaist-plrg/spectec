@@ -205,6 +205,12 @@ let validate_instr case args const (rt1, rt2) =
       let a' = dec_align a (n / 8) in
 
       Some [ vt; vloadop'; compose_memop a' o; ]
+    | [ vt; vloadop; memidx; memop; ] -> (* TODO: Dedup *)
+      let vloadop', n = validate_vloadop vloadop in
+      let (a, o) = decompose_memop memop in
+      let a' = dec_align a (n / 8) in
+
+      Some [ vt; vloadop'; memidx; compose_memop a' o; ]
     | v -> failwith ("Invalid vec load op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VSTORE" -> ( match args with
@@ -213,6 +219,11 @@ let validate_instr case args const (rt1, rt2) =
         let a' = dec_align a (128 / 8) in
 
         Some [ vt; compose_memop a' o; ]
+      | [ vt; memidx; memop; ] ->
+        let (a, o) = decompose_memop memop in
+        let a' = dec_align a (128 / 8) in
+
+        Some [ vt; memidx; compose_memop a' o; ]
       | v -> failwith ("Invalid vec store op: " ^ Print.string_of_value (listV_of_list v))
       )
   | "VLOAD_LANE" | "VSTORE_LANE" ->
@@ -224,6 +235,13 @@ let validate_instr case args const (rt1, rt2) =
       let j = Random.int (128 / i) in
 
       Some [ vt; n; compose_memop a' o; numV_of_int j ]
+    | [ vt; n; memidx; memop; _ ] ->
+      let i = unwrap_numv_to_int n in
+      let (a, o) = decompose_memop memop in
+      let a' = dec_align a (i / 8) in
+      let j = Random.int (128 / i) in
+
+      Some [ vt; n; memidx; compose_memop a' o; numV_of_int j ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VUNOP"   -> let op = List.nth args 1 in Some [ get_vunop_shape op; op ]

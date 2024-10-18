@@ -31,6 +31,8 @@ let flatten_rec =
 
 let spf = Printf.sprintf
 
+let version = Backend_interpreter.Construct.version
+
 (** Helpers to handle type-family-based generation **)
   let has_name name def =
     match def.it with
@@ -126,6 +128,11 @@ let string_of_module m = match m with
 let flatten_args e = match e.it with
 | Il.Ast.TupE es -> es
 | _ -> [ e ]
+
+let nth_typ typs n =
+  match typs.it with
+  | Il.Ast.TupT ts -> List.nth ts n |> snd
+  | _ -> List.nth [typs] n
 
 let replace ixs = List.mapi (fun i x -> match List.assoc_opt i ixs with Some x' -> x' | None -> x)
 
@@ -343,8 +350,16 @@ let append_cache ref v = ref := v :: !ref; v
 let cache_if cond ref v = if cond then ref := v; v
 let append_cache_if cond ref v = if cond then ref := v :: !ref; v
 
+let flatten_types = List.concat_map (fun rectype ->
+  rectype
+  |> casev_nth_arg 0
+  |> casev_nth_arg 0
+  |> unwrap_listv_to_list
+  |> List.map (casev_nth_arg 2)
+)
+
 let get_type types tid =
-  match !Backend_interpreter.Construct.version with
+  match !version with
   | 2 ->
     let arrow = List.nth types tid |> casev_nth_arg 0 in
     let f i =
@@ -353,15 +368,9 @@ let get_type types tid =
       |> List.map (fun v -> T v) in
     f 0, f 1
   | 3 ->
-    let flattened = types |> List.concat_map (fun rectype ->
-      rectype
-      |> casev_nth_arg 0
-      |> casev_nth_arg 0
-      |> unwrap_listv_to_list
-    ) in
-    let subtype = List.nth flattened tid in
-    let comptype = casev_nth_arg 2 subtype in
-    (* print_endline (Al.Print.string_of_value comptype); *) (*TODO : What if not FUNC? *)
+    let comptypes = flatten_types types in
+    let comptype = List.nth comptypes tid in
+    (* Assert: comptype is FUNC *)
     let arrow = comptype |> casev_nth_arg 0 in
     let f i =
       casev_nth_arg i arrow
@@ -384,6 +393,31 @@ let estimate_out t types =
 let is_func_table = function
   | Al.Ast.CaseV ("TABLE", [ TupV [ _; CaseV ("FUNCREF", []) ]]) -> true
   | _ -> false
+
+let enforce_func_type types =
+  assert (!version = 3);
+  let comptypes = flatten_types types in
+  if List.exists (fun t -> casev_get_case t = "FUNC") comptypes then
+    types
+  else
+    (
+      CaseV ("SUB", [
+        unary "FINAL" noneV;
+        empty_list;
+        unary "FUNC" (CaseV ("->", [empty_list; empty_list]))
+      ])
+      |> singleton
+      |> unary "REC"
+      |> unary "TYPE"
+    ) :: types
+
+let choose_func_type_idx types =
+  types
+  |> flatten_types
+  |> List.mapi (fun i x -> i, x)
+  |> List.filter (fun (_, x) -> casev_get_case x = "FUNC")
+  |> choose
+  |> fst
 
 exception OutOfLife
 
@@ -432,6 +466,7 @@ let rec gen c name =
       (* CaseV *)
       (* HARDCODE: Wasm instruction *)
       | VariantT typcases when name = "instr" ->
+        (* Filters for preventing certain wasm instructions to be generated *)
         (* HARDCODE: checks if currently in a context that requires const instrution *)
         let const_required = List.mem c.parent_case !const_ctxs in
         let get_winstr_name mixop = string_of_atom (mixop |> List.hd |> List.hd) in
@@ -439,7 +474,21 @@ let rec gen c name =
         let block_filter (mixop, _, _) =
           (c.depth_limit <= 0) --> not (List.mem (get_winstr_name mixop) [ "BLOCK"; "LOOP"; "IF" ])
         in
-        let typcases' = typcases |> List.filter const_filter |> List.filter block_filter in
+        let admin_filter (mixop, _, _) = not (List.mem (get_winstr_name mixop) [
+          "REF.I31_NUM";
+          "REF.STRUCT_ADDR";
+          "REF.ARRAY_ADDR";
+          "REF.FUNC_ADDR";
+          "REF.EXN_ADDR";
+          "REF.HOST_ADDR";
+          "REF.EXTERN";
+          "LABEL_";
+          "FRAME_";
+          "HANDLER_";
+          "TRAP";
+        ]) in
+        (* End of filters *)
+        let typcases' = typcases |> List.filter const_filter |> List.filter block_filter |> List.filter admin_filter in
         let rec try_instr life =
           if life = 0 then raise OutOfLife;
           let mixop, (_, typs, _), _ = choose typcases' in
@@ -467,8 +516,11 @@ let rec gen c name =
                   | "IF" -> [
                     gen c'' "blocktype";
                     gen_wasm_expr c'' (hds rt1) rt2 rt2;
-                    gen_wasm_expr c'' (hds rt1) rt2 rt2
-                  ]
+                    gen_wasm_expr c'' (hds rt1) rt2 rt2]
+                  | "TRY_TABLE" -> [
+                    gen_typ c'' (nth_typ typs 0);
+                    gen_typ c'' (nth_typ typs 1);
+                    gen_wasm_expr c'' rt1 rt2 rt2]
                   | _ -> gen_typs c'' ~fixed:induced_args typs
                   ) |> replace induced_args
                   in
@@ -480,7 +532,7 @@ let rec gen c name =
                   if List.mem name ["RETURN"; "BR"; "BR_TABLE"; "UNREACHABLE"] then
                     nullify_target ();
                   Al.Ast.CaseV (case, args')
-              ) with DispatchFail "testop_" -> try_args (life' - 1) (* Unhabite testop for TESTOP Fxx _ *)
+              ) with DispatchFail ("testop_" | "vtestop_" | "loadop_" | "half__") -> try_args (life' - 1) (* Unhabite testop for TESTOP Fxx _ *)
             in
             try_args 100
         in
@@ -599,6 +651,9 @@ and gen_typ c typ =
       | Il.Ast.NatE z -> numV z
       | Il.Ast.SubE (e, _, _) -> e2v e
       | Il.Ast.VarE id -> List.assoc id.it c.args
+      | Il.Ast.CaseE (mixop, {it = TupE args; _}) ->
+        let case = match get_atom mixop with Some atom -> string_of_atom atom | _ -> "" in
+        CaseV (case, List.map e2v args)
       (* HARDCODE *)
       | Il.Ast.CallE (id, [ vt ]) when List.mem id.it ["size"; "sizenn"; "vsize"] ->
         ( match casev_get_case (a2v vt) with
@@ -630,11 +685,19 @@ and gen_typ c typ =
     in
     (* Hardcode: Defer generating functions *)
     if name = "func" then (
-      tids_cache := List.init n (fun _ -> Random.int (List.length !types_cache));
+      tids_cache := (
+        match !version with
+        | 2 -> List.init n (fun _ -> Random.int (List.length !types_cache));
+        | 3 -> List.init n (fun _ -> choose_func_type_idx !types_cache);
+        | _ -> failwith "Unsupported version"
+      );
       nullary "DEFERRED_FUNCS"
     )
     else
       let l = List.init n (fun i -> gen_typ { c with i = i } typ') in
+      (* Ensure that there is at least one func type *)
+      let l = if name = "type" && !version = 3 then enforce_func_type l else l in
+      (* Store these module infos into chache *)
       if name = "type" then types_cache := l;
       if name = "local" then locals_cache := l;
       if name = "table" then tables_cache := l;
@@ -673,8 +736,14 @@ and fix_rts case const_required rt1 rt2 entangles =
     | CaseV ("_RESULT", [ OptV None ]) -> i32_opt, [], pair
     | CaseV ("_RESULT", [ OptV (Some t) ]) ->
       i32_opt, [ T t ], pair
-    | CaseV ("_IDX", [ tid ]) ->
+    | CaseV ("_IDX", [ tid ]) when !version = 2 ->
       let rt1', rt2' = get_type !types_cache (unwrap_numv_to_int tid) in
+      rt1' @ i32_opt, rt2', pair
+    | CaseV ("_IDX", [ _ ]) when !version = 3 ->
+      let tid = choose_func_type_idx !types_cache in
+      let bt = casev_replace_nth_arg 0 (numV_of_int tid) bt in
+      let pair = [0, bt] in
+      let rt1', rt2' = get_type !types_cache tid in
       rt1' @ i32_opt, rt2', pair
     | _ -> failwith "Unreachable (Are you using Wasm 1 or Wasm 3?)"
 
@@ -715,7 +784,8 @@ and fix_rts case const_required rt1 rt2 entangles =
     let tid, table = choosei !tables_cache in
     let rt =
       match table with
-      | CaseV ("TABLE", [ TupV [ _; rt ] ] ) -> rt
+      | CaseV ("TABLE", [ TupV [ _; rt ] ] )
+      | CaseV ("TABLE", [ TupV [ _; rt ]; _ ] ) -> rt
       | _ -> failwith "Unreachable: Table"
     in
     let subst = function SubT _ -> T rt | t -> t in
@@ -723,7 +793,8 @@ and fix_rts case const_required rt1 rt2 entangles =
 
   else if case = "TABLE.COPY" then
     let get_rt = function
-      | CaseV ("TABLE", [ TupV [ _; rt ] ] ) -> rt
+      | CaseV ("TABLE", [ TupV [ _; rt ] ] )
+      | CaseV ("TABLE", [ TupV [ _; rt ]; _ ] ) -> rt
       | _ -> failwith "Unreachable: Table"
     in
     let groups = groupi_by get_rt !tables_cache in
@@ -733,6 +804,7 @@ and fix_rts case const_required rt1 rt2 entangles =
   else if case = "TABLE.INIT" then
     let get_rt = function
       | CaseV ("TABLE", [ TupV [ _; rt ] ] )
+      | CaseV ("TABLE", [ TupV [ _; rt ]; _ ] )
       | CaseV ("ELEM", rt :: _) -> rt
       | _ -> failwith "Unreachable: Table / Elem"
     in
@@ -995,7 +1067,9 @@ let to_wast seed m result =
       global "F32" (0x4426a666l |> Z.of_int32_unsigned |> Construct.(al_of_floatN layout32));
       global "F64" (0x4084d4cccccccccdL |> Z.of_int64_unsigned |> Construct.(al_of_floatN layout64));
     ];
-    empty_list; empty_list; empty_list; empty_list; OptV None;
+    empty_list; empty_list;
+    ]@ (if !version = 3 then [empty_list] else []) @[
+    empty_list; empty_list; OptV None;
     listV_of_list [
       export "global_i32" 0l;
       export "global_i64" 1l;

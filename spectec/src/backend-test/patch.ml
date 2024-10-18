@@ -3,12 +3,15 @@ open Ast
 open Al_util
 open Utils
 
+let version = Backend_interpreter.Construct.version
+
 let types   = ref empty_list
 let imports = ref empty_list
 let funcs   = ref empty_list
 let globals = ref empty_list
 let tables  = ref empty_list
 let mems    = ref empty_list
+let tags    = ref empty_list
 let elems   = ref empty_list
 let datas   = ref empty_list
 let starts  = ref empty_list
@@ -43,6 +46,9 @@ let patch_mems mems =
   match unwrap_listv_to_list mems with
   | [] -> empty_list
   | mem :: _ -> singleton (patch_mem mem)
+
+(* tag *)
+let patch_tags tags = tags
 
 (* elem *)
 let patch_mode rt = function
@@ -115,10 +121,11 @@ let patch_module module_ =
   globals := nth_arg 3;
   tables  := nth_arg 4;
   mems    := nth_arg 5;
-  elems   := nth_arg 6;
-  datas   := nth_arg 7;
-  starts  := nth_arg 8;
-  exports := nth_arg 9;
+  tags    := nth_arg 6;
+  elems   := nth_arg (if !version = 3 then 7 else 6);
+  datas   := nth_arg (if !version = 3 then 8 else 7);
+  starts  := nth_arg (if !version = 3 then 9 else 8);
+  exports := nth_arg (if !version = 3 then 10 else 9);
 
 
   let types'  = patch_types !types in
@@ -127,6 +134,7 @@ let patch_module module_ =
   let globals'= patch_globals !globals in
   let tables' = patch_tables !tables in
   let mems'   = patch_mems !mems in
+  let tags'   = patch_tags !tags in
   let elems'  = patch_elems !elems in
   let datas'  = patch_datas !datas in
   let starts' = patch_starts !starts in
@@ -140,6 +148,7 @@ let patch_module module_ =
     globals';
     tables';
     mems';
+    ] @ (if !version = 3 then [tags'] else []) @ [
     elems';
     datas';
     starts';
