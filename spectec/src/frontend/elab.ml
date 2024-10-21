@@ -434,9 +434,6 @@ let rec as_variant_typid' phrase env id args at : typcase list * dots =
     List.concat (filter_nl cases :: List.map fst casess), dots2
   | _ -> error_dir_typ env id.at phrase Infer (VarT (id, args) $ id.at) "| ..."
 
-and as_variant_typid phrase env id args : typcase list * dots =
-  as_variant_typid' phrase env id args id.at
-
 and as_variant_typ phrase env dir t at : typcase list * dots =
   match expand_singular env t with
   | VarT (id, args) -> as_variant_typid' phrase env id args at
@@ -643,7 +640,7 @@ and elab_typ env t : Il.typ =
   | StrT _ | CaseT _ | ConT _ | RangeT _ | AtomT _ | SeqT _ | InfixT _ | BrackT _ ->
     error t.at "this type is only allowed in type definitions"
 
-and elab_typ_definition env tid t : Il.deftyp =
+and elab_typ_definition env tid tid2 t : Il.deftyp =
   assert (valid_tid tid);
   (match t.it with
   | StrT tfs ->
@@ -651,20 +648,33 @@ and elab_typ_definition env tid t : Il.deftyp =
     check_atoms "record" "field" tfs' t.at;
     Il.StructT (map_filter_nl_list (elab_typfield env tid t.at) tfs)
   | CaseT (dots1, ts, cases, _dots2) ->
-    let cases0 =
-      if dots1 = Dots then fst (as_variant_typid "own type" env tid []) else [] in
-    let casess =
+    let own_tcs =
+      if dots1 = Dots then (
+        match find "syntax type" env.typs tid with
+        | _, Defined (_, {it = Il.VariantT tcs; _}) -> tcs
+        | _ -> error t.at "Failed to extend with the type cases"
+      ) else [] in
+    let included_tcss =
       map_filter_nl_list (fun t ->
-        let cases, dots = as_variant_typ "parent type" env Infer t t.at in
-        if dots = Dots then
-          error t.at "cannot include incomplete syntax type";
-        List.map Iter.clone_typcase cases  (* ensure atom annotations are fresh *)
+        let tid = match t.it with | VarT (tid, _) -> tid | _ -> error t.at "expected a VarT" in
+        match find "syntax type" env.typs tid with
+        | _, Defined ({it = CaseT (_, _, _, Dots); _}, _) -> error t.at "cannot include incomplete syntax type"
+        | _, Defined (_, {it = Il.VariantT tcs; _}) -> tcs
+        | _ -> error t.at "Failed to extend with the type cases"
       ) ts
     in
-    let cases' = List.flatten (List.map Iter.clone_typcase cases0 :: casess @ [filter_nl cases]) in
-    let tcs' = List.map (elab_typcase env tid t.at) cases' in
-    check_atoms "variant" "case" cases' t.at;
-    Il.VariantT tcs'
+    let cases' = filter_nl cases in
+    check_atoms "variant" "case" cases' t.at; (* TODO check atoms dedupness for all typecases *)
+    let tcs = List.map (elab_typcase env tid t.at) cases' in
+    let append_subid_hint (mixop, ps, hints) =
+      let subid_hint =
+        match tid2.it with
+        | "" -> []
+        | _ -> [Il.Ast.{hintid = "subid" $ no_region; hintexp = El.Ast.TextE tid2.it $ no_region}]
+      in
+      (mixop, ps, hints @ subid_hint)
+    in
+    Il.VariantT (own_tcs @ (List.flatten (included_tcss @ [tcs]) |> List.map append_subid_hint))
   | ConT tc ->
     let tc' = elab_typcon env tid t.at tc in
     Il.VariantT [tc']
@@ -1911,7 +1921,7 @@ and elab_param env p : Il.param list =
       ) free.typid []
     in
     let t' = elab_typ env t in
-    ps' @ [Il.GramP (id, t') $ p.at] 
+    ps' @ [Il.GramP (id, t') $ p.at]
   | DefP (id, ps, t) ->
     let env' = local_env env in
     let ps' = elab_params env' ps in
@@ -2027,7 +2037,7 @@ let elab_def env d : Il.def list =
     let env' = local_env env in
     let ps1, k1 = find "syntax type" env.typs id1 in
     let as', _s = elab_args `Lhs env' as_ ps1 d.at in
-    let dt' = elab_typ_definition env' id1 t in
+    let dt' = elab_typ_definition env' id1 id2 t in
     let dims = Dim.check_def d in
     let dims' = Dim.Env.map (List.map (elab_iter env')) dims in
     let bs' = infer_binds env env' dims d in
