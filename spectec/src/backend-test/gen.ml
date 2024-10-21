@@ -136,6 +136,12 @@ let nth_typ typs n =
 
 let replace ixs = List.mapi (fun i x -> match List.assoc_opt i ixs with Some x' -> x' | None -> x)
 
+let is_subid_hint id Il.Ast.{hintid; hintexp} =
+  hintid.it = "subid" &&
+  match hintexp.it with
+  | TextE id' -> id' = id
+  | _ -> false
+
 let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
@@ -538,8 +544,7 @@ let rec gen c name =
         in
         try_instr 100
       | VariantT typcases ->
-        let typcases = List.filter (fun (mixop, _, _) -> string_of_mixop mixop <> "BOT") typcases in
-        (* let typcases = List.filter (fun (mixop, _, _) -> string_of_mixop mixop <> "EXTERNREF") typcases in *)
+        let typcases = List.filter (fun (_, _, hints) -> not (List.exists (is_subid_hint "sem") hints)) typcases in
         let typcase = choose typcases in
         gen_typcase c' typcase
     in
