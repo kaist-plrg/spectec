@@ -284,7 +284,8 @@ let estimate_const () =
     match def.it with
     | RelD (id, _, _, rules) when id.it = "Instr_const" ->
       List.iter (fun rule -> match rule.it with
-        | RuleD (id, _, _, _, _) -> push (String.uppercase_ascii id.it) consts
+        | RuleD (id, _, _, _, []) -> push (String.uppercase_ascii id.it) consts
+        | _ -> () (* TODO: conditioned const instrs *)
       ) rules
     | RelD (_, _, _, rules) ->
       List.iter (fun rule ->
@@ -417,13 +418,16 @@ let enforce_func_type types =
       |> unary "TYPE"
     ) :: types
 
-let choose_func_type_idx types =
+let choose_type_idx kind types =
   types
   |> flatten_types
   |> List.mapi (fun i x -> i, x)
-  |> List.filter (fun (_, x) -> casev_get_case x = "FUNC")
+  |> List.filter (fun (_, x) -> casev_get_case x = kind)
   |> choose
   |> fst
+let choose_func_type_idx = choose_type_idx "FUNC"
+let choose_struct_type_idx = choose_type_idx "STRUCT"
+let choose_array_type_idx = choose_type_idx "ARRAY"
 
 exception OutOfLife
 
@@ -686,6 +690,7 @@ and gen_typ c typ =
       match name with
       | "table" | "data" | "elem" | "type" | "func" | "global" | "mem" -> Random.int 3 + 3 (* 3, 4, 5 *)
       | "byte" -> Random.int 3 + 1 (* 1, 2, 3, HACK for wasmtime *)
+      | "typeuse" -> 0 (* HARDCODE: Disable generating subtype for now *)
       | _ -> Random.int 3 (* 0, 1, 2 *)
     in
     (* Hardcode: Defer generating functions *)
