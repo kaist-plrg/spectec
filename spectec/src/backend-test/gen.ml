@@ -1,3 +1,4 @@
+open Langs
 open Utils
 open Valid
 open Prune
@@ -6,13 +7,6 @@ open Util.Source
 open Util
 open Backend_interpreter
 open Al.Al_util
-
-(* Specs *)
-let el: El.Ast.script ref = ref []
-let il: Il.Ast.script ref = ref []
-let al: Al.Ast.script ref = ref []
-
-let orig_il: Il.Ast.script ref = ref []
 
 (* Helpers *)
 let hds xs = xs |> List.rev |> List.tl |> List.rev
@@ -141,6 +135,8 @@ let is_subid_hint id Il.Ast.{hintid; hintexp} =
   match hintexp.it with
   | TextE id' -> id' = id
   | _ -> false
+let has_subid_hint id (_, _, hints) =
+  List.exists (is_subid_hint id) hints
 
 let push v s = s := v :: !s
 let pop s = s := List.tl !s
@@ -157,14 +153,6 @@ let print_rts () =
     let (rt1, rt2, _) = v in
     Printf.sprintf "%s : %s -> %s" k (string_of_rt rt1) (string_of_rt rt2) |> print_endline
   ) !rts
-
-
-let get_typing_rules =
-  List.concat_map (fun def ->
-    match def.it with
-    | Il.Ast.RelD (id, _, _, rules) when id.it = "Instr_ok" || id.it = "Instrf_ok" -> rules
-    | _ -> []
-  )
 
 let get_rt rule =
   let open Il.Ast in
@@ -548,7 +536,7 @@ let rec gen c name =
         in
         try_instr 100
       | VariantT typcases ->
-        let typcases = List.filter (fun (_, _, hints) -> not (List.exists (is_subid_hint "sem") hints)) typcases in
+        let typcases = Lib.List.filter_not (has_subid_hint "sem") typcases in
         let typcase = choose typcases in
         gen_typcase c' typcase
     in
@@ -1172,7 +1160,7 @@ let gen_test el' il' al' =
   orig_il := !il;
 
   (* Initialize *)
-  rts := List.map get_rt (get_typing_rules !il);
+  rts := List.map get_rt (get_typing_rules ());
   estimate_const ();
   let st = Sys.time () in
   let times = ref [] in

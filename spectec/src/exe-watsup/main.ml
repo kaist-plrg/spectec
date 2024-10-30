@@ -309,7 +309,12 @@ let () =
       Backend_interpreter.Runner.run args
     | Test ->
       log "Generating tests...";
-      Backend_test.Gen.gen_test el il al
+      Backend_test.Gen.gen_test el il al;
+      Backend_test.Bottom_up.gen_test_containing_seq [
+        "CONST";
+        "BINOP";
+        "BR_IF"
+      ] |> Al.Print.string_of_value |> print_endline
     );
     log "Complete."
   with
