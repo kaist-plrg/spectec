@@ -10,17 +10,22 @@ let find_index_all f l =
   let fi i x = if f x then Some i else None in
   l |> List.mapi fi |> List.filter_map (fun o -> o)
 
-let groupi_by f xs =
+let groupix_by f xs =
   let ixs = List.mapi (fun i x -> (i, x)) xs in
   List.fold_left (fun groups (i, x) ->
     let tag = f x in
     let rec new_ groups = match groups with
-    | [] -> [ tag, [ i ] ]
-    | (tag', is) :: gs when tag = tag' -> (tag, i :: is) :: gs
+    | [] -> [ tag, [ (i, x) ] ]
+    | (tag', ixs) :: gs when tag = tag' -> (tag, (i, x) :: ixs) :: gs
     | g :: gs -> g :: new_ gs in
     new_ groups
   ) [] ixs
 
+let groupi_by f xs =
+  groupix_by f xs |> List.map (fun (tag, ixs) -> (tag, List.map fst ixs))
+
+let group_by f xs =
+  groupix_by f xs |> List.map (fun (tag, ixs) -> (tag, List.map snd ixs))
 
 (* Interesting values *)
 module IntSet = Set.Make (Z)

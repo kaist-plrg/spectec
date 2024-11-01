@@ -35,8 +35,8 @@ let rec transform_expr f e =
     | CaseE (mixop, e1) -> CaseE (mixop, new_ e1)
     | SubE (e1, _t1, t2) -> SubE (new_ e1, _t1, t2)
   in
-  f { e with it }
-
+  let note = transform_typ f e.note in
+  f { e with it; note }
 
 and transform_arg f a =
   { a with it = match a.it with
@@ -44,3 +44,16 @@ and transform_arg f a =
     | TypA t -> TypA t
     | DefA id -> DefA id
     | GramA id -> GramA id }
+
+and transform_typ f t =
+  { t with it = match t.it with
+    | VarT (id, args) -> VarT (id, List.map (transform_arg f) args)
+    | t' -> t' }
+
+let rec transform_prem f p =
+  { p with it = match p.it with
+    | RulePr (id, mixop, e) -> RulePr (id, mixop, transform_expr f e)
+    | IfPr e -> IfPr (transform_expr f e)
+    | LetPr (e1, e2, xs) -> LetPr (transform_expr f e1, transform_expr f e2, xs)
+    | ElsePr -> ElsePr
+    | IterPr (p, iterexp) -> IterPr (transform_prem f p, iterexp) } (* TODO: iterexp *)
