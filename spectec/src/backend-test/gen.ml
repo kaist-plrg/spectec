@@ -25,7 +25,7 @@ let flatten_rec =
 
 let spf = Printf.sprintf
 
-let version = Backend_interpreter.Construct.version
+let version = Flag.version
 
 (** Helpers to handle type-family-based generation **)
   let has_name name def =

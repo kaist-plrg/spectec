@@ -5,7 +5,7 @@ open Langs
 (* open Valid *)
 
 (* open Al.Ast *)
-(* open Al.Al_util *)
+open Al.Al_util
 
 open Il2al.Il_walk
 
@@ -33,6 +33,12 @@ let rec dedup eq = function
 | hd :: tl -> hd :: dedup eq (Lib.List.filter_not (eq hd) tl)
 
 let to_phrase ty x = x $$ no_region % ty
+
+let il_case name tname args =
+  Il.Ast.CaseE (
+    [El.Atom.Atom name $$ no_region % (El.Atom.info name)] :: (List.map (fun _ -> []) args),
+    Il.Ast.TupE args $$ no_region % (Il.Ast.TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
+  ) $$ no_region % (Il.Ast.VarT (tname $ no_region, []) $ no_region)
 
 (** Helpers to handle type-family-based generation **)
   let has_name name def =
@@ -407,9 +413,33 @@ let fix_immediate (cases: string list) rts: Il.Ast.exp list =
   ) ([], rt) cases rts |> fst |> List.rev
 
 let gen_values rt: Il.Ast.exp list =
+  let open Il.Ast in
   List.map (fun t ->
-    CaseE ("TODO: " ^ (Il.Print.string_of_t) t, TupE ())
-  )
+    match t.it with
+    (* HARDCODE: Default value for each type *)
+    | CaseE ([[{it = El.Atom.Atom nt; _}]], {it = TupE []; _}) ->
+      let zero = Il.Ast.NatE Z.zero $$ no_region % (Il.Ast.NumT NatT $ no_region) in
+      let const, v =
+        match nt with
+        | "I32" | "I64" -> "CONST", zero
+        | "F32" | "F64" -> "CONST", il_case "POS" "fN" [il_case "SUBNORM" "fNmag" [zero]]
+        | "V128" -> "VCONST", Il.Ast.NatE Z.zero $$ no_region % no_note
+        | _ -> failwith ("Unexpected type: " ^ nt)
+      in
+      il_case const "instr" [t; v]
+    | CaseE ([[{it = El.Atom.Atom "REF"; _}];[];[]], {it = TupE [
+        {it = CaseE ([[{it = El.Atom.Atom "NULL"; _}];[{it = El.Atom.Quest; _}]], {it = TupE [{it = OptE nul; _}]; _}); _};
+        ht
+      ]; _}) ->
+      assert (!Flag.version = 3);
+      (match nul with
+      | Some _ -> il_case "REF.NULL" "instr" [ht]
+      | None ->
+        (match ht with
+        | _ -> il_case "TODO: REF NONNULL " "instr" [ht]))
+    | _ ->
+      il_case ("TODO: " ^ (Il.Print.string_of_exp t)) "" []
+  ) rt
 
 let wrap_as_func (instrs: Il.Ast.exp list) =
   ignore instrs;
@@ -454,6 +484,10 @@ let gen_test_containing_seq (cases: string list): Al.Ast.value =
 
   (* 3. Prepend values *)
   let values = gen_values (List.hd rts) in
+  print_endline "===========";
+  values |> List.iter (fun v ->
+    print_endline (Il.Print.string_of_exp v);
+  );
 
   (* 4. Wrap as a function *)
   let func = wrap_as_func (values @ instrs) in
