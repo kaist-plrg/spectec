@@ -5,7 +5,7 @@ open Langs
 (* open Valid *)
 
 (* open Al.Ast *)
-open Al.Al_util
+(* open Al.Al_util *)
 
 open Il2al.Il_walk
 
@@ -39,6 +39,18 @@ let il_case name tname args =
     [El.Atom.Atom name $$ no_region % (El.Atom.info name)] :: (List.map (fun _ -> []) args),
     Il.Ast.TupE args $$ no_region % (Il.Ast.TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
   ) $$ no_region % (Il.Ast.VarT (tname $ no_region, []) $ no_region)
+
+let rec replace_caseE_arg is it e =
+  let open Il.Ast in
+  match is, e.it with
+  | [], _ ->
+    { e with it }
+  | i :: is, CaseE (mixop, ({ it = TupE es; _ } as tup)) ->
+    let es' = List.mapi (fun i' e' -> if i = i' then replace_caseE_arg is it e' else e') es in
+    { e with it = CaseE (mixop, { tup with it = TupE es' })}
+  | 0 :: is, CaseE (mixop, e') ->
+    { e with it = CaseE (mixop, replace_caseE_arg is it e') }
+  | _ -> failwith "Expected a CaseE"
 
 (** Helpers to handle type-family-based generation **)
   let has_name name def =
@@ -196,21 +208,27 @@ let as_sidecond pr =
   | Il.Ast.IfPr e -> [IfPrC e]
   | _ -> []
 
-let rec unify_vts' map es1 es2 =
+let rec unify_vt map e1 e2 =
+  let open Il.Ast in
   let rec resolve e =
     match e.it with
-    | Il.Ast.VarE x -> (match List.assoc_opt x.it map with Some e -> resolve e | None -> e)
+    | VarE x -> (match List.assoc_opt x.it map with Some e -> resolve e | None -> e)
     | _ -> e
   in
+  let e1 = resolve e1 in
+  let e2 = resolve e2 in
+  if Il.Eq.eq_exp e1 e2 then map else
+  match e1.it, e2.it with (*TODO: Generalize to more cases *)
+  | _, VarE x -> ((x.it, e1) :: map)
+  | VarE x, _ -> ((x.it, e2) :: map)
+  | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 -> unify_vt map args1 args2
+  | TupE es1, TupE es2 when List.length es1 = List.length es2 -> List.fold_left2 (fun map e1 e2 -> unify_vt map e1 e2) map es1 es2
+  | _, _ -> failwith ("Unification fail of " ^ (Il.Print.string_of_exp e1) ^ ", " ^ (Il.Print.string_of_exp e2))
+
+let rec unify_vts' map es1 es2 =
   match es1, es2 with
   | [], _ | _, [] -> map
-  | e1::es1, e2::es2 ->
-    match resolve e1, resolve e2 with (*TODO: Generalize this so that it can handle, i.e., function calls *)
-    | e1, e2 when Il.Eq.eq_exp e1 e2 -> unify_vts' map es1 es2
-    | e, {it = Il.Ast.VarE x; _}
-    | {it = Il.Ast.VarE x; _}, e ->
-      unify_vts' ((x.it, e) :: map) es1 es2
-    | e1, e2 -> failwith ("Unification fail of " ^ (Il.Print.string_of_exp e1) ^ ", " ^ (Il.Print.string_of_exp e2))
+  | e1::es1, e2::es2 -> unify_vts' (unify_vt map e1 e2) es1 es2
 let unify_vts es1 es2 = unify_vts' [] es1 es2
 let print_unify_result =
   List.iter (fun (x, e) ->
@@ -327,11 +345,48 @@ let concretize_instr trule instr =
     trule', instr'
   ) (trule, instr)
 
+let fix_values vt: string list * restype list =
+  let open Il.Ast in
+  match vt.it with
+  (* HARDCODE: Default instr for each type *)
+  | CaseE ([[{it = El.Atom.Atom nt; _}]], {it = TupE []; _}) ->
+    (match nt with
+    | "I32" | "I64" | "F32" | "F64" -> ["CONST"], [[vt]]
+    | "V128" -> ["VCONST"], [[vt]]
+    | _ -> failwith "Unknown type"
+    )
+  | CaseE ([[{it = El.Atom.Atom "REF"; _}];[];[]], {it = TupE [
+      {it = CaseE ([[{it = El.Atom.Atom "NULL"; _}];[{it = El.Atom.Quest; _}]], {it = TupE [{it = OptE nul; _}]; _}); _};
+      ht
+    ]; _}) ->
+    assert (!Flag.version = 3);
+    (match nul with
+    | Some _ -> ["REF.NULL"], [[vt]]
+    | None ->
+      (match ht with
+      | _ ->
+        let vt' = vt |> replace_caseE_arg [0; 0] (OptE (Some (TupE [] $$ no_region % (TupT [] $ no_region)))) in
+        ["REF.NULL"; "REF.AS_NON_NULL"], [[vt']; [vt]]
+      )
+    )
+  | _ ->
+    ["LOCAl.GET"], [[vt]]
+let accumulate_rtss rtss =
+  List.fold_left (fun stack rts ->
+    let last_rt = List.hd (List.rev stack) in
+    stack @ List.map (fun rt -> rt @ last_rt) rts
+  ) [[]] rtss
+let values_cnt = ref 0
+
 let fix_immediate (cases: string list) rts: Il.Ast.exp list =
   let rt = List.hd rts in
   let rts = List.tl rts in
 
   List.fold_left2 (fun (acc, rt1) case rt2 ->
+    print_endline "=====";
+    print_endline case;
+    print_endline "======";
+
     let i = List.length acc in
 
     let (rt1', rt2') = List.assoc case !arrow_map in
@@ -342,7 +397,7 @@ let fix_immediate (cases: string list) rts: Il.Ast.exp list =
     *)
     let get_cached_length e =
       List.find_map (function
-      | TypeLenC (i', e', l) when i = i' && Il.Eq.eq_exp e e' -> Some l
+      | TypeLenC (i', e', l) when i = (i' + !values_cnt) && Il.Eq.eq_exp e e' -> Some l
       | _ -> None) !sideconds
     in
     let rec mk_vts rt =
@@ -412,35 +467,6 @@ let fix_immediate (cases: string list) rts: Il.Ast.exp list =
     instr :: acc, rt2
   ) ([], rt) cases rts |> fst |> List.rev
 
-let gen_values rt: Il.Ast.exp list =
-  let open Il.Ast in
-  List.map (fun t ->
-    match t.it with
-    (* HARDCODE: Default value for each type *)
-    | CaseE ([[{it = El.Atom.Atom nt; _}]], {it = TupE []; _}) ->
-      let zero = Il.Ast.NatE Z.zero $$ no_region % (Il.Ast.NumT NatT $ no_region) in
-      let const, v =
-        match nt with
-        | "I32" | "I64" -> "CONST", zero
-        | "F32" | "F64" -> "CONST", il_case "POS" "fN" [il_case "SUBNORM" "fNmag" [zero]]
-        | "V128" -> "VCONST", Il.Ast.NatE Z.zero $$ no_region % no_note
-        | _ -> failwith ("Unexpected type: " ^ nt)
-      in
-      il_case const "instr" [t; v]
-    | CaseE ([[{it = El.Atom.Atom "REF"; _}];[];[]], {it = TupE [
-        {it = CaseE ([[{it = El.Atom.Atom "NULL"; _}];[{it = El.Atom.Quest; _}]], {it = TupE [{it = OptE nul; _}]; _}); _};
-        ht
-      ]; _}) ->
-      assert (!Flag.version = 3);
-      (match nul with
-      | Some _ -> il_case "REF.NULL" "instr" [ht]
-      | None ->
-        (match ht with
-        | _ -> il_case "TODO: REF NONNULL " "instr" [ht]))
-    | _ ->
-      il_case ("TODO: " ^ (Il.Print.string_of_exp t)) "" []
-  ) rt
-
 let wrap_as_func (instrs: Il.Ast.exp list) =
   ignore instrs;
 
@@ -468,8 +494,19 @@ let gen_test_containing_seq (cases: string list): Al.Ast.value =
     print_endline "";
   );
 
+  (* 2. Prepend values *)
+  let (casess, rtss) = List.map fix_values (List.hd rts |> List.rev) |> List.split in
+  let cases' = List.flatten casess in
+  let cases = cases' @ cases in
+  let rts = (accumulate_rtss rtss) @ List.tl rts in
+  values_cnt := List.length cases';
 
-  (* 2. Fix immediates *)
+  print_endline "===========";
+  cases |> List.iter print_endline;
+  let print_rt rt = List.iter (fun vt -> print_endline (Il.Print.string_of_exp vt)) rt; print_endline "" in
+  rts |> List.iter print_rt;
+
+  (* 3. Fix immediates *)
   let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
   print_endline "===========";
   instrs |> List.iter (fun i ->
@@ -481,16 +518,8 @@ let gen_test_containing_seq (cases: string list): Al.Ast.value =
     | IfPrC e -> print_endline ("-- " ^ Il.Print.string_of_exp e)
   );
 
-
-  (* 3. Prepend values *)
-  let values = gen_values (List.hd rts) in
-  print_endline "===========";
-  values |> List.iter (fun v ->
-    print_endline (Il.Print.string_of_exp v);
-  );
-
   (* 4. Wrap as a function *)
-  let func = wrap_as_func (values @ instrs) in
+  let func = wrap_as_func instrs in
 
   (* 5. Wrap as a module *)
   wrap_as_module func
