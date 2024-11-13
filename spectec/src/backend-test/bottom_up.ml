@@ -95,7 +95,7 @@ let rec replace_caseE_arg is it e =
     (* print_endline (Printf.sprintf "has_type %s %s ?" (Il.Print.string_of_exp a) (Il.Print.string_of_typ t)); *)
     match a.it, t.it with
     | Il.Ast.NatE _, Il.Ast.(NumT NatT) -> true
-    | _, Il.Ast.VarT (name, []) -> has_deftyp a (dispatch_deftyp name.it [])
+    | _, Il.Ast.VarT (name, []) -> has_deftyp a (dispatch_deftyp name.it [] |> snd)
     | _ -> Il.Eq.eq_typ a.note t
   and has_argtype a p =
     (* print_endline (Printf.sprintf "has_argtype %s %s ?" (Il.Print.string_of_exp a) (Il.Print.string_of_arg p)); *)
@@ -103,9 +103,9 @@ let rec replace_caseE_arg is it e =
 
   and match_params args inst =
     match inst.it with
-    | Il.Ast.InstD (_binds, params, deftyp) when (
+    | Il.Ast.InstD (binds, params, deftyp) when (
         List.for_all2 has_argtype args params
-      ) -> Some deftyp
+      ) -> Some (binds, deftyp)
     | _ -> None
   and dispatch_deftyp name args =
     match List.find_map (has_name name) !il with
@@ -122,18 +122,32 @@ type context = {
 }
 
 let rec gen c x =
-  match x with
-  | "iN" -> Il.Ast.NatE (Utils.gen_bytes 4) |> to_phrase c.typ (* TODO *)
-  | _ ->
-    let a2e a = match a.it with | Il.Ast.ExpA e -> e | _ -> failwith "Unsupported arg" in
-    let deftyp = dispatch_deftyp x (List.map a2e c.args) in
-    match deftyp.it with
-    | AliasT typ -> gen_typ c typ
-    | StructT _ -> failwith "StructT not supported"
-    | VariantT typcases ->
-      let typcases = Lib.List.filter_not (Gen.has_subid_hint "sem") typcases in
-      let typcase = Utils.choose typcases in
-      gen_typcase c typcase
+  let a2e a =
+    match a.it with
+    | Il.Ast.ExpA e -> Il.Eval.reduce_exp !Langs.il_env e
+    | _ -> failwith "Unsupported arg"
+  in
+  let args = List.map a2e c.args in
+  let binds, deftyp = dispatch_deftyp x args in
+  let replace_params = (fun e ->
+    List.fold_left2 (fun e b a ->
+      match b.it with
+      | Il.Ast.ExpB (x, _) -> replace_id_with x.it a e
+      | _ -> e
+    ) e binds args
+  ) in
+  match deftyp.it with
+  | AliasT typ -> gen_typ c (transform_typ replace_params typ);
+  | StructT _ -> failwith "StructT not supported"
+  | VariantT typcases ->
+    let typcases = Lib.List.filter_not (Gen.has_subid_hint "sem") typcases in
+    let typcase = Utils.choose typcases in
+    let typcase' =
+      let (m, (bs, t, ps), hs) = typcase in
+      let t' = transform_typ replace_params t in
+      m, (bs, t', ps), hs
+    in
+    gen_typcase c typcase'
 and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
   let args = Il.Ast.TupE (gen_typs c typs) |> to_phrase c.typ in
   Il.Ast.CaseE (mixop, args) |> to_phrase c.typ
@@ -200,12 +214,14 @@ let rule_to_prems rule =
 
 type sidecond =
   | TypeLenC of int * Il.Ast.exp * int
+  | RulePrC of Il.Ast.(id * mixop * exp)
   | IfPrC of Il.Ast.exp
 let sideconds: sidecond list ref = ref []
 
 let as_sidecond pr =
   match pr.it with
   | Il.Ast.IfPr e -> [IfPrC e]
+  | Il.Ast.RulePr (id, mixop, e) -> [RulePrC (id, mixop, e)]
   | _ -> []
 
 let rec unify_vt map e1 e2 =
@@ -383,10 +399,6 @@ let fix_immediate (cases: string list) rts: Il.Ast.exp list =
   let rts = List.tl rts in
 
   List.fold_left2 (fun (acc, rt1) case rt2 ->
-    print_endline "=====";
-    print_endline case;
-    print_endline "======";
-
     let i = List.length acc in
 
     let (rt1', rt2') = List.assoc case !arrow_map in
@@ -434,7 +446,7 @@ let fix_immediate (cases: string list) rts: Il.Ast.exp list =
           let es = List.init l (fun i ->
             List.fold_left (fun e (x, _) ->
               transform_expr (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
-            ) e xes) in
+            ) e' xes) in
           let it = Il.Ast.ListE es in
           { e with it })
       | _ -> e
@@ -516,6 +528,7 @@ let gen_test_containing_seq (cases: string list): Al.Ast.value =
   !sideconds |> List.iter (function
     | TypeLenC _ -> ()
     | IfPrC e -> print_endline ("-- " ^ Il.Print.string_of_exp e)
+    | RulePrC (id, mixop, exp) -> print_endline (Il.Print.(id.it ^ ": " ^ string_of_mixop mixop ^ string_of_exp exp))
   );
 
   (* 4. Wrap as a function *)

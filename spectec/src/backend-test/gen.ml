@@ -1159,6 +1159,8 @@ let gen_test el' il' al' =
 
   orig_il := !il;
 
+  il_env := Il.Env.env_of_script il';
+
   (* Initialize *)
   rts := List.map get_rt (get_typing_rules ());
   estimate_const ();
