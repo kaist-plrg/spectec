@@ -314,7 +314,7 @@ let () =
         "CONST";
         "BINOP";
         "BR_IF"
-      ] |> Al.Print.string_of_value |> print_endline
+      ] |> Il.Print.string_of_exp |> print_endline
     );
     log "Complete."
   with
