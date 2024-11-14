@@ -501,16 +501,16 @@ let wrap_as_func (instrs: exp list) rt =
       in
       let is_set e =
         match e.it with
-        | CaseE ([[{it = Atom "SET"; _}]; []], _) -> true
+        | CaseE ([[{it = Atom "SET"; _}]], _) -> true
         | _ -> false
       in
       Some (to_int index, (is_set init, t))
     | _ -> None
   in
   let local_conds = List.filter_map extract_local_sidecond !sideconds in
-  let lub_total = List.fold_left (fun m (i, (_, _)) -> max m i) 0 local_conds in
-  (* TODO: This may not generate the case where, i-th local is intially unset, then set by LOCAL.SET, then read by LOCAl.GET *)
-  let lub_param = List.fold_left (fun m (i, (require_set, _)) -> if require_set then m else max m i) 0 local_conds in
+  let lub_total = 1 + List.fold_left (fun m (i, (_, _)) -> max m i) 0 local_conds in
+  (* TODO: This may not generate the case where, i-th local is intially unset, then set by LOCAL.SET, then read by LOCAL.GET *)
+  let lub_param = 1 + List.fold_left (fun m (i, (require_set, _)) -> if require_set then max m i else m) 0 local_conds in
   let param_num = lub_param + Random.int 3 in
   let local_num = max (lub_total - param_num) 0 + Random.int 3 in
   
@@ -523,13 +523,9 @@ let wrap_as_func (instrs: exp list) rt =
   let typeidx =
     TupE [
       ListE (List.init param_num (fun i ->
-        let i = i in
-        let t =
-          match List.assoc_opt i local_conds with
-          | None -> gen_typ (mk_VarT "valtype")
-          | Some (_, t) -> t
-        in
-        il_case "LOCAL" "local" [t]
+        match List.assoc_opt i local_conds with
+        | None -> gen_typ (mk_VarT "valtype")
+        | Some (_, t) -> t
       )) |> to_phrase (mk_VarT "resulttype");
       ListE rt |> to_phrase (mk_VarT "resulttype")
     ] |> to_phrase (mk_VarT "TODO") in
@@ -555,9 +551,13 @@ let wrap_as_module (func: exp) =
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
 let gen_test_containing_seq (cases: string list): exp =
   (* 0. Init *)
+  print_endline "Seed: ";
+  print_int !Flag.seed;
+  print_endline "";
   Random.init !Flag.seed;
   trules := get_typing_rules ();
   arrow_map := !trules |> List.map rule_to_arrow;
+  sideconds := [];
 
   (* 1. Fix rt *)
   let rts = fix_rts cases in (* May throw, if this combination is impossible *)
