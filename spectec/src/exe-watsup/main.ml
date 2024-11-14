@@ -311,9 +311,13 @@ let () =
       log "Generating tests...";
       Backend_test.Gen.gen_test el il al;
       Backend_test.Bottom_up.gen_test_containing_seq [
+        (*
         "CONST";
         "BINOP";
         "BR_IF"
+        *)
+        "LOCAL.GET";
+        "LOCAL.TEE"
       ] |> Il.Print.string_of_exp |> print_endline
     );
     log "Complete."

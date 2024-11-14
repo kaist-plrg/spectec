@@ -35,11 +35,12 @@ let rec dedup eq = function
 
 let to_phrase ty x = x $$ no_region % ty
 
+let mk_VarT x = VarT (x $ no_region, []) $ no_region
 let il_case name tname args =
   CaseE (
     [El.Atom.Atom name $$ no_region % (El.Atom.info name)] :: (List.map (fun _ -> []) args),
     TupE args $$ no_region % (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
-  ) $$ no_region % (VarT (tname $ no_region, []) $ no_region)
+  ) $$ no_region % (mk_VarT tname)
 
 let rec replace_caseE_arg is it e =
   match is, e.it with
@@ -478,19 +479,77 @@ let fix_immediate (cases: string list) rts: exp list =
     instr :: acc, rt2
   ) ([], rt) cases rts |> fst |> List.rev
 
-let wrap_as_func (instrs: exp list) =
+let wrap_as_func (instrs: exp list) rt =
+  (* 1. If sidecondition contains something about local, generate locals *)
+  let extract_local_sidecond sidecond =
+    match sidecond with
+    | IfPrC {it = CmpE (
+        EqOp,
+        {it = IdxE ({it = DotE (_C, {it = Atom "LOCALS"; _}); _}, index); _},
+        {it = CaseE ([[]; []; []], {it = TupE [init; t]; _}); _} (* Wasm 3 *)
+      ); _}
+    | IfPrC {it = CmpE (
+        EqOp,
+        {it = CaseE ([[]; []; []], {it = TupE [init; t]; _}); _}, (* Wasm 3 *)
+        {it = IdxE ({it = DotE (_C, {it = Atom "LOCALS"; _}); _}, index); _}
+      ); _}
+    ->
+      let to_int e =
+        match (Il.Eval.reduce_exp !il_env e).it with
+        | NatE z -> Z.to_int z
+        | _ -> failwith (Il.Print.string_of_exp e ^ " is not an integer")
+      in
+      let is_set e =
+        match e.it with
+        | CaseE ([[{it = Atom "SET"; _}]; []], _) -> true
+        | _ -> false
+      in
+      Some (to_int index, (is_set init, t))
+    | _ -> None
+  in
+  let local_conds = List.filter_map extract_local_sidecond !sideconds in
+  let lub_total = List.fold_left (fun m (i, (_, _)) -> max m i) 0 local_conds in
+  (* TODO: This may not generate the case where, i-th local is intially unset, then set by LOCAL.SET, then read by LOCAl.GET *)
+  let lub_param = List.fold_left (fun m (i, (require_set, _)) -> if require_set then m else max m i) 0 local_conds in
+  let param_num = lub_param + Random.int 3 in
+  let local_num = max (lub_total - param_num) 0 + Random.int 3 in
+  
+  (* 2. If sidecondition contains something about label, generate labels *)
+  let _extract_label_sidecond _sidecond = None in
+  
   ignore instrs;
 
-  let typeidx = TupE [] |> to_phrase (TupT [] $ no_region) in
-  let locals = TupE [] |> to_phrase (TupT [] $ no_region) in
-  let expr = TupE [] |> to_phrase (TupT [] $ no_region) in
+  (* let typeidx = NatE (Z.zero) |> to_phrase (mk_VarT "typeidx") in (* TODO *) *)
+  let typeidx =
+    TupE [
+      ListE (List.init param_num (fun i ->
+        let i = i in
+        let t =
+          match List.assoc_opt i local_conds with
+          | None -> gen_typ (mk_VarT "valtype")
+          | Some (_, t) -> t
+        in
+        il_case "LOCAL" "local" [t]
+      )) |> to_phrase (mk_VarT "resulttype");
+      ListE rt |> to_phrase (mk_VarT "resulttype")
+    ] |> to_phrase (mk_VarT "TODO") in
+  let locals = ListE (List.init local_num (fun i ->
+    let i = i + param_num in
+    let t =
+      match List.assoc_opt i local_conds with
+      | None -> gen_typ (mk_VarT "valtype")
+      | Some (_, t) -> t
+    in
+    il_case "LOCAL" "local" [t]
+  )) |> to_phrase (IterT (mk_VarT "local", List) $ no_region) in
+  let expr = ListE instrs |> to_phrase (mk_VarT "expr") in
 
   il_case "FUNC" "func" [typeidx; locals; expr]
 
 let wrap_as_module (func: exp) =
   ignore func;
 
-  il_case "MODULE" "module" []
+  il_case "MODULE" "module" [func]
 
 
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
@@ -535,7 +594,7 @@ let gen_test_containing_seq (cases: string list): exp =
   );
 
   (* 4. Wrap as a function *)
-  let func = wrap_as_func instrs in
+  let func = wrap_as_func instrs (List.hd @@ List.rev rts) in
 
   (* 5. Wrap as a module *)
   wrap_as_module func
