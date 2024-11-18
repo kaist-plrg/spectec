@@ -42,6 +42,26 @@ let il_case name tname args =
     TupE args $$ no_region % (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
   ) $$ no_region % (mk_VarT tname)
 
+let mixop_of_case e =
+  match e.it with
+  | CaseE (mixop, _) -> mixop
+  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
+
+let case_of_case e =
+  match mixop_of_case e with
+  | [atom] :: tl when List.for_all ((=) []) tl -> atom.it
+  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE with single atom")
+
+let args_of_case e =
+  match e.it with
+  | CaseE (_, {it = TupE args; _}) -> args
+  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
+
+let nth_arg_of_case n e =
+  match e.it with
+  | CaseE (_, {it = TupE args; _}) -> List.nth args n
+  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
+
 let rec replace_caseE_arg is it e =
   match is, e.it with
   | [], _ ->
@@ -52,6 +72,11 @@ let rec replace_caseE_arg is it e =
   | 0 :: is, CaseE (mixop, e') ->
     { e with it = CaseE (mixop, replace_caseE_arg is it e') }
   | _ -> failwith "Expected a CaseE"
+
+let exp_to_int e =
+  match (Il.Eval.reduce_exp !il_env e).it with
+  | NatE z -> Z.to_int z
+  | _ -> failwith (Il.Print.string_of_exp e ^ " is not an integer")
 
 (** Helpers to handle type-family-based generation **)
   let has_name name def =
@@ -215,6 +240,7 @@ type sidecond =
   | TypeLenC of int * exp * int
   | RulePrC of (id * mixop * exp)
   | IfPrC of exp
+  | TypeCondC of int * (restype * restype)
 let sideconds: sidecond list ref = ref []
 
 let as_sidecond pr =
@@ -479,56 +505,135 @@ let fix_immediate (cases: string list) rts: exp list =
     instr :: acc, rt2
   ) ([], rt) cases rts |> fst |> List.rev
 
-let wrap_as_func (instrs: exp list) rt =
-  (* 1. If sidecondition contains something about local, generate locals *)
-  let extract_local_sidecond sidecond =
+(* Helper for extracting sidecond *)
+let extract_context_sidecond field f_elem sidecond =
+  match sidecond with
+  | IfPrC {it = CmpE (
+      EqOp,
+      {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _},
+      elem
+    ); _}
+  | IfPrC {it = CmpE (
+      EqOp,
+      elem,
+      {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _}
+    ); _}
+  ->
+    if field' <> field then
+      None
+    else
+      (match f_elem elem with
+      | None -> None
+      | Some x -> Some (exp_to_int index, x))
+  | _ -> None
+
+let rec gen_default_instrs rt1 rt2 =
+  match rt1, rt2 with
+  | hd1 :: tl1, hd2 :: tl2 when Il.Eq.eq_exp hd1 hd2 -> gen_default_instrs tl1 tl2
+  | _ ->
+    List.map (fun _ -> il_case "DROP" "instr" []) rt1
+    @ List.map (fun vt -> il_case "CONST" "isntr" [vt]) rt2
+
+let register_typ rt1 rt2 =
+  let extract_type_sidecond sidecond =
     match sidecond with
-    | IfPrC {it = CmpE (
-        EqOp,
-        {it = IdxE ({it = DotE (_C, {it = Atom "LOCALS"; _}); _}, index); _},
-        {it = CaseE ([[]; []; []], {it = TupE [init; t]; _}); _} (* Wasm 3 *)
-      ); _}
-    | IfPrC {it = CmpE (
-        EqOp,
-        {it = CaseE ([[]; []; []], {it = TupE [init; t]; _}); _}, (* Wasm 3 *)
-        {it = IdxE ({it = DotE (_C, {it = Atom "LOCALS"; _}); _}, index); _}
-      ); _}
-    ->
-      let to_int e =
-        match (Il.Eval.reduce_exp !il_env e).it with
-        | NatE z -> Z.to_int z
-        | _ -> failwith (Il.Print.string_of_exp e ^ " is not an integer")
+    | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
+        { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
+        func
+      ]; _}) ->
+      (try
+        assert (case_of_case func = Atom "FUNC");
+        let arrow = nth_arg_of_case 0 func in
+        let unwrap_listE e = match e.it with | ListE es -> es | _ -> failwith "Not a list" in
+        let rt1 = nth_arg_of_case 0 arrow |> nth_arg_of_case 0 |> unwrap_listE in
+        let rt2 = nth_arg_of_case 1 arrow |> nth_arg_of_case 0 |> unwrap_listE in
+        Some (exp_to_int idx, (rt1, rt2))
+      with | _ -> None)
+    | TypeCondC (idx, (rt1, rt2)) -> Some (idx, (rt1, rt2))
+    | _ -> None
+  in
+
+  let type_conds = List.filter_map extract_type_sidecond !sideconds in
+
+  let existing_types =
+    let eq_exps l1 l2 = List.length l1 = List.length l2 && List.for_all2 Il.Eq.eq_exp l1 l2 in
+    List.filter (fun (_, (rt1', rt2')) ->
+      eq_exps rt1 rt1' && eq_exps rt2 rt2'
+    ) type_conds
+  in
+  let tid =
+    match existing_types with
+    | [] ->
+      let sorted = List.sort compare (List.map fst type_conds) in
+      let rec aux expected = function
+        | [] -> expected
+        | x :: xs ->
+            if x = expected then aux (expected + 1) xs
+            else if x > expected then expected
+            else aux expected xs
       in
+      let idx = aux 0 sorted in
+      sideconds := TypeCondC (idx, (rt1, rt2)) :: !sideconds;
+      idx
+    | _ -> Utils.choose existing_types |> fst
+  in
+  NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
+
+let wrap_as_func (instrs: exp list) (rt: restype) =
+  (* 1. If sidecondition contains something about local, generate locals *)
+  let extract_local_sidecond = extract_context_sidecond "LOCAL" (fun e ->
+    match e.it with
+    | CaseE ([[]; []; []], {it = TupE [init; t]; _}) -> (* Wasm 3 *)
       let is_set e =
         match e.it with
         | CaseE ([[{it = Atom "SET"; _}]], _) -> true
         | _ -> false
       in
-      Some (to_int index, (is_set init, t))
-    | _ -> None
+      Some (is_set init, t)
+    | _ -> None)
   in
   let local_conds = List.filter_map extract_local_sidecond !sideconds in
-  let lub_total = 1 + List.fold_left (fun m (i, (_, _)) -> max m i) 0 local_conds in
-  (* TODO: This may not generate the case where, i-th local is intially unset, then set by LOCAL.SET, then read by LOCAL.GET *)
-  let lub_param = 1 + List.fold_left (fun m (i, (require_set, _)) -> if require_set then max m i else m) 0 local_conds in
+  let lub_total = 1 + List.fold_left max (-1) (List.split local_conds |> fst) in
+  (* TODO: This may not generate the case where, i-th local is initially unset, then set by LOCAL.SET, then read by LOCAL.GET *)
+  let lub_param = 1 + List.fold_left (fun m (i, (require_set, _)) -> if require_set then max m i else m) (-1) local_conds in
   let param_num = lub_param + Random.int 3 in
   let local_num = max (lub_total - param_num) 0 + Random.int 3 in
-  
-  (* 2. If sidecondition contains something about label, generate labels *)
-  let _extract_label_sidecond _sidecond = None in
-  
-  ignore instrs;
 
-  (* let typeidx = NatE (Z.zero) |> to_phrase (mk_VarT "typeidx") in (* TODO *) *)
-  let typeidx =
-    TupE [
-      ListE (List.init param_num (fun i ->
-        match List.assoc_opt i local_conds with
-        | None -> gen_typ (mk_VarT "valtype")
-        | Some (_, t) -> t
-      )) |> to_phrase (mk_VarT "resulttype");
-      ListE rt |> to_phrase (mk_VarT "resulttype")
-    ] |> to_phrase (mk_VarT "TODO") in
+  (* 2. If sidecondition contains something about label, generate labels *)
+  let extract_label_sidecond = extract_context_sidecond "LABELS" (fun e ->
+    match e.it with
+    | CaseE ([[]; []], {it = TupE [{it = ListE rt; _}]; _}) -> Some rt
+    | _ -> None)
+  in
+  let label_conds = List.filter_map extract_label_sidecond !sideconds in
+  let block_cnt = 1 + List.fold_left max (-1) (List.split label_conds |> fst) in
+
+  let rec wrap_as_block i acc (rt:restype) =
+    if i = block_cnt then acc, rt else
+    match List.assoc_opt i label_conds with
+    | None ->
+      let blocktype = [register_typ [] rt] |> il_case "_IDX" "blocktype" in
+      wrap_as_block (i+1)
+      [il_case "BLOCK" "instr" [blocktype; ListE acc |> to_phrase (IterT (mk_VarT "instr", List) $ no_region)]]
+      rt
+    | Some rt'->
+      let blocktype = [register_typ [] rt'] |> il_case "_IDX" "blocktype" in
+      let suffix = gen_default_instrs rt rt' in
+      wrap_as_block (i+1)
+      [il_case "BLOCK" "instr" [blocktype; ListE (acc @ suffix) |> to_phrase (IterT (mk_VarT "instr", List) $ no_region)]]
+      rt'
+  in
+
+  let instrs, rt = wrap_as_block 0 instrs rt in
+
+  let typeidx = register_typ
+    (List.init param_num (fun i ->
+      match List.assoc_opt i local_conds with
+      | None -> gen_typ (mk_VarT "valtype")
+      | Some (_, t) -> t
+    ))
+    rt
+  in
   let locals = ListE (List.init local_num (fun i ->
     let i = i + param_num in
     let t =
@@ -562,7 +667,7 @@ let gen_test_containing_seq (cases: string list): exp =
   (* 1. Fix rt *)
   let rts = fix_rts cases in (* May throw, if this combination is impossible *)
   (* Print *)
-  print_endline "===========";
+  print_endline "1===========";
   rts |> List.iter (fun rt ->
     rt |> List.iter (fun vt -> Il.Print.string_of_exp vt |> print_endline);
     print_endline "";
@@ -575,14 +680,14 @@ let gen_test_containing_seq (cases: string list): exp =
   let rts = (accumulate_rtss rtss) @ List.tl rts in
   values_cnt := List.length cases';
 
-  print_endline "===========";
+  print_endline "2===========";
   cases |> List.iter print_endline;
   let print_rt rt = List.iter (fun vt -> print_endline (Il.Print.string_of_exp vt)) rt; print_endline "" in
   rts |> List.iter print_rt;
 
   (* 3. Fix immediates *)
   let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
-  print_endline "===========";
+  print_endline "3===========";
   instrs |> List.iter (fun i ->
     print_endline (Il.Print.string_of_exp i);
   );
@@ -590,11 +695,28 @@ let gen_test_containing_seq (cases: string list): exp =
   !sideconds |> List.iter (function
     | TypeLenC _ -> ()
     | IfPrC e -> print_endline ("-- " ^ Il.Print.string_of_exp e)
-    | RulePrC (id, mixop, exp) -> print_endline (Il.Print.(id.it ^ ": " ^ string_of_mixop mixop ^ string_of_exp exp))
+    | RulePrC (id, mixop, exp) -> print_endline ("-- " ^ Il.Print.(id.it ^ ": " ^ string_of_mixop mixop ^ string_of_exp exp))
+    | TypeCondC (idx, (rt1, rt2)) -> print_endline (
+      Printf.sprintf "-- C.TYPES[%d] ~~ %s -> %s"
+      idx
+      (List.map Il.Print.string_of_exp rt1 |> String.concat " ")
+      (List.map Il.Print.string_of_exp rt2 |> String.concat " ")
+    )
   );
 
   (* 4. Wrap as a function *)
-  let func = wrap_as_func instrs (List.hd @@ List.rev rts) in
+  let func = wrap_as_func instrs (List.rev (List.hd (List.rev rts))) in (* TODO: It's too confusing to decide when to rev or not *)
+  print_endline "4===========";
+  print_endline (Il.Print.string_of_exp func);
+  !sideconds |> List.iter (function
+    | TypeCondC (idx, (rt1, rt2)) -> print_endline (
+      Printf.sprintf "-- C.TYPES[%d] ~~ %s -> %s"
+      idx
+      (List.map Il.Print.string_of_exp rt1 |> String.concat " ")
+      (List.map Il.Print.string_of_exp rt2 |> String.concat " ")
+    )
+    | _ -> ()
+  );
 
   (* 5. Wrap as a module *)
   wrap_as_module func

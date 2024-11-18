@@ -317,8 +317,14 @@ let () =
         "BINOP";
         "BR_IF"
         *)
+        (*
         "LOCAL.GET";
         "LOCAL.TEE"
+        *)
+        (*
+        "CONST";
+        "CALL_INDIRECT";*)
+        "BR"
       ] |> Il.Print.string_of_exp |> print_endline;
       Backend_test.Flag.seed := !Backend_test.Flag.seed + 1
       ) |> ignore
