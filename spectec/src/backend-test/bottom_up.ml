@@ -39,12 +39,14 @@ let to_phrase ty x = x $$ no_region % ty
 let mk_VarT x = VarT (x $ no_region, []) $ no_region
 let il_case name tname args =
   CaseE (
-    [El.Atom.Atom name $$ no_region % (El.Atom.info name)] :: (List.map (fun _ -> []) args),
+    (if name = "" then [] else [El.Atom.Atom name $$ no_region % (El.Atom.info name)]) :: (List.map (fun _ -> []) args),
     TupE args $$ no_region % (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
   ) $$ no_region % (mk_VarT tname)
 let il_list es t =
   ListE es $$ no_region % (IterT (t, List) $ no_region)
-let some_opt = OptE (Some (TupE [] $$ no_region % (TupT [] $ no_region)))
+let il_tup es =
+  TupE es $$ no_region % (TupT (List.map (fun e -> e, e.note) es) $ no_region)
+let some_opt = OptE (Some (il_tup []))
 
 let mixop_of_case e =
   match e.it with
@@ -393,7 +395,7 @@ let concretize_instr trule instr =
 (* 2. fix_values: generate necessary values in front of main instrs *)
 let fix_values vt: string list * restype list =
   match vt.it with
-  (* HARDCODE: Default instr for each type *)
+  (* HARDCODE: Default instr name for each type *)
   | CaseE ([[{it = El.Atom.Atom nt; _}]], {it = TupE []; _}) ->
     (match nt with
     | "I32" | "I64" | "F32" | "F64" -> ["CONST"], [[vt]]
@@ -534,12 +536,17 @@ let extract_context_sidecond field f_elem sidecond =
       | Some x -> Some (exp_to_int index, x))
   | _ -> None
 
+(* TODO: This code heavily overlaps with fix_value. Do something. *)
+let gen_default_instr' vt =
+  let names, rts = fix_values vt in
+  fix_immediate names ([] :: rts)
+
 let rec gen_default_instrs rt1 rt2 =
   match rt1, rt2 with
   | hd1 :: tl1, hd2 :: tl2 when Il.Eq.eq_exp hd1 hd2 -> gen_default_instrs tl1 tl2
   | _ ->
     List.map (fun _ -> il_case "DROP" "instr" []) rt1
-    @ List.map (fun vt -> il_case "CONST" "isntr" [vt]) rt2
+    @ List.concat_map gen_default_instr' rt2
 
 let extract_type_sidecond sidecond =
   match sidecond with
@@ -663,7 +670,7 @@ let wrap_as_module (func: exp) =
   let type_cnt = 1 + List.fold_left max (-1) (List.split type_conds |> fst) in
 
   let arrow_to_type rt1 rt2 =
-    let func = CaseE ([[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []], TupE [il_list rt1 (mk_VarT "valtype"); il_list rt2 (mk_VarT "valtype")] $$ no_region % mk_VarT "functype") $$ no_region % mk_VarT "functype" in
+    let func = CaseE ([[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []], il_tup [il_list rt1 (mk_VarT "valtype"); il_list rt2 (mk_VarT "valtype")]) $$ no_region % mk_VarT "functype" in
     match !Flag.version with
     | 3 ->
         il_case "REC" "rectype" [
@@ -685,9 +692,48 @@ let wrap_as_module (func: exp) =
     il_case "TYPE" "type" [arrow_to_type rt1 rt2]
   ) in
 
+  (* 2. Generate globals *)
+  let extract_global_sidecond = extract_context_sidecond "GLOBALS" (fun e ->
+    match e.it with
+    | CaseE ([[]; []; []], {it = TupE [mut; t]; _}) ->
+      let is_mut e =
+        match e.it with
+        | CaseE ([[{it = Atom "MUT"; _}]; [{it = El.Atom.Quest; _}]], {it = TupE [{it = OptE (Some _); _}]; _}) -> true
+        | CaseE ([[{it = Atom "MUT"; _}]; [{it = El.Atom.Quest; _}]], {it = TupE [{it = OptE None; _}]; _}) -> false
+        | _ -> Random.bool ()
+      in
+      Some (is_mut mut, t)
+    | _ -> None)
+  in
+  let global_conds = List.filter_map extract_global_sidecond !sideconds in
+  let global_cnt = 1 + List.fold_left max (-1) (List.split global_conds |> fst) in
+  let construct_gt mut t =
+    il_case "" "globaltype" [
+      CaseE (
+        [[El.Atom.Atom "MUT" $$ no_region % El.Atom.info "MUT"]; [El.Atom.Quest $$ no_region % El.Atom.info "?"]],
+        il_tup [
+          OptE (if mut then Some (il_tup []) else None)
+          |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
+        ]
+      ) |> to_phrase (mk_VarT "mut");
+      t
+    ]
+  in
+
+  let globals = List.init global_cnt (fun i ->
+    let mut, t =
+      match List.assoc_opt i global_conds with
+      | None -> false, il_case "I32" "valtype" []
+      | Some x -> x
+    in
+    il_case "GLOBAL" "global" [construct_gt mut t; ListE (gen_default_instr' t) |> to_phrase (mk_VarT "expr")]
+    (* TODO: GLOBAL must be const *)
+  ) in
+
   il_case "MODULE" "module" [
     il_list types (mk_VarT "type");
-    il_list [func] func.note
+    il_list globals (mk_VarT "global");
+    il_list [func] (mk_VarT "func");
   ]
 
 
