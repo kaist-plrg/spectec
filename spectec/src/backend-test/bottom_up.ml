@@ -35,12 +35,16 @@ let rec dedup eq = function
 
 let to_phrase ty x = x $$ no_region % ty
 
+(* Smart Constructors *)
 let mk_VarT x = VarT (x $ no_region, []) $ no_region
 let il_case name tname args =
   CaseE (
     [El.Atom.Atom name $$ no_region % (El.Atom.info name)] :: (List.map (fun _ -> []) args),
     TupE args $$ no_region % (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
   ) $$ no_region % (mk_VarT tname)
+let il_list es t =
+  ListE es $$ no_region % (IterT (t, List) $ no_region)
+let some_opt = OptE (Some (TupE [] $$ no_region % (TupT [] $ no_region)))
 
 let mixop_of_case e =
   match e.it with
@@ -297,6 +301,7 @@ let fix_free_var ess =
     List.map (List.map (transform_expr (replace_id_with x e))) ess
   ) ess free_vars
 
+(* 1. fix_rts: pre-determine concrete types of each cases *)
 let fix_rts (cases: string list): restype list =
   List.fold_left (fun rts case ->
     let i = List.length rts - 1 in
@@ -385,6 +390,7 @@ let concretize_instr trule instr =
     trule', instr'
   ) (trule, instr)
 
+(* 2. fix_values: generate necessary values in front of main instrs *)
 let fix_values vt: string list * restype list =
   match vt.it with
   (* HARDCODE: Default instr for each type *)
@@ -407,7 +413,7 @@ let fix_values vt: string list * restype list =
       | CaseE ([[{it = El.Atom.Atom "I31"; _}]], {it = TupE []; _}) ->
         ["CONST"; "REF.I31"], [[il_case "I32" "valtype" []]; [vt]]
       | _ ->
-        let vt' = vt |> replace_caseE_arg [0; 0] (OptE (Some (TupE [] $$ no_region % (TupT [] $ no_region)))) in
+        let vt' = vt |> replace_caseE_arg [0; 0] some_opt in
         ["REF.NULL"; "REF.AS_NON_NULL"], [[vt']; [vt]]
       )
     )
@@ -420,6 +426,7 @@ let accumulate_rtss rtss =
   ) [[]] rtss
 let values_cnt = ref 0
 
+(* 3. fix_immediate: determine and concretize the immediates of each instr *)
 let fix_immediate (cases: string list) rts: exp list =
   let rt = List.hd rts in
   let rts = List.tl rts in
@@ -534,25 +541,24 @@ let rec gen_default_instrs rt1 rt2 =
     List.map (fun _ -> il_case "DROP" "instr" []) rt1
     @ List.map (fun vt -> il_case "CONST" "isntr" [vt]) rt2
 
-let register_typ rt1 rt2 =
-  let extract_type_sidecond sidecond =
-    match sidecond with
-    | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
-        { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
-        func
-      ]; _}) ->
-      (try
-        assert (case_of_case func = Atom "FUNC");
-        let arrow = nth_arg_of_case 0 func in
-        let unwrap_listE e = match e.it with | ListE es -> es | _ -> failwith "Not a list" in
-        let rt1 = nth_arg_of_case 0 arrow |> nth_arg_of_case 0 |> unwrap_listE in
-        let rt2 = nth_arg_of_case 1 arrow |> nth_arg_of_case 0 |> unwrap_listE in
-        Some (exp_to_int idx, (rt1, rt2))
-      with | _ -> None)
-    | TypeCondC (idx, (rt1, rt2)) -> Some (idx, (rt1, rt2))
-    | _ -> None
-  in
+let extract_type_sidecond sidecond =
+  match sidecond with
+  | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
+      { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
+      func
+    ]; _}) ->
+    (try
+      assert (case_of_case func = Atom "FUNC");
+      let arrow = nth_arg_of_case 0 func in
+      let unwrap_listE e = match e.it with | ListE es -> es | _ -> failwith "Not a list" in
+      let rt1 = nth_arg_of_case 0 arrow |> nth_arg_of_case 0 |> unwrap_listE in
+      let rt2 = nth_arg_of_case 1 arrow |> nth_arg_of_case 0 |> unwrap_listE in
+      Some (exp_to_int idx, (rt1, rt2))
+    with | _ -> None)
+  | TypeCondC (idx, (rt1, rt2)) -> Some (idx, (rt1, rt2))
+  | _ -> None
 
+let register_typ rt1 rt2 =
   let type_conds = List.filter_map extract_type_sidecond !sideconds in
 
   let existing_types =
@@ -579,6 +585,7 @@ let register_typ rt1 rt2 =
   in
   NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
 
+(* 4. wrap_as_func: Wrap the generated instruction sequence with func, including params and blocks *)
 let wrap_as_func (instrs: exp list) (rt: restype) =
   (* 1. If sidecondition contains something about local, generate locals *)
   let extract_local_sidecond = extract_context_sidecond "LOCAL" (fun e ->
@@ -647,10 +654,41 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
 
   il_case "FUNC" "func" [typeidx; locals; expr]
 
+(* 5. wrap_as_func: Wrap the generated function sequence with module, including types, globals, etc. *)
 let wrap_as_module (func: exp) =
   ignore func;
 
-  il_case "MODULE" "module" [func]
+  (* 1. Generate types *)
+  let type_conds = List.filter_map extract_type_sidecond !sideconds in
+  let type_cnt = 1 + List.fold_left max (-1) (List.split type_conds |> fst) in
+
+  let arrow_to_type rt1 rt2 =
+    let func = CaseE ([[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []], TupE [il_list rt1 (mk_VarT "valtype"); il_list rt2 (mk_VarT "valtype")] $$ no_region % mk_VarT "functype") $$ no_region % mk_VarT "functype" in
+    match !Flag.version with
+    | 3 ->
+        il_case "REC" "rectype" [
+          il_list [il_case "SUB" "subtype" [
+            il_case "FINAL" "fin" [some_opt $$ no_region % (IterT (mk_VarT "fin", Opt) $ no_region)];
+            il_list [] (mk_VarT "typeuse");
+            il_case "FUNC" "comptype" [func];
+          ]] (mk_VarT "subtype")
+        ]
+    | _ -> func
+  in
+
+  let types = List.init type_cnt (fun i ->
+    let rt1, rt2 =
+      match List.assoc_opt i type_conds with
+      | None -> [], []
+      | Some rts -> rts
+    in
+    il_case "TYPE" "type" [arrow_to_type rt1 rt2]
+  ) in
+
+  il_case "MODULE" "module" [
+    il_list types (mk_VarT "type");
+    il_list [func] func.note
+  ]
 
 
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
