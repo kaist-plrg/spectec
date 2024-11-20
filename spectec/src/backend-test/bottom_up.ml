@@ -46,7 +46,11 @@ let il_list es t =
   ListE es $$ no_region % (IterT (t, List) $ no_region)
 let il_tup es =
   TupE es $$ no_region % (TupT (List.map (fun e -> e, e.note) es) $ no_region)
-let some_opt = OptE (Some (il_tup []))
+let some_opt = OptE (Some (il_tup [])) |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
+let none_opt = OptE None |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
+let il_some x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.Atom.Quest |> to_phrase (El.Atom.info "?")]], il_tup [some_opt]) |> to_phrase (mk_VarT t)
+let il_none x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.Atom.Quest |> to_phrase (El.Atom.info "?")]], il_tup [none_opt]) |> to_phrase (mk_VarT t)
+let il_zero = NatE Z.zero |> to_phrase (mk_VarT "u32")
 
 let mixop_of_case e =
   match e.it with
@@ -68,15 +72,15 @@ let nth_arg_of_case n e =
   | CaseE (_, {it = TupE args; _}) -> List.nth args n
   | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
 
-let rec replace_caseE_arg is it e =
+let rec replace_caseE_arg is re e =
   match is, e.it with
   | [], _ ->
-    { e with it }
+    re
   | i :: is, CaseE (mixop, ({ it = TupE es; _ } as tup)) ->
-    let es' = List.mapi (fun i' e' -> if i = i' then replace_caseE_arg is it e' else e') es in
+    let es' = List.mapi (fun i' e' -> if i = i' then replace_caseE_arg is re e' else e') es in
     { e with it = CaseE (mixop, { tup with it = TupE es' })}
   | 0 :: is, CaseE (mixop, e') ->
-    { e with it = CaseE (mixop, replace_caseE_arg is it e') }
+    { e with it = CaseE (mixop, replace_caseE_arg is re e') }
   | _ -> failwith "Expected a CaseE"
 
 let exp_to_int e =
@@ -428,6 +432,41 @@ let accumulate_rtss rtss =
   ) [[]] rtss
 let values_cnt = ref 0
 
+let rec simplify_equality prems =
+  (* If there is equality prems within these prems, where one side is a variable, simplify the whole prems *)
+  (* Assumption: No cyclic binding *)
+  let is_eq_prem prem =
+    match prem.it with
+    | IfPr ({it = CmpE (EqOp, {it = VarE x; _}, e); _})
+    | IfPr ({it = CmpE (EqOp, e, {it = VarE x; _}); _}) ->
+      Either.Left ((x, e), prem)
+    | RulePr (id, _, {it = TupE [_C; {it = VarE x; _}; e]; _}) when String.ends_with ~suffix:"_sub" id.it ->
+      (* TODO: subtype is currently considered eq *)
+      Either.Left((x, e), prem)
+    | _ -> Either.Right prem
+  in
+  match List.partition_map is_eq_prem prems with
+  | ((x, e), _) :: tl, prems ->
+    let prems' = List.split tl |> snd in
+    List.map (transform_prem @@ replace_id_with x.it e) (prems' @ prems) |> simplify_equality
+  | _ -> prems
+
+let concretize_prems prems =
+  let free_vars = ref [] in
+  List.map (transform_prem (fun e ->
+    match e.it with
+    | VarE _ -> free_vars := e :: !free_vars; e
+    | _ -> e
+  )) prems |> ignore;
+  dedup Il.Eq.eq_exp !free_vars
+  |> List.fold_left (fun prems e ->
+    match e.it with
+    | VarE {it = "C"; _} -> prems
+    | _ ->
+      let e' = gen_typ e.note in
+      prems |> List.map (transform_prem (replace e e'))
+  ) prems
+
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
 let fix_immediate (cases: string list) rts: exp list =
   let rt = List.hd rts in
@@ -509,7 +548,12 @@ let fix_immediate (cases: string list) rts: exp list =
     (* print_endline (Il.Print.string_of_rule trule); *)
     (* print_endline (Il.Print.string_of_exp instr); *)
 
-    sideconds := (rule_to_prems trule |> List.concat_map as_sidecond) @ !sideconds;
+    sideconds := (
+      rule_to_prems trule
+      |> simplify_equality
+      |> concretize_prems
+      |> List.concat_map as_sidecond
+    ) @ !sideconds;
 
     instr :: acc, rt2
   ) ([], rt) cases rts |> fst |> List.rev
@@ -675,7 +719,7 @@ let wrap_as_module (func: exp) =
     | 3 ->
         il_case "REC" "rectype" [
           il_list [il_case "SUB" "subtype" [
-            il_case "FINAL" "fin" [some_opt $$ no_region % (IterT (mk_VarT "fin", Opt) $ no_region)];
+            il_some "FINAL" "fin";
             il_list [] (mk_VarT "typeuse");
             il_case "FUNC" "comptype" [func];
           ]] (mk_VarT "subtype")
@@ -709,17 +753,10 @@ let wrap_as_module (func: exp) =
   let global_cnt = 1 + List.fold_left max (-1) (List.split global_conds |> fst) in
   let construct_gt mut t =
     il_case "" "globaltype" [
-      CaseE (
-        [[El.Atom.Atom "MUT" $$ no_region % El.Atom.info "MUT"]; [El.Atom.Quest $$ no_region % El.Atom.info "?"]],
-        il_tup [
-          OptE (if mut then Some (il_tup []) else None)
-          |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
-        ]
-      ) |> to_phrase (mk_VarT "mut");
+      (if mut then il_some else il_none) "MUT" "mut";
       t
     ]
   in
-
   let globals = List.init global_cnt (fun i ->
     let mut, t =
       match List.assoc_opt i global_conds with
@@ -730,10 +767,41 @@ let wrap_as_module (func: exp) =
     (* TODO: GLOBAL must be const *)
   ) in
 
+  (* 3. Generate tables *)
+  let extract_table_sidecond = extract_context_sidecond "TABLES" (fun e ->
+    match e.it with
+    | CaseE ([[]; []; []], {it = TupE [lim; rt]; _}) ->
+      Some (lim, rt)
+    | _ -> None)
+  in
+  let table_conds = List.filter_map extract_table_sidecond !sideconds in
+  let table_cnt = 1 + List.fold_left max (-1) (List.split table_conds |> fst) in
+  let tables = List.init table_cnt (fun i ->
+    let lim, rt =
+      match List.assoc_opt i table_conds with
+      | None ->
+        (* lim *)
+        CaseE (El.Atom.[[LBrack |> to_phrase (info "[")];[Dot2 |> to_phrase (info "..")];[RBrack |> to_phrase (info "]")]], il_tup [il_zero; il_zero]) |> to_phrase (mk_VarT "limits"),
+        (* rt *)
+        il_case "REF" "reftype" [il_some "NULL" "nul"; il_case "FUNC" "reftype" []]
+      | Some x -> x
+    in
+    print_endline (Il.Print.string_of_exp rt);
+    il_case "TABLE" "table" [il_case "" "tabletype" [lim; rt]; ListE (gen_default_instr' rt) |> to_phrase (mk_VarT "expr")]
+  ) in
+
+  (* TODO: These are very repetitive. Let's make a template! *)
+
   il_case "MODULE" "module" [
     il_list types (mk_VarT "type");
-    il_list globals (mk_VarT "global");
+    il_list [] (mk_VarT "import");
     il_list [func] (mk_VarT "func");
+    il_list globals (mk_VarT "global");
+    il_list tables (mk_VarT "table");
+    il_list [] (mk_VarT "mem");
+    il_list [] (mk_VarT "tag");
+    il_list [] (mk_VarT "elem");
+    il_list [] (mk_VarT "data");
   ]
 
 

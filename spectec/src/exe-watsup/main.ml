@@ -321,14 +321,15 @@ let () =
         "LOCAL.GET";
         "LOCAL.TEE"
         *)
-        (*
         "CONST";
-        "CALL_INDIRECT";*)
+        "CALL_INDIRECT";
         (*
         "BR"
         *)
+        (*
         "GLOBAL.GET";
         "GLOBAL.SET";
+        *)
       ] |> Il.Print.string_of_exp |> print_endline;
       Backend_test.Flag.seed := !Backend_test.Flag.seed + 1
       ) |> ignore
