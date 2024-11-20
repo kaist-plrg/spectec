@@ -1,3 +1,5 @@
+open Utils
+
 open Util
 open Source
 
@@ -181,7 +183,7 @@ let rec gen c x =
   | AliasT typ -> gen_typ c (transform_typ replace_params typ);
   | StructT _ -> failwith "StructT not supported"
   | VariantT typcases ->
-    let typcases = Lib.List.filter_not (Gen.has_subid_hint "sem") typcases in
+    let typcases = Lib.List.filter_not (has_subid_hint "sem") typcases in
     let typcase = Utils.choose typcases in
     let typcase' =
       let (m, (bs, t, ps), hs) = typcase in
@@ -921,12 +923,8 @@ let wrap_as_module (func: exp) =
 
 
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
-let gen_test_containing_seq (cases: string list): exp =
+let gen_module (cases: string list): Al.Ast.value =
   (* 0. Init *)
-  print_endline "Seed: ";
-  print_int !Flag.seed;
-  print_endline "";
-  Random.init !Flag.seed;
   trules := get_typing_rules ();
   arrow_map := !trules |> List.map rule_to_arrow;
   sideconds := [];

@@ -310,33 +310,6 @@ let () =
     | Test ->
       log "Generating tests...";
       Backend_test.Gen.gen_test el il al;
-      List.init !Backend_test.Flag.n (fun _ ->
-      Backend_test.Bottom_up.gen_test_containing_seq [
-        (*
-        "CONST";
-        "BINOP";
-        "BR_IF"
-        *)
-        (*
-        "LOCAL.GET";
-        "LOCAL.TEE"
-        *)
-        (*
-        "CONST";
-        "CALL_INDIRECT";
-        *)
-        (*
-        "BR"
-        *)
-        (*
-        "GLOBAL.GET";
-        "GLOBAL.SET";
-        *)
-        (* "MEMORY.COPY" *)
-        "MEMORY.INIT"
-      ] |> Il.Print.string_of_exp |> print_endline;
-      Backend_test.Flag.seed := !Backend_test.Flag.seed + 1
-      ) |> ignore
     );
     log "Complete."
   with

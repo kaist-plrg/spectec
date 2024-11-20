@@ -69,6 +69,15 @@ let append_byte bs b = Z.(logor (shift_left bs 8) b)
 let gen_byte _ = Random.int 256 |> Z.of_int
 let gen_bytes n = List.init n gen_byte |> List.fold_left append_byte Z.zero
 
+(* IL Specific utils *)
+let is_subid_hint id Il.Ast.{hintid; hintexp} =
+  hintid.it = "subid" &&
+  match hintexp.it with
+  | TextE id' -> id' = id
+  | _ -> false
+let has_subid_hint id (_, _, hints) =
+  List.exists (is_subid_hint id) hints
+
 (* TODO: move this to al/walk.ml *)
 open Al.Ast
 
