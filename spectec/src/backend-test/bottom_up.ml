@@ -158,10 +158,15 @@ type context = {
 }
 
 let rec gen c x =
+  (* HARDCODE: list *)
+  if x = "list" then
+    let t = (List.hd c.args) |> (fun a -> match a.it with | TypA t -> t | _ -> failwith "syntax list(syntax X)") in
+    gen_typ c (IterT (t, List) $ no_region)
+  else
   let a2e a =
     match a.it with
     | ExpA e -> Il.Eval.reduce_exp !Langs.il_env e
-    | _ -> failwith "Unsupported arg"
+    | _ -> failwith @@ "Unsupported arg for " ^ x
   in
   let args = List.map a2e c.args in
   let binds, deftyp = dispatch_deftyp x args in
@@ -195,6 +200,9 @@ and gen_typ c typ =
   match typ.it with
   | NumT NatT -> NatE (Random.int 3 |> Z.of_int) |> to_phrase typ (* 0, 1, 2 *)
   | VarT (id, args) -> gen {typ; args} id.it
+  | IterT (typ', List) ->
+    let len = Random.int 3 in (* 0, 1, 2 *)
+    ListE (List.init len (fun _ -> gen_typ c typ')) |> to_phrase typ
   | IterT (typ', Opt) ->
     if Random.bool() then OptE None |> to_phrase typ
     else OptE (Some (gen_typ c typ')) |> to_phrase typ
@@ -550,7 +558,7 @@ let fix_immediate (cases: string list) rts: exp list =
 
     sideconds := (
       rule_to_prems trule
-      |> simplify_equality
+      (* |> simplify_equality *) (* TODO: This should be moved to someting like unify *)
       |> concretize_prems
       |> List.concat_map as_sidecond
     ) @ !sideconds;
@@ -579,6 +587,37 @@ let extract_context_sidecond field f_elem sidecond =
       | None -> None
       | Some x -> Some (exp_to_int index, x))
   | _ -> None
+
+let extract_context_len_sidecond field sidecond =
+  match sidecond with
+  | IfPrC {it = CmpE (
+      LtOp _,
+      len,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
+    ); _}
+  | IfPrC {it = CmpE (
+      GtOp _,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
+      len
+    ); _}
+  when field = field'
+  ->
+    Some (exp_to_int len + 1)
+  | IfPrC {it = CmpE (
+      LeOp _,
+      len,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
+    ); _}
+  | IfPrC {it = CmpE (
+      GeOp _,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
+      len
+    ); _}
+  when field = field'
+  ->
+    Some (exp_to_int len)
+  | _ -> None
+
 
 (* TODO: This code heavily overlaps with fix_value. Do something. *)
 let gen_default_instr' vt =
@@ -705,14 +744,25 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
 
   il_case "FUNC" "func" [typeidx; locals; expr]
 
+let gen_stuffs fname extract default name tname f_args =
+  let conds = List.filter_map extract !sideconds in
+  let lens = List.filter_map (extract_context_len_sidecond fname) !sideconds in
+  let cnt = 1 + List.fold_left max (-1) (List.split conds |> fst) in
+  let cnt = List.fold_left max cnt lens in
+  List.init cnt (fun i ->
+    let v =
+      match List.assoc_opt i conds with
+      | None -> default ()
+      | Some x -> x
+    in
+    il_case name tname (f_args v)
+  )
+
 (* 5. wrap_as_func: Wrap the generated function sequence with module, including types, globals, etc. *)
 let wrap_as_module (func: exp) =
   ignore func;
 
   (* 1. Generate types *)
-  let type_conds = List.filter_map extract_type_sidecond !sideconds in
-  let type_cnt = 1 + List.fold_left max (-1) (List.split type_conds |> fst) in
-
   let arrow_to_type rt1 rt2 =
     let func = CaseE ([[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []], il_tup [il_list rt1 (mk_VarT "valtype"); il_list rt2 (mk_VarT "valtype")]) $$ no_region % mk_VarT "functype" in
     match !Flag.version with
@@ -727,14 +777,14 @@ let wrap_as_module (func: exp) =
     | _ -> func
   in
 
-  let types = List.init type_cnt (fun i ->
-    let rt1, rt2 =
-      match List.assoc_opt i type_conds with
-      | None -> [], []
-      | Some rts -> rts
-    in
-    il_case "TYPE" "type" [arrow_to_type rt1 rt2]
-  ) in
+  let types = gen_stuffs
+    "TYPES"
+    extract_type_sidecond
+    (fun _ -> [], [])
+    "TYPE"
+    "type"
+    (fun (rt1, rt2) -> [arrow_to_type rt1 rt2])
+  in
 
   (* 2. Generate globals *)
   let extract_global_sidecond = extract_context_sidecond "GLOBALS" (fun e ->
@@ -749,23 +799,25 @@ let wrap_as_module (func: exp) =
       Some (is_mut mut, t)
     | _ -> None)
   in
-  let global_conds = List.filter_map extract_global_sidecond !sideconds in
-  let global_cnt = 1 + List.fold_left max (-1) (List.split global_conds |> fst) in
+
   let construct_gt mut t =
     il_case "" "globaltype" [
       (if mut then il_some else il_none) "MUT" "mut";
       t
     ]
   in
-  let globals = List.init global_cnt (fun i ->
-    let mut, t =
-      match List.assoc_opt i global_conds with
-      | None -> false, il_case "I32" "valtype" []
-      | Some x -> x
-    in
-    il_case "GLOBAL" "global" [construct_gt mut t; ListE (gen_default_instr' t) |> to_phrase (mk_VarT "expr")]
-    (* TODO: GLOBAL must be const *)
-  ) in
+
+  let globals = gen_stuffs
+    "GLOBALS"
+    extract_global_sidecond
+    (fun _ -> false, il_case "I32" "valtype" []) (* default *)
+    "GLOBAL"
+    "global"
+    (fun (mut, t) ->
+      (* TODO: GLOBAL must be const *)
+      [construct_gt mut t; ListE (gen_default_instr' t) |> to_phrase (mk_VarT "expr")]
+    )
+  in
 
   (* 3. Generate tables *)
   let extract_table_sidecond = extract_context_sidecond "TABLES" (fun e ->
@@ -774,34 +826,97 @@ let wrap_as_module (func: exp) =
       Some (lim, rt)
     | _ -> None)
   in
-  let table_conds = List.filter_map extract_table_sidecond !sideconds in
-  let table_cnt = 1 + List.fold_left max (-1) (List.split table_conds |> fst) in
-  let tables = List.init table_cnt (fun i ->
-    let lim, rt =
-      match List.assoc_opt i table_conds with
-      | None ->
-        (* lim *)
-        CaseE (El.Atom.[[LBrack |> to_phrase (info "[")];[Dot2 |> to_phrase (info "..")];[RBrack |> to_phrase (info "]")]], il_tup [il_zero; il_zero]) |> to_phrase (mk_VarT "limits"),
-        (* rt *)
-        il_case "REF" "reftype" [il_some "NULL" "nul"; il_case "FUNC" "reftype" []]
-      | Some x -> x
-    in
-    print_endline (Il.Print.string_of_exp rt);
-    il_case "TABLE" "table" [il_case "" "tabletype" [lim; rt]; ListE (gen_default_instr' rt) |> to_phrase (mk_VarT "expr")]
-  ) in
 
-  (* TODO: These are very repetitive. Let's make a template! *)
+  let default_table () =
+    let mixop = El.Atom.[
+      [LBrack |> to_phrase (info "[")];
+      [Dot2 |> to_phrase (info "..")];
+      [RBrack |> to_phrase (info "]")]
+    ] in
+    CaseE (mixop, il_tup [il_zero; il_zero]) |> to_phrase (mk_VarT "limits"),
+    il_case "REF" "reftype" [il_some "NULL" "nul"; il_case "FUNC" "heaptype" []]
+  in
+
+  let tables = gen_stuffs
+    "TABLES"
+    extract_table_sidecond
+    default_table
+    "TABLE"
+    "table"
+    (fun (lim, rt) ->
+      [il_case "" "tabletype" [lim; rt]; ListE (gen_default_instr' rt) |> to_phrase (mk_VarT "expr")]
+    )
+  in
+
+  (* 4. Generate mems *)
+  let extract_mem_sidecond = extract_context_sidecond "MEMS" (fun e -> Some e) in
+  let default_mem () = gen_typ (mk_VarT "memtype") in
+  let mems = gen_stuffs
+    "MEMS"
+    extract_mem_sidecond
+    default_mem
+    "MEMORY"
+    "mem"
+    (fun mt -> [mt])
+  in
+
+  (* 5. Generate tags *)
+  let extract_tag_sidecond = (fun _ -> None) in (* TODO *)
+  let default_tag () = gen_typ (mk_VarT "typeidx") in
+  let tags = gen_stuffs
+    "TAGS"
+    extract_tag_sidecond
+    default_tag
+    "TAG"
+    "tag"
+    (fun tid -> [tid])
+  in
+
+  (* 6. Generate elems *)
+  let extract_elem_sidecond = extract_context_sidecond "ELEMS" (fun rt -> Some(rt, [], il_case "PASSIVE" "elemmode" [])) in
+  let default_elem () =
+    il_case "REF" "reftype" [il_some "NULL" "nul"; il_case "FUNC" "heaptype" []],
+    [],
+    il_case "PASSIVE" "elemmode" []
+  in
+  let elems = gen_stuffs
+    "ELEMS"
+    extract_elem_sidecond
+    default_elem
+    "ELEM"
+    "elem"
+    (fun (rt, es, mode) -> [rt; il_list es (mk_VarT "expr"); mode])
+  in
+
+  (* 7. Generate datas *)
+  let extract_data_sidecond = (fun _ -> None) in (* Only number matters *)
+  let default_data () = List.init (Random.int 3) (fun _ -> gen_typ (mk_VarT "byte")), il_case "PASSIVE" "datamode" [] in
+  let datas = gen_stuffs
+    "DATAS"
+    extract_data_sidecond
+    default_data
+    "DATA"
+    "data"
+    (fun (bs, datamode) -> [il_list bs (mk_VarT "byte"); datamode])
+  in
+
+  let funcs = [func] in (* TODO *)
+
+  let imports = [] in
+  let exports = [] in
 
   il_case "MODULE" "module" [
     il_list types (mk_VarT "type");
-    il_list [] (mk_VarT "import");
-    il_list [func] (mk_VarT "func");
+    il_list imports (mk_VarT "import");
+    il_list funcs (mk_VarT "func");
     il_list globals (mk_VarT "global");
     il_list tables (mk_VarT "table");
-    il_list [] (mk_VarT "mem");
-    il_list [] (mk_VarT "tag");
-    il_list [] (mk_VarT "elem");
-    il_list [] (mk_VarT "data");
+    il_list mems (mk_VarT "mem");
+    il_list tags (mk_VarT "tag");
+    il_list elems (mk_VarT "elem");
+    il_list datas (mk_VarT "data");
+    OptE None |> to_phrase (IterT (mk_VarT "start", Opt) $ no_region);
+    il_list exports (mk_VarT "export");
   ]
 
 
@@ -817,29 +932,28 @@ let gen_test_containing_seq (cases: string list): exp =
   sideconds := [];
 
   (* 1. Fix rt *)
-  let rts = fix_rts cases in (* May throw, if this combination is impossible *)
-  (* Print *)
   print_endline "1===========";
+  let rts = fix_rts cases in (* May throw, if this combination is impossible *)
   rts |> List.iter (fun rt ->
     rt |> List.iter (fun vt -> Il.Print.string_of_exp vt |> print_endline);
     print_endline "";
   );
 
   (* 2. Prepend values *)
+  print_endline "2===========";
   let (casess, rtss) = List.map fix_values (List.hd rts |> List.rev) |> List.split in
   let cases' = List.flatten casess in
   let cases = cases' @ cases in
   let rts = (accumulate_rtss rtss) @ List.tl rts in
   values_cnt := List.length cases';
 
-  print_endline "2===========";
   cases |> List.iter print_endline;
   let print_rt rt = List.iter (fun vt -> print_endline (Il.Print.string_of_exp vt)) rt; print_endline "" in
   rts |> List.iter print_rt;
 
   (* 3. Fix immediates *)
-  let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
   print_endline "3===========";
+  let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
   instrs |> List.iter (fun i ->
     print_endline (Il.Print.string_of_exp i);
   );
@@ -857,8 +971,8 @@ let gen_test_containing_seq (cases: string list): exp =
   );
 
   (* 4. Wrap as a function *)
-  let func = wrap_as_func instrs (List.rev (List.hd (List.rev rts))) in (* TODO: It's too confusing to decide when to rev or not *)
   print_endline "4===========";
+  let func = wrap_as_func instrs (List.rev (List.hd (List.rev rts))) in (* TODO: It's too confusing to decide when to rev or not *)
   print_endline (Il.Print.string_of_exp func);
   !sideconds |> List.iter (function
     | TypeCondC (idx, (rt1, rt2)) -> print_endline (
@@ -871,4 +985,14 @@ let gen_test_containing_seq (cases: string list): exp =
   );
 
   (* 5. Wrap as a module *)
-  wrap_as_module func
+  print_endline "5===========";
+  let module_ = wrap_as_module func in
+  print_endline (Il.Print.string_of_exp module_);
+
+  (* 6. IL2AL *)
+  let al_module = module_
+  |> Il2al.Translate.translate_exp
+  |> Backend_interpreter.Interpreter.eval_expr Backend_interpreter.Ds.Env.empty
+  in
+
+  al_module

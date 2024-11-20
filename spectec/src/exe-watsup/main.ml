@@ -321,8 +321,10 @@ let () =
         "LOCAL.GET";
         "LOCAL.TEE"
         *)
+        (*
         "CONST";
         "CALL_INDIRECT";
+        *)
         (*
         "BR"
         *)
@@ -330,6 +332,8 @@ let () =
         "GLOBAL.GET";
         "GLOBAL.SET";
         *)
+        (* "MEMORY.COPY" *)
+        "MEMORY.INIT"
       ] |> Il.Print.string_of_exp |> print_endline;
       Backend_test.Flag.seed := !Backend_test.Flag.seed + 1
       ) |> ignore
