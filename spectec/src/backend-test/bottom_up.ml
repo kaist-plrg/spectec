@@ -316,16 +316,18 @@ let apply_unify_result_prem result p =
   ) p result
 
 let fix_free_var ess =
-  let destruct_var e =
+  let free_vars = ref [] in
+  List.map (transform_expr (fun e ->
     match e.it with
-    | VarE x -> Some (x.it, e.note)
-    | _ -> None
-  in
-  let free_vars = List.flatten ess |> List.filter_map destruct_var |> dedup (fun x y -> fst x = fst y) in
+    | VarE x -> free_vars := (x.it, e.note) :: !free_vars; e
+    | _ -> e
+  )) (List.flatten ess) |> ignore;
+  dedup (fun x y -> (fst x) = (fst y)) !free_vars
+  |>
   List.fold_left (fun ess (x, typ) ->
     let e = gen_typ typ in
     List.map (List.map (transform_expr (replace_id_with x e))) ess
-  ) ess free_vars
+  ) ess
 
 (* 1. fix_rts: pre-determine concrete types of each cases *)
 let fix_rts (cases: string list): restype list =
@@ -938,6 +940,7 @@ let gen_module (cases: string list): Al.Ast.value =
   trules := get_typing_rules ();
   arrow_map := !trules |> List.map rule_to_arrow;
   sideconds := [];
+  let cases = List.map (fun x -> if x = "" then choose !arrow_map |> fst else x) cases in
 
   (* 1. Fix rt *)
   print_endline "1===========";
