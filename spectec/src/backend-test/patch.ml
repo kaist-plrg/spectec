@@ -43,6 +43,7 @@ let patch_tables tables = listv_map patch_table tables
 (* mem *)
 let patch_mem mem = mem
 let patch_mems mems =
+  if !Flag.version = 3 then mems else
   match unwrap_listv_to_list mems with
   | [] -> empty_list
   | mem :: _ -> singleton (patch_mem mem)

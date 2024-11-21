@@ -159,6 +159,15 @@ type context = {
   args: arg list;
 }
 
+(* HARDCODE: force valid expressions *)
+let validate x e =
+  match x with
+  | "limits" ->
+    let l = nth_arg_of_case 0 e in
+    let r = nth_arg_of_case 1 e in
+    if nth_arg_of_case 0 l <= nth_arg_of_case 0 r then e else
+    e |> replace_caseE_arg [0] r |> replace_caseE_arg [1] l
+  | _ -> e
 let rec gen c x =
   (* HARDCODE: list *)
   if x = "list" then
@@ -179,7 +188,7 @@ let rec gen c x =
       | _ -> e
     ) e binds args
   ) in
-  match deftyp.it with
+  (match deftyp.it with
   | AliasT typ -> gen_typ c (transform_typ replace_params typ);
   | StructT _ -> failwith "StructT not supported"
   | VariantT typcases ->
@@ -191,6 +200,7 @@ let rec gen c x =
       m, (bs, t', ps), hs
     in
     gen_typcase c typcase'
+  ) |> validate x
 and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
   let args = TupE (gen_typs c typs) |> to_phrase c.typ in
   CaseE (mixop, args) |> to_phrase c.typ
@@ -988,9 +998,12 @@ let gen_module (cases: string list): Al.Ast.value =
   print_endline (Il.Print.string_of_exp module_);
 
   (* 6. IL2AL *)
+  print_endline "6===========";
   let al_module = module_
   |> Il2al.Translate.translate_exp
   |> Backend_interpreter.Interpreter.eval_expr Backend_interpreter.Ds.Env.empty
   in
+
+  print_endline (Al.Print.string_of_value al_module);
 
   al_module
