@@ -820,7 +820,7 @@ and al_to_instr': value -> Ast.instr' = function
   | CaseV ("CALL_INDIRECT", [ idx1; typeuse2 ]) ->
     CallIndirect (al_to_idx idx1, al_to_typeuse typeuse2)
   | CaseV ("RETURN_CALL", [ idx ]) -> ReturnCall (al_to_idx idx)
-  | CaseV ("RETURN_CALL_REF", [ OptV (Some (typeuse)) ]) -> ReturnCallRef (al_to_typeuse typeuse)
+  | CaseV ("RETURN_CALL_REF", [ typeuse ]) -> ReturnCallRef (al_to_typeuse typeuse)
   | CaseV ("RETURN_CALL_INDIRECT", [ idx1; typeuse2 ]) ->
     ReturnCallIndirect (al_to_idx idx1, al_to_typeuse typeuse2)
   | CaseV ("THROW", [ idx ]) -> Throw (al_to_idx idx)
@@ -1938,7 +1938,7 @@ let rec al_of_instr instr =
     let args = al_with_version [ 2; 3 ] al_of_idx idx1 @ [ al_of_typeuse idx2 ] in
     CaseV ("CALL_INDIRECT", args)
   | ReturnCall idx -> CaseV ("RETURN_CALL", [ al_of_idx idx ])
-  | ReturnCallRef idx -> CaseV ("RETURN_CALL_REF", [ optV (Some (al_of_typeuse idx)) ])
+  | ReturnCallRef idx -> CaseV ("RETURN_CALL_REF", [ al_of_typeuse idx ])
   | ReturnCallIndirect (idx1, idx2) ->
     CaseV ("RETURN_CALL_INDIRECT", [ al_of_idx idx1; al_of_typeuse idx2 ])
   | Throw idx -> CaseV ("THROW", [ al_of_idx idx ])
