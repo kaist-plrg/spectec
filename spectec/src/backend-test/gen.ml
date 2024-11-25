@@ -307,7 +307,7 @@ let gen_test el' il' al' =
 
   List.init !Flag.n (fun i -> !Flag.seed + i)
   |> List.iter (fun seed ->
-    if seed mod 100 = 0 then Log.info ("=== Generating " ^ string_of_int seed ^ ".wast... ===");
+    (if seed mod 100 = 0 then Log.info else Log.debug) ("=== Generating " ^ string_of_int seed ^ ".wast... ===");
 
     (* Set random seed *)
     Random.init seed;

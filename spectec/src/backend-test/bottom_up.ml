@@ -189,10 +189,15 @@ let rec gen c x =
     ) e binds args
   ) in
   (match deftyp.it with
-  | AliasT typ -> gen_typ c (transform_typ replace_params typ);
-  | StructT _ -> failwith "StructT not supported"
+  | AliasT typ -> gen_typ c (transform_typ replace_params typ)
+  | StructT typfields ->
+    let gen_typfield (atom, (_binds, typ, _prems), _hints) =
+      atom, gen_typ c (transform_typ replace_params typ)
+    in
+    StrE (List.map gen_typfield typfields) |> to_phrase c.typ
   | VariantT typcases ->
     let typcases = Lib.List.filter_not (has_subid_hint "sem") typcases in
+    let typcases = Lib.List.filter_not (has_subid_hint "admin") typcases in
     let typcase = Utils.choose typcases in
     let typcase' =
       let (m, (bs, t, ps), hs) = typcase in
@@ -201,7 +206,7 @@ let rec gen c x =
     in
     gen_typcase c typcase'
   ) |> validate x
-and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
+and gen_typcase c (mixop, (_binds, typs, _prems), _hints) =
   let args = TupE (gen_typs c typs) |> to_phrase c.typ in
   CaseE (mixop, args) |> to_phrase c.typ
 and gen_typs c typs =
@@ -536,25 +541,31 @@ let fix_immediate (cases: string list) rts: exp list =
     let iter_to_list' e =
       match e.it with
       | IterE (e', (List, xes)) ->
-        (match get_cached_length e' with
-        | None -> e'
-        | Some l ->
-          let es = List.init l (fun i ->
-            List.fold_left (fun e (x, _) ->
-              transform_expr (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
-            ) e' xes) in
-          let it = ListE es in
-          { e with it })
+        let l =
+          match get_cached_length e' with
+          | None -> Random.int 3
+          | Some l -> l
+        in
+        let es = List.init l (fun i ->
+          List.fold_left (fun e (x, _) ->
+            transform_expr (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+          ) e' xes) in
+        let it = ListE es in
+        { e with it }
       | _ -> e
     in
     let iter_to_list = transform_expr iter_to_list' in
-    let iter_to_list_prem = transform_prem iter_to_list' in
+    let iter_to_list_prem = transform_prem iter_to_list' in (* TODO: Handle IterPr *)
 
     (* Transform trule *)
-    let trule = List.find (fun r ->
+    print_endline case;
+    let trule = List.filter (fun r ->
       let RuleD (id, _, _, _, _) = r.it in
-      String.uppercase_ascii id.it = case
-    ) !trules in
+      String.uppercase_ascii id.it
+      |> String.split_on_char '-'
+      |> List.hd
+      = case
+    ) !trules |> choose in
 
     let trule = {trule with it =
       match trule.it with
@@ -943,70 +954,30 @@ let gen_module (cases: string list): Al.Ast.value =
   let cases = List.map (fun x -> if x = "" then choose !arrow_map |> fst else x) cases in
 
   (* 1. Fix rt *)
-  print_endline "1===========";
   let rts = fix_rts cases in (* May throw, if this combination is impossible *)
-  rts |> List.iter (fun rt ->
-    rt |> List.iter (fun vt -> Il.Print.string_of_exp vt |> print_endline);
-    print_endline "";
-  );
 
   (* 2. Prepend values *)
-  print_endline "2===========";
   let (casess, rtss) = List.map fix_values (List.hd rts |> List.rev) |> List.split in
   let cases' = List.flatten casess in
   let cases = cases' @ cases in
   let rts = (accumulate_rtss rtss) @ List.tl rts in
   values_cnt := List.length cases';
 
-  cases |> List.iter print_endline;
-  let print_rt rt = List.iter (fun vt -> print_endline (Il.Print.string_of_exp vt)) rt; print_endline "" in
-  rts |> List.iter print_rt;
-
   (* 3. Fix immediates *)
-  print_endline "3===========";
   let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
-  instrs |> List.iter (fun i ->
-    print_endline (Il.Print.string_of_exp i);
-  );
-  print_endline "===========";
-  !sideconds |> List.iter (function
-    | TypeLenC _ -> ()
-    | IfPrC e -> print_endline ("-- " ^ Il.Print.string_of_exp e)
-    | RulePrC (id, mixop, exp) -> print_endline ("-- " ^ Il.Print.(id.it ^ ": " ^ string_of_mixop mixop ^ string_of_exp exp))
-    | TypeCondC (idx, (rt1, rt2)) -> print_endline (
-      Printf.sprintf "-- C.TYPES[%d] ~~ %s -> %s"
-      idx
-      (List.map Il.Print.string_of_exp rt1 |> String.concat " ")
-      (List.map Il.Print.string_of_exp rt2 |> String.concat " ")
-    )
-  );
 
   (* 4. Wrap as a function *)
-  print_endline "4===========";
   let func = wrap_as_func instrs (List.rev (List.hd (List.rev rts))) in (* TODO: It's too confusing to decide when to rev or not *)
-  print_endline (Il.Print.string_of_exp func);
-  !sideconds |> List.iter (function
-    | TypeCondC (idx, (rt1, rt2)) -> print_endline (
-      Printf.sprintf "-- C.TYPES[%d] ~~ %s -> %s"
-      idx
-      (List.map Il.Print.string_of_exp rt1 |> String.concat " ")
-      (List.map Il.Print.string_of_exp rt2 |> String.concat " ")
-    )
-    | _ -> ()
-  );
 
   (* 5. Wrap as a module *)
-  print_endline "5===========";
   let module_ = wrap_as_module func in
-  print_endline (Il.Print.string_of_exp module_);
 
   (* 6. IL2AL *)
-  print_endline "6===========";
   let al_module = module_
   |> Il2al.Translate.translate_exp
   |> Backend_interpreter.Interpreter.eval_expr Backend_interpreter.Ds.Env.empty
   in
 
-  print_endline (Al.Print.string_of_value al_module);
+  Log.debug (Al.Print.string_of_value al_module);
 
   al_module
