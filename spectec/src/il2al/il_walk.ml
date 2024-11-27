@@ -48,7 +48,7 @@ and transform_arg f a =
 and transform_typ f t =
   { t with it = match t.it with
     | VarT (id, args) -> VarT (id, List.map (transform_arg f) args)
-    | TupT ets -> TupT (ets |> List.map (fun (e, t) -> transform_expr f e, transform_typ f t))
+    | TupT ets -> TupT (ets |> List.map (fun (e, t) -> e, transform_typ f t))
     | t' -> t' }
 
 let rec transform_prem f p =

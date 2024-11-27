@@ -54,28 +54,34 @@ let il_some x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.At
 let il_none x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.Atom.Quest |> to_phrase (El.Atom.info "?")]], il_tup [none_opt]) |> to_phrase (mk_VarT t)
 let il_zero = NatE Z.zero |> to_phrase (mk_VarT "u32")
 
-let mixop_of_case e =
+let remove_sub e =
   match e.it with
+  | SubE (e, _, _) -> e
+  | _ -> e
+
+let mixop_of_case e =
+  match (remove_sub e).it with
   | CaseE (mixop, _) -> mixop
-  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
+  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE")
 
 let case_of_case e =
   match mixop_of_case e with
-  | [atom] :: tl when List.for_all ((=) []) tl -> atom.it
-  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE with single atom")
+  | (atom :: _) :: _ -> atom.it
+  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE with at least one atom")
 
 let args_of_case e =
-  match e.it with
+  match (remove_sub e).it with
   | CaseE (_, {it = TupE args; _}) -> args
-  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
+  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE")
 
 let nth_arg_of_case n e =
-  match e.it with
+  match (remove_sub e).it with
   | CaseE (_, {it = TupE args; _}) -> List.nth args n
-  | _ -> failwith (Il.Print.string_of_exp e ^ "is not a CaseE")
+  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE")
 
 let rec replace_caseE_arg is re e =
   match is, e.it with
+  | _, SubE (e', t1, t2) -> { e with it = SubE (replace_caseE_arg is re e', t1, t2) }
   | [], _ ->
     re
   | i :: is, CaseE (mixop, ({ it = TupE es; _ } as tup)) ->
@@ -89,6 +95,39 @@ let exp_to_int e =
   match (Il.Eval.reduce_exp !il_env e).it with
   | NatE z -> Z.to_int z
   | _ -> failwith (Il.Print.string_of_exp e ^ " is not an integer")
+let exp_of_int i =
+  NatE (Z.of_int i) |> to_phrase (NumT NatT $ no_region)
+
+let rec unify_exp map e1 e2 =
+  let rec resolve e =
+    match e.it with
+    | VarE x -> (match List.assoc_opt x.it map with Some e -> resolve e | None -> e)
+    | SubE (e, _, _) -> e
+    | _ -> e
+  in
+  let e1 = resolve e1 in
+  let e2 = resolve e2 in
+  if Il.Eq.eq_exp e1 e2 then map else
+  match e1.it, e2.it with (*TODO: Generalize to more cases *)
+  | _, VarE x -> ((x.it, e1) :: map)
+  | VarE x, _ -> ((x.it, e2) :: map)
+  | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 ->
+    unify_exp map args1 args2
+  | CallE (id1, args1), CallE (id2, args2) when Il.Eq.eq_id id1 id2 ->
+    List.fold_left2 (fun map a1 a2 ->
+      match a1.it, a2.it with
+      | ExpA e1, ExpA e2 -> unify_exp map e1 e2
+      | _ -> map
+    ) map args1 args2
+  | TupE es1, TupE es2 when List.length es1 = List.length es2 ->
+    List.fold_left2 unify_exp map es1 es2
+  | IterE (e1, (iter1, xes1)), IterE (e2, (iter2, xes2))
+    when iter1 = iter2
+      && List.length xes1 = List.length xes2
+      && List.for_all2 (fun (x1, e1) (x2, e2) -> Il.Eq.eq_id x1 x2 && Il.Eq.eq_exp e1 e2) xes1 xes2 ->
+    unify_exp map e1 e2
+  | _, _ -> failwith ("Unification fail of " ^ (Il.Print.string_of_exp e1) ^ ", " ^ (Il.Print.string_of_exp e2))
+
 
 (** Helpers to handle type-family-based generation **)
   let has_name name def =
@@ -115,35 +154,29 @@ let exp_to_int e =
   exception DispatchFail of string
 
   let rec has_deftyp a dt =
-    (* print_endline (Printf.sprintf "has_deftype %s %s ?" (Il.Print.string_of_exp a) (Il.Print.string_of_deftyp `H dt)); *)
     match a.it, dt.it with
-    | CaseE (mixop, {it = TupE []; _}), VariantT typcases ->
-      List.exists (fun (mixop', _, _) -> Il.Mixop.eq mixop mixop') typcases
+    | CaseE (mixop, {it = TupE args; _}), VariantT typcases ->
+      List.exists (fun (mixop', (binds, _, _), _) ->
+        Il.Mixop.eq mixop mixop'
+        &&
+        List.for_all2 has_type args (List.map typ_of_bind binds)
+      ) typcases
     | _, AliasT t -> has_type a t
     | _, VariantT [ [[]; []], ([ bind ], _, _), _ ] -> has_type a (typ_of_bind bind)
-    (* HARDCODE: N x M *)
-    (*
-    | Al.Ast.CaseV ("X", as), VariantT [ typcase ] ->
-      let (_mixop, (binds, _, _), _) = typcase in
-      (* TODO: assert mixop = `%X%` *)
-      List.for_all2 has_type as (List.map typ_of_bind binds)\
-    *)
     | _ -> false
   and has_type a t =
-    (* print_endline (Printf.sprintf "has_type %s %s ?" (Il.Print.string_of_exp a) (Il.Print.string_of_typ t)); *)
     match a.it, t.it with
     | NatE _, (NumT NatT) -> true
     | _, VarT (name, []) -> has_deftyp a (dispatch_deftyp name.it [] |> snd)
     | _ -> Il.Eq.eq_typ a.note t
   and has_argtype a p =
-    (* print_endline (Printf.sprintf "has_argtype %s %s ?" (Il.Print.string_of_exp a) (Il.Print.string_of_arg p)); *)
     has_type a (type_of_arg p)
 
   and match_params args inst =
     match inst.it with
-    | InstD (binds, params, deftyp) when (
+    | InstD (_binds, params, deftyp) when (
         List.for_all2 has_argtype args params
-      ) -> Some (binds, deftyp)
+      ) -> Some (params, deftyp)
     | _ -> None
   and dispatch_deftyp name args =
     match List.find_map (has_name name) !il with
@@ -157,6 +190,7 @@ let exp_to_int e =
 type context = {
   typ: typ;
   args: arg list;
+  prems: prem list;
 }
 
 (* HARDCODE: force valid expressions *)
@@ -168,6 +202,32 @@ let validate x e =
     if nth_arg_of_case 0 l <= nth_arg_of_case 0 r then e else
     e |> replace_caseE_arg [0] r |> replace_caseE_arg [1] l
   | _ -> e
+
+let try_gen_from_prems prems e =
+  match e.it with
+  | VarE id when id.it <> "_" ->
+    let rec is_choose e' =
+      match e'.it with
+      | BinE (OrOp, e1, e2) ->
+          (match is_choose e1, is_choose e2 with
+          | Some es1, Some es2 -> Some (es1 @ es2)
+          | _ -> None)
+      | CmpE (EqOp, e1, e2) when Il.Eq.eq_exp e e1 -> Some [e2]
+      | CmpE (EqOp, e2, e1) when Il.Eq.eq_exp e e1 -> Some [e2]
+      | _ -> None
+    in
+        
+    let is_choose_prem p =
+      match p.it with
+      | IfPr e -> is_choose e
+      | _ -> None
+    in
+
+    (match prems |> List.find_map (is_choose_prem) with
+    | Some es -> Some (choose es)
+    | None -> None)
+  | _ -> None
+  
 let rec gen c x =
   (* HARDCODE: list *)
   if x = "list" then
@@ -180,13 +240,13 @@ let rec gen c x =
     | _ -> failwith @@ "Unsupported arg for " ^ x
   in
   let args = List.map a2e c.args in
-  let binds, deftyp = dispatch_deftyp x args in
+  let params, deftyp = dispatch_deftyp x args in
+  let params = List.map a2e params in
+  let map = List.fold_left2 unify_exp [] params args in
   let replace_params = (fun e ->
-    List.fold_left2 (fun e b a ->
-      match b.it with
-      | ExpB (x, _) -> replace_id_with x.it a e
-      | _ -> e
-    ) e binds args
+    List.fold_left (fun e (x, e') ->
+      replace_id_with x e' e
+    ) e map
   ) in
   (match deftyp.it with
   | AliasT typ -> gen_typ c (transform_typ replace_params typ)
@@ -206,17 +266,24 @@ let rec gen c x =
     in
     gen_typcase c typcase'
   ) |> validate x
-and gen_typcase c (mixop, (_binds, typs, _prems), _hints) =
-  let args = TupE (gen_typs c typs) |> to_phrase c.typ in
+and gen_typcase c (mixop, (_binds, typs, prems), _hints) =
+  let args = il_tup (gen_typs {c with prems} typs) in
   CaseE (mixop, args) |> to_phrase c.typ
 and gen_typs c typs =
   match typs.it with
-  | TupT typs' -> List.map (gen_typ c) (List.map snd typs')
+  | TupT typs' -> List.fold_left_map (fun replaces (e, t) ->
+      let e' =
+        match try_gen_from_prems c.prems e with
+        | None -> gen_typ c (List.fold_left (fun t (e, e') -> transform_typ  (replace e e') t) t replaces)
+        | Some e -> e
+      in
+      (e, e') :: replaces, e'
+    ) [] typs' |> snd
   | _ -> [ gen_typ c typs ]
 and gen_typ c typ =
   match typ.it with
   | NumT NatT -> NatE (Random.int 3 |> Z.of_int) |> to_phrase typ (* 0, 1, 2 *)
-  | VarT (id, args) -> gen {typ; args} id.it
+  | VarT (id, args) -> gen {typ; args; prems = []} id.it
   | IterT (typ', List) ->
     let len = Random.int 3 in (* 0, 1, 2 *)
     ListE (List.init len (fun _ -> gen_typ c typ')) |> to_phrase typ
@@ -225,7 +292,7 @@ and gen_typ c typ =
     else OptE (Some (gen_typ c typ')) |> to_phrase typ
   | TupT ets -> TupE (ets |> List.map (fun (_, t) -> gen_typ c t)) |> to_phrase typ
   | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
-let gen_typ typ = gen_typ {typ; args = []} typ
+let gen_typ typ = gen_typ {typ; args = []; prems = []} typ
 
 (** End of Helpers **)
 
@@ -284,26 +351,10 @@ let as_sidecond pr =
   | RulePr (id, mixop, e) -> [RulePrC (id, mixop, e)]
   | _ -> []
 
-let rec unify_vt map e1 e2 =
-  let rec resolve e =
-    match e.it with
-    | VarE x -> (match List.assoc_opt x.it map with Some e -> resolve e | None -> e)
-    | _ -> e
-  in
-  let e1 = resolve e1 in
-  let e2 = resolve e2 in
-  if Il.Eq.eq_exp e1 e2 then map else
-  match e1.it, e2.it with (*TODO: Generalize to more cases *)
-  | _, VarE x -> ((x.it, e1) :: map)
-  | VarE x, _ -> ((x.it, e2) :: map)
-  | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 -> unify_vt map args1 args2
-  | TupE es1, TupE es2 when List.length es1 = List.length es2 -> List.fold_left2 (fun map e1 e2 -> unify_vt map e1 e2) map es1 es2
-  | _, _ -> failwith ("Unification fail of " ^ (Il.Print.string_of_exp e1) ^ ", " ^ (Il.Print.string_of_exp e2))
-
 let rec unify_vts' map es1 es2 =
   match es1, es2 with
   | [], _ | _, [] -> map
-  | e1::es1, e2::es2 -> unify_vts' (unify_vt map e1 e2) es1 es2
+  | e1::es1, e2::es2 -> unify_vts' (unify_exp map e1 e2) es1 es2
 let unify_vts es1 es2 = unify_vts' [] es1 es2
 let print_unify_result =
   List.iter (fun (x, e) ->
@@ -369,8 +420,6 @@ let fix_rts (cases: string list): restype list =
       | _ -> [rt]
     in
 
-    let remove_sub e = match e.it with | SubE (e, _, _) -> e | _ -> e in
-
     let append_idx = transform_expr (replace_id_using (fun x -> x ^ "@" ^ (string_of_int i))) in
 
     let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx in
@@ -406,12 +455,17 @@ let concretize_instr trule instr =
   let free_vars = ref [] in
   transform_expr (fun e ->
     match e.it with
-    | VarE _ -> free_vars := e :: !free_vars; e
+    | VarE id when id.it <> "_" -> free_vars := e :: !free_vars; e
     | _ -> e
   ) instr |> ignore;
-  dedup Il.Eq.eq_exp !free_vars
+
+  let replaces = ref [] in
+
+  dedup Il.Eq.eq_exp (List.rev !free_vars)
   |> List.fold_left (fun (trule, instr) e ->
-    let e' = gen_typ e.note in
+    let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
+    let e' = gen_typ t in
+    replaces := (e, e') :: !replaces;
     let trule' = {trule with it =
       match trule.it with
       | RuleD (id, binds, mixop, exp, prems) ->
@@ -451,7 +505,7 @@ let fix_values vt: string list * restype list =
       )
     )
   | _ ->
-    ["LOCAl.GET"], [[vt]]
+    ["LOCAL.GET"], [[vt]]
 let accumulate_rtss rtss =
   List.fold_left (fun stack rts ->
     let last_rt = List.hd (List.rev stack) in
@@ -503,11 +557,7 @@ let fix_immediate (cases: string list) rts: exp list =
     let i = List.length acc in
 
     let (rt1', rt2') = List.assoc case !arrow_map in
-    (*
-    print_endline (Il.Print.string_of_rule trule);
-    print_endline (Il.Print.string_of_exp rt1');
-    print_endline (Il.Print.string_of_exp rt2');
-    *)
+    
     let get_cached_length e =
       List.find_map (function
       | TypeLenC (i', e', l) when i = (i' + !values_cnt) && Il.Eq.eq_exp e e' -> Some l
@@ -552,13 +602,18 @@ let fix_immediate (cases: string list) rts: exp list =
           ) e' xes) in
         let it = ListE es in
         { e with it }
+      | IterE (e', (Opt, _)) ->
+        { e with it =
+          if Random.bool () then
+            OptE None
+          else
+            OptE (Some e') }
       | _ -> e
     in
     let iter_to_list = transform_expr iter_to_list' in
     let iter_to_list_prem = transform_prem iter_to_list' in (* TODO: Handle IterPr *)
 
     (* Transform trule *)
-    print_endline case;
     let trule = List.filter (fun r ->
       let RuleD (id, _, _, _, _) = r.it in
       String.uppercase_ascii id.it
@@ -578,9 +633,6 @@ let fix_immediate (cases: string list) rts: exp list =
     let instr = rule_to_instr trule in
     let trule, instr = concretize_instr trule instr in
 
-    (* print_endline (Il.Print.string_of_rule trule); *)
-    (* print_endline (Il.Print.string_of_exp instr); *)
-
     sideconds := (
       rule_to_prems trule
       (* |> simplify_equality *) (* TODO: This should be moved to someting like unify *)
@@ -590,6 +642,110 @@ let fix_immediate (cases: string list) rts: exp list =
 
     instr :: acc, rt2
   ) ([], rt) cases rts |> fst |> List.rev
+
+(* 3.5 patch: Make manual, syntactic patch to instrs. Eventually should be removed, or automated *)
+let rec patch instrs =
+  let patch_shape sh =
+    match sh.it with
+    | CaseE ([[]; [{it = El.Atom.Atom "X"; _}]; []], {it = TupE [t; _dim]; _}) ->
+      let dim =
+        match case_of_case t with
+        | Atom "I8" -> 16
+        | Atom "I16" -> 8
+        | Atom "I32" -> 4
+        | Atom "F32" -> 4
+        | Atom "I64" -> 2
+        | Atom "F64" -> 2
+        | _ -> failwith "invalid shape: did you add new `shape`?"
+      in
+      sh |> replace_caseE_arg [1; 0] (exp_of_int dim)
+    | _ -> sh
+  in
+  let patch_sz sz =
+    match sz.note.it with
+    | VarT ({it = "sz"; _}, []) ->
+      let i = nth_arg_of_case 0 sz |> exp_to_int in
+      if List.mem i [8; 16; 32; 64] then sz else
+      gen_typ sz.note
+    | _ -> sz
+  in
+  let ixx n = il_case ("I" ^ string_of_int n) "Jnn" [] in
+  let handle_rec i instr =
+    let instrs = nth_arg_of_case i instr in
+    let instrs' = 
+      match instrs.it with
+      | ListE is -> {instrs with it = ListE (patch is)}
+      | _ -> instrs
+    in
+    replace_caseE_arg [i] instrs' instr
+  in
+  List.map (fun instr ->
+    (match case_of_case instr with
+    | Atom "VSWIZZLE" ->
+      instr
+      |> replace_caseE_arg [0; 0] (il_case "I8" "lanetype" [])
+      |> replace_caseE_arg [0; 1; 0] (exp_of_int 16)
+    | Atom "VSHUFFLE" ->
+      let li = mk_VarT "laneidx" in
+      instr
+      |> replace_caseE_arg [0; 0] (il_case "I8" "lanetype" [])
+      |> replace_caseE_arg [0; 1; 0] (exp_of_int 16)
+      |> replace_caseE_arg [1] (il_list (List.init 16 (fun _ -> gen_typ li)) li)
+    | Atom "VEXTUNOP" ->
+      let (t1, t2) = (16, 8) // (32, 16) in
+      instr
+      |> replace_caseE_arg [0; 0] (ixx t1)
+      |> replace_caseE_arg [1; 0] (ixx t2)
+    | Atom "VEXTBINOP" ->
+      let (t1, t2) =
+        match case_of_case @@ nth_arg_of_case 2 instr with
+        | Atom "EXTMUL" -> (16, 8) // (32, 16)
+        | Atom "DOT" -> (32, 16)
+        | _ -> failwith "Unknown vextbinop"
+      in
+      instr
+      |> replace_caseE_arg [0; 0] (ixx t1)
+      |> replace_caseE_arg [1; 0] (ixx t2)
+    | Atom "VEXTRACT_LANE" ->
+      let sx_opt =
+        match instr |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> case_of_case with
+        | Atom ("I8" | "I16") -> {(nth_arg_of_case 1 instr) with it = OptE (Some (gen_typ (mk_VarT "sx")))}
+        | _ -> {(nth_arg_of_case 1 instr) with it = OptE None}
+      in
+      instr
+      |> replace_caseE_arg [1] sx_opt
+    | Atom "VLOAD" ->
+      let vloadop = nth_arg_of_case 1 instr in
+      let vloadop' =
+        match vloadop.it with
+        | OptE (Some e) ->
+          let e' =
+            match case_of_case e with
+            | Atom "SHAPE" ->
+              let sz, m = choose [8,8; 16,4; 32,2] in
+              let sz = il_case "" "sz" [exp_of_int sz] in
+              let m = exp_of_int m in
+              e |> replace_caseE_arg [0] sz |> replace_caseE_arg [1] m
+            | Atom "ZERO" ->
+              let sz = gen_typ (mk_VarT "sz") |> replace_caseE_arg [0] (exp_of_int (32 // 64)) in
+              e |> replace_caseE_arg [0] sz
+            | _ -> e
+          in
+          { vloadop with it = OptE (Some e') }
+        | _ -> vloadop
+      in
+      instr
+      |> replace_caseE_arg [1] vloadop'
+    (* Recursive cases *)
+    | Atom "BLOCK" -> instr |> handle_rec 1
+    | Atom "LOOP"  -> instr |> handle_rec 1
+    | Atom "IF" -> instr |> handle_rec 1 |> handle_rec 2
+    | Atom "TRY_TABLE"  -> instr |> handle_rec 2
+    | _ -> instr
+    )
+    |> transform_expr patch_shape
+    |> transform_expr patch_sz
+  ) instrs
 
 (* Helper for extracting sidecond *)
 let extract_context_sidecond field f_elem sidecond =
@@ -954,9 +1110,11 @@ let gen_module (cases: string list): Al.Ast.value =
   let cases = List.map (fun x -> if x = "" then choose !arrow_map |> fst else x) cases in
 
   (* 1. Fix rt *)
+  Log.debug ("===1===");
   let rts = fix_rts cases in (* May throw, if this combination is impossible *)
 
   (* 2. Prepend values *)
+  Log.debug ("===2===");
   let (casess, rtss) = List.map fix_values (List.hd rts |> List.rev) |> List.split in
   let cases' = List.flatten casess in
   let cases = cases' @ cases in
@@ -964,15 +1122,27 @@ let gen_module (cases: string list): Al.Ast.value =
   values_cnt := List.length cases';
 
   (* 3. Fix immediates *)
+  Log.debug ("===3===");
   let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
+  List.iter (fun e ->
+    Log.debug (Il.Print.string_of_exp e);
+  ) instrs;
+  
+  (* 3.5 Manual patch *)
+  Log.debug ("===3.5===");
+  let instrs = patch instrs in
 
   (* 4. Wrap as a function *)
+  Log.debug ("===4===");
   let func = wrap_as_func instrs (List.rev (List.hd (List.rev rts))) in (* TODO: It's too confusing to decide when to rev or not *)
 
   (* 5. Wrap as a module *)
-  let module_ = wrap_as_module func in
+  Log.debug ("===5===");
+  let module_ = wrap_as_module func |> Il.Eval.reduce_exp !il_env in
+  Log.debug (Il.Print.string_of_exp module_);
 
   (* 6. IL2AL *)
+  Log.debug ("===6===");
   let al_module = module_
   |> Il2al.Translate.translate_exp
   |> Backend_interpreter.Interpreter.eval_expr Backend_interpreter.Ds.Env.empty

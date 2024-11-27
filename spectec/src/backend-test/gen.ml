@@ -306,7 +306,7 @@ let gen_test el' il' al' =
   let times = ref [] in
 
   List.init !Flag.n (fun i -> !Flag.seed + i)
-  |> List.iter (fun seed ->
+  |> List.iter (fun seed -> try (
     (if seed mod 100 = 0 then Log.info else Log.debug) ("=== Generating " ^ string_of_int seed ^ ".wast... ===");
 
     (* Set random seed *)
@@ -344,6 +344,8 @@ let gen_test el' il' al' =
     Conform_test.conform_test seed;
 
     times := Sys.time () -. st :: !times;
+
+    ) with | e -> print_endline @@ "FAIL: " ^ (string_of_int seed) ^ ".wast - " ^ Printexc.to_string e;
   );
 
   (* Print Coverage *)

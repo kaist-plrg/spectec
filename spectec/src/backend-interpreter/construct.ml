@@ -816,7 +816,7 @@ and al_to_instr': value -> Ast.instr' = function
     BrOnCastFail (al_to_idx idx, al_to_ref_type rt1, al_to_ref_type rt2)
   | CaseV ("RETURN", []) -> Return
   | CaseV ("CALL", [ idx ]) -> Call (al_to_idx idx)
-  | CaseV ("CALL_REF", [ OptV (Some (idx)) ]) -> CallRef (al_to_idx idx)
+  | CaseV ("CALL_REF", [ idx ]) -> CallRef (al_to_typeuse idx)
   | CaseV ("CALL_INDIRECT", [ idx1; typeuse2 ]) ->
     CallIndirect (al_to_idx idx1, al_to_typeuse typeuse2)
   | CaseV ("RETURN_CALL", [ idx ]) -> ReturnCall (al_to_idx idx)
@@ -1933,7 +1933,7 @@ let rec al_of_instr instr =
     CaseV ("BR_ON_CAST_FAIL", [ al_of_idx idx; al_of_ref_type rt1; al_of_ref_type rt2 ])
   | Return -> nullary "RETURN"
   | Call idx -> CaseV ("CALL", [ al_of_idx idx ])
-  | CallRef idx -> CaseV ("CALL_REF", [ optV (Some (al_of_idx idx)) ])
+  | CallRef idx -> CaseV ("CALL_REF", [ al_of_typeuse idx ])
   | CallIndirect (idx1, idx2) ->
     let args = al_with_version [ 2; 3 ] al_of_idx idx1 @ [ al_of_typeuse idx2 ] in
     CaseV ("CALL_INDIRECT", args)
