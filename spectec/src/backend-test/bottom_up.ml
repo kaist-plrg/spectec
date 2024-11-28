@@ -216,7 +216,7 @@ let try_gen_from_prems prems e =
       | CmpE (EqOp, e2, e1) when Il.Eq.eq_exp e e1 -> Some [e2]
       | _ -> None
     in
-        
+
     let is_choose_prem p =
       match p.it with
       | IfPr e -> is_choose e
@@ -227,7 +227,7 @@ let try_gen_from_prems prems e =
     | Some es -> Some (choose es)
     | None -> None)
   | _ -> None
-  
+
 let rec gen c x =
   (* HARDCODE: list *)
   if x = "list" then
@@ -342,7 +342,7 @@ type sidecond =
   | TypeLenC of int * exp * int
   | RulePrC of (id * mixop * exp)
   | IfPrC of exp
-  | TypeCondC of int * (restype * restype)
+  | TypeCondC of int * exp
 let sideconds: sidecond list ref = ref []
 
 let as_sidecond pr =
@@ -557,7 +557,7 @@ let fix_immediate (cases: string list) rts: exp list =
     let i = List.length acc in
 
     let (rt1', rt2') = List.assoc case !arrow_map in
-    
+
     let get_cached_length e =
       List.find_map (function
       | TypeLenC (i', e', l) when i = (i' + !values_cnt) && Il.Eq.eq_exp e e' -> Some l
@@ -672,7 +672,7 @@ let rec patch instrs =
   let ixx n = il_case ("I" ^ string_of_int n) "Jnn" [] in
   let handle_rec i instr =
     let instrs = nth_arg_of_case i instr in
-    let instrs' = 
+    let instrs' =
       match instrs.it with
       | ListE is -> {instrs with it = ListE (patch is)}
       | _ -> instrs
@@ -813,46 +813,73 @@ let rec gen_default_instrs rt1 rt2 =
     @ List.concat_map gen_default_instr' rt2
 
 let extract_type_sidecond sidecond =
+  (* TODO: Handle (or not) Wasm 2.0 *)
   match sidecond with
   | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
       { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
-      func
-    ]; _}) ->
-    (try
-      assert (case_of_case func = Atom "FUNC");
-      let arrow = nth_arg_of_case 0 func in
-      let unwrap_listE e = match e.it with | ListE es -> es | _ -> failwith "Not a list" in
-      let rt1 = nth_arg_of_case 0 arrow |> nth_arg_of_case 0 |> unwrap_listE in
-      let rt2 = nth_arg_of_case 1 arrow |> nth_arg_of_case 0 |> unwrap_listE in
-      Some (exp_to_int idx, (rt1, rt2))
-    with | _ -> None)
-  | TypeCondC (idx, (rt1, rt2)) -> Some (idx, (rt1, rt2))
+      typ
+    ]; _}) -> Some (exp_to_int idx, typ)
+  | TypeCondC (idx, typ) -> Some (idx, typ)
   | _ -> None
 
-let register_typ rt1 rt2 =
+let arrow_to_func rt1 rt2 =
+  let f_rt rt = il_case "" "resulttype" [il_list rt (mk_VarT "valtype")] in
+  let func = CaseE (
+    [[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []],
+    il_tup [f_rt rt1; f_rt rt2]
+  ) |> to_phrase (mk_VarT "functype") in
+  match !Flag.version with
+  | 3 -> il_case "FUNC" "comptype" [func]
+  | _ -> func
+
+let alloc idxs =
+  let rec aux expected = function
+    | [] -> expected
+    | x :: xs ->
+        if x = expected then aux (expected + 1) xs
+        else if x > expected then expected
+        else aux expected xs
+  in
+  aux 0 (List.sort compare idxs)
+
+let register_func_typ rt1 rt2 =
   let type_conds = List.filter_map extract_type_sidecond !sideconds in
 
   let existing_types =
     let eq_exps l1 l2 = List.length l1 = List.length l2 && List.for_all2 Il.Eq.eq_exp l1 l2 in
-    List.filter (fun (_, (rt1', rt2')) ->
-      eq_exps rt1 rt1' && eq_exps rt2 rt2'
+    List.filter (fun (_, typ) ->
+      match typ.it with
+      | CaseE ([[{it = Atom "FUNC"; _}]; []], _) ->
+        print_endline (Il.Print.string_of_exp typ);
+        let arrow = nth_arg_of_case 0 typ in
+        let unwrap_listE e = match e.it with | ListE es -> es | _ -> failwith "Not a list" in
+        let rt1' = arrow |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> unwrap_listE in
+        let rt2' = arrow |> nth_arg_of_case 1 |> nth_arg_of_case 0 |> unwrap_listE in
+        eq_exps rt1 rt1' && eq_exps rt2 rt2'
+      | _ -> false
     ) type_conds
   in
   let tid =
     match existing_types with
     | [] ->
-      let sorted = List.sort compare (List.map fst type_conds) in
-      let rec aux expected = function
-        | [] -> expected
-        | x :: xs ->
-            if x = expected then aux (expected + 1) xs
-            else if x > expected then expected
-            else aux expected xs
-      in
-      let idx = aux 0 sorted in
-      sideconds := TypeCondC (idx, (rt1, rt2)) :: !sideconds;
+      let idx = alloc (List.map fst type_conds) in
+      sideconds := TypeCondC (idx, arrow_to_func rt1 rt2) :: !sideconds;
       idx
-    | _ -> Utils.choose existing_types |> fst
+    | _ -> choose existing_types |> fst
+  in
+  NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
+
+let register_typ t =
+  let type_conds = List.filter_map extract_type_sidecond !sideconds in
+
+  let existing_types = List.filter (fun (_, typ) -> Il.Eq.eq_exp t typ) type_conds in
+  let tid =
+    match existing_types with
+    | [] ->
+      let idx = alloc (List.map fst type_conds) in
+      sideconds := TypeCondC (idx, t) :: !sideconds;
+      idx
+    | _ -> choose existing_types |> fst
   in
   NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
 
@@ -890,12 +917,12 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
     if i = block_cnt then acc, rt else
     match List.assoc_opt i label_conds with
     | None ->
-      let blocktype = [register_typ [] rt] |> il_case "_IDX" "blocktype" in
+      let blocktype = [register_func_typ [] rt] |> il_case "_IDX" "blocktype" in
       wrap_as_block (i+1)
       [il_case "BLOCK" "instr" [blocktype; ListE acc |> to_phrase (IterT (mk_VarT "instr", List) $ no_region)]]
       rt
     | Some rt'->
-      let blocktype = [register_typ [] rt'] |> il_case "_IDX" "blocktype" in
+      let blocktype = [register_func_typ [] rt'] |> il_case "_IDX" "blocktype" in
       let suffix = gen_default_instrs rt rt' in
       wrap_as_block (i+1)
       [il_case "BLOCK" "instr" [blocktype; ListE (acc @ suffix) |> to_phrase (IterT (mk_VarT "instr", List) $ no_region)]]
@@ -904,7 +931,7 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
 
   let instrs, rt = wrap_as_block 0 instrs rt in
 
-  let typeidx = register_typ
+  let typeidx = register_func_typ
     (List.init param_num (fun i ->
       match List.assoc_opt i local_conds with
       | None -> gen_typ (mk_VarT "valtype")
@@ -941,32 +968,6 @@ let gen_stuffs fname extract default name tname f_args =
 
 (* 5. wrap_as_func: Wrap the generated function sequence with module, including types, globals, etc. *)
 let wrap_as_module (func: exp) =
-  ignore func;
-
-  (* 1. Generate types *)
-  let arrow_to_type rt1 rt2 =
-    let func = CaseE ([[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []], il_tup [il_list rt1 (mk_VarT "valtype"); il_list rt2 (mk_VarT "valtype")]) $$ no_region % mk_VarT "functype" in
-    match !Flag.version with
-    | 3 ->
-        il_case "REC" "rectype" [
-          il_list [il_case "SUB" "subtype" [
-            il_some "FINAL" "fin";
-            il_list [] (mk_VarT "typeuse");
-            il_case "FUNC" "comptype" [func];
-          ]] (mk_VarT "subtype")
-        ]
-    | _ -> func
-  in
-
-  let types = gen_stuffs
-    "TYPES"
-    extract_type_sidecond
-    (fun _ -> [], [])
-    "TYPE"
-    "type"
-    (fun (rt1, rt2) -> [arrow_to_type rt1 rt2])
-  in
-
   (* 2. Generate globals *)
   let extract_global_sidecond = extract_context_sidecond "GLOBALS" (fun e ->
     match e.it with
@@ -1042,15 +1043,22 @@ let wrap_as_module (func: exp) =
   in
 
   (* 5. Generate tags *)
-  let extract_tag_sidecond = (fun _ -> None) in (* TODO *)
-  let default_tag () = gen_typ (mk_VarT "typeidx") in
+  let extract_tag_sidecond sidecond =
+    match sidecond with
+    | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
+        { it = IdxE ({ it = DotE (_C, {it = Atom "TAGS"; _}); _ }, idx); _ };
+        func
+      ]; _}) -> Some (exp_to_int idx, func)
+    | _ -> None
+  in
+  let default_tag () = arrow_to_func [] [] in
   let tags = gen_stuffs
     "TAGS"
     extract_tag_sidecond
     default_tag
     "TAG"
     "tag"
-    (fun tid -> [tid])
+    (fun func -> [register_typ func])
   in
 
   (* 6. Generate elems *)
@@ -1079,6 +1087,30 @@ let wrap_as_module (func: exp) =
     "DATA"
     "data"
     (fun (bs, datamode) -> [il_list bs (mk_VarT "byte"); datamode])
+  in
+
+  (* 1. Generate types *)
+  let to_rectype comptype =
+    il_case "REC" "rectype" [
+      il_list [il_case "SUB" "subtype" [
+        il_some "FINAL" "fin";
+        il_list [] (mk_VarT "typeuse");
+        comptype;
+      ]] (mk_VarT "subtype")
+    ]
+  in
+
+  let types = gen_stuffs
+    "TYPES"
+    extract_type_sidecond
+    (fun _ -> arrow_to_func [] [])
+    "TYPE"
+    "type"
+    (fun t -> [
+      match !Flag.version with
+      | 3 -> to_rectype t
+      | _ -> t
+    ])
   in
 
   let funcs = [func] in (* TODO *)
@@ -1127,7 +1159,7 @@ let gen_module (cases: string list): Al.Ast.value =
   List.iter (fun e ->
     Log.debug (Il.Print.string_of_exp e);
   ) instrs;
-  
+
   (* 3.5 Manual patch *)
   Log.debug ("===3.5===");
   let instrs = patch instrs in
