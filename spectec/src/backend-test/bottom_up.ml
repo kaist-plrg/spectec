@@ -886,7 +886,7 @@ let register_typ t =
 (* 4. wrap_as_func: Wrap the generated instruction sequence with func, including params and blocks *)
 let wrap_as_func (instrs: exp list) (rt: restype) =
   (* 1. If sidecondition contains something about local, generate locals *)
-  let extract_local_sidecond = extract_context_sidecond "LOCAL" (fun e ->
+  let extract_local_sidecond = extract_context_sidecond "LOCALS" (fun e ->
     match e.it with
     | CaseE ([[]; []; []], {it = TupE [init; t]; _}) -> (* Wasm 3 *)
       let is_set e =
