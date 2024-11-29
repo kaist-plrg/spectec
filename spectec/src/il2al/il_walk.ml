@@ -3,8 +3,8 @@ open Il.Ast
 
 (* Walker-based transformer *)
 
-let rec transform_expr f e =
-  let new_ = transform_expr f in
+let rec transform_exp f e =
+  let new_ = transform_exp f in
   let it =
     match e.it with
     | VarE _
@@ -40,7 +40,7 @@ let rec transform_expr f e =
 
 and transform_arg f a =
   { a with it = match a.it with
-    | ExpA e -> ExpA (transform_expr f e)
+    | ExpA e -> ExpA (transform_exp f e)
     | TypA t -> TypA t
     | DefA id -> DefA id
     | GramA id -> GramA id }
@@ -53,8 +53,8 @@ and transform_typ f t =
 
 let rec transform_prem f p =
   { p with it = match p.it with
-    | RulePr (id, mixop, e) -> RulePr (id, mixop, transform_expr f e)
-    | IfPr e -> IfPr (transform_expr f e)
-    | LetPr (e1, e2, xs) -> LetPr (transform_expr f e1, transform_expr f e2, xs)
+    | RulePr (id, mixop, e) -> RulePr (id, mixop, transform_exp f e)
+    | IfPr e -> IfPr (transform_exp f e)
+    | LetPr (e1, e2, xs) -> LetPr (transform_exp f e1, transform_exp f e2, xs)
     | ElsePr -> ElsePr
     | IterPr (p, iterexp) -> IterPr (transform_prem f p, iterexp) } (* TODO: iterexp *)

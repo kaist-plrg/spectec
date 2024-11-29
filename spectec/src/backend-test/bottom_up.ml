@@ -187,20 +187,39 @@ let rec unify_exp map e1 e2 =
     | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 (** End of Helpers to handle type-family-based generation **)
 
+type sidecond =
+  | TypeLenC of int * exp * int
+  | RulePrC of (id * mixop * exp)
+  | IfPrC of exp
+  | TypeCondC of int * exp
+  | ContextLenC of string * int
+let sideconds: sidecond list ref = ref []
+
+let as_sidecond pr =
+  match pr.it with
+  | IfPr e -> [IfPrC e]
+  | RulePr (id, mixop, e) -> [RulePrC (id, mixop, e)]
+  | _ -> []
+
 type context = {
   typ: typ;
   args: arg list;
   prems: prem list;
 }
 
-(* HARDCODE: force valid expressions *)
+(* HARDCODE: force valid expressions + append sidecondtions by this expression *)
 let validate x e =
-  match x with
-  | "limits" ->
+  match x, e.it with
+  | "limits", _ ->
     let l = nth_arg_of_case 0 e in
     let r = nth_arg_of_case 1 e in
     if nth_arg_of_case 0 l <= nth_arg_of_case 0 r then e else
     e |> replace_caseE_arg [0] r |> replace_caseE_arg [1] l
+  | ("typeuse" | "heaptype"), CaseE ([[{it = Atom "_IDX"; _}]; []], _) ->
+    let tid = e |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> exp_to_int in
+    let sidecond = ContextLenC ("TYPES", tid + 1) in
+    sideconds := sidecond :: !sideconds;
+    e
   | _ -> e
 
 let try_gen_from_prems prems e =
@@ -338,19 +357,6 @@ let rule_to_prems rule =
   let RuleD (_, _, _, _, prems) = rule.it in
   prems
 
-type sidecond =
-  | TypeLenC of int * exp * int
-  | RulePrC of (id * mixop * exp)
-  | IfPrC of exp
-  | TypeCondC of int * exp
-let sideconds: sidecond list ref = ref []
-
-let as_sidecond pr =
-  match pr.it with
-  | IfPr e -> [IfPrC e]
-  | RulePr (id, mixop, e) -> [RulePrC (id, mixop, e)]
-  | _ -> []
-
 let rec unify_vts' map es1 es2 =
   match es1, es2 with
   | [], _ | _, [] -> map
@@ -363,7 +369,7 @@ let print_unify_result =
 
 let apply_unify_result result e =
   List.fold_left (fun e (x, e_x) ->
-    transform_expr (replace_id_with x e_x) e
+    transform_exp (replace_id_with x e_x) e
   ) e result
 
 let apply_unify_result_prem result p =
@@ -373,7 +379,7 @@ let apply_unify_result_prem result p =
 
 let fix_free_var ess =
   let free_vars = ref [] in
-  List.map (transform_expr (fun e ->
+  List.map (transform_exp (fun e ->
     match e.it with
     | VarE x -> free_vars := (x.it, e.note) :: !free_vars; e
     | _ -> e
@@ -382,7 +388,7 @@ let fix_free_var ess =
   |>
   List.fold_left (fun ess (x, typ) ->
     let e = gen_typ typ in
-    List.map (List.map (transform_expr (replace_id_with x e))) ess
+    List.map (List.map (transform_exp (replace_id_with x e))) ess
   ) ess
 
 (* 1. fix_rts: pre-determine concrete types of each cases *)
@@ -414,13 +420,13 @@ let fix_rts (cases: string list): restype list =
         let length = get_cached_length e in
         List.init length (fun i ->
           List.fold_left (fun e (x, _) ->
-            transform_expr (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+            transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
           ) e xes
         )
       | _ -> [rt]
     in
 
-    let append_idx = transform_expr (replace_id_using (fun x -> x ^ "@" ^ (string_of_int i))) in
+    let append_idx = transform_exp (replace_id_using (fun x -> x ^ "@" ^ (string_of_int i))) in
 
     let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx in
     let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx in
@@ -453,7 +459,7 @@ let fix_rts (cases: string list): restype list =
 
 let concretize_instr trule instr =
   let free_vars = ref [] in
-  transform_expr (fun e ->
+  transform_exp (fun e ->
     match e.it with
     | VarE id when id.it <> "_" -> free_vars := e :: !free_vars; e
     | _ -> e
@@ -469,11 +475,11 @@ let concretize_instr trule instr =
     let trule' = {trule with it =
       match trule.it with
       | RuleD (id, binds, mixop, exp, prems) ->
-        let exp' = exp |> transform_expr (replace e e') in
+        let exp' = exp |> transform_exp (replace e e') in
         let prems' = prems |> List.map (transform_prem (replace e e')) in
         RuleD (id, binds, mixop, exp', prems')
     } in
-    let instr' = transform_expr (replace e e') instr in
+    let instr' = transform_exp (replace e e') instr in
     trule', instr'
   ) (trule, instr)
 
@@ -571,7 +577,7 @@ let fix_immediate (cases: string list) rts: exp list =
         let length = get_cached_length e |> Option.get in
         List.init length (fun i ->
           List.fold_left (fun e (x, _) ->
-            transform_expr (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+            transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
           ) e xes
         )
       | _ -> [rt]
@@ -598,7 +604,7 @@ let fix_immediate (cases: string list) rts: exp list =
         in
         let es = List.init l (fun i ->
           List.fold_left (fun e (x, _) ->
-            transform_expr (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+            transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
           ) e' xes) in
         let it = ListE es in
         { e with it }
@@ -610,7 +616,7 @@ let fix_immediate (cases: string list) rts: exp list =
             OptE (Some e') }
       | _ -> e
     in
-    let iter_to_list = transform_expr iter_to_list' in
+    let iter_to_list = transform_exp iter_to_list' in
     let iter_to_list_prem = transform_prem iter_to_list' in (* TODO: Handle IterPr *)
 
     (* Transform trule *)
@@ -743,8 +749,8 @@ let rec patch instrs =
     | Atom "TRY_TABLE"  -> instr |> handle_rec 2
     | _ -> instr
     )
-    |> transform_expr patch_shape
-    |> transform_expr patch_sz
+    |> transform_exp patch_shape
+    |> transform_exp patch_sz
   ) instrs
 
 (* Helper for extracting sidecond *)
@@ -797,6 +803,7 @@ let extract_context_len_sidecond field sidecond =
   when field = field'
   ->
     Some (exp_to_int len)
+  | ContextLenC (field', len) when field = field' -> Some len
   | _ -> None
 
 
@@ -832,7 +839,7 @@ let arrow_to_func rt1 rt2 =
   | 3 -> il_case "FUNC" "comptype" [func]
   | _ -> func
 
-let alloc idxs =
+let alloc min idxs =
   let rec aux expected = function
     | [] -> expected
     | x :: xs ->
@@ -840,48 +847,35 @@ let alloc idxs =
         else if x > expected then expected
         else aux expected xs
   in
-  aux 0 (List.sort compare idxs)
-
-let register_func_typ rt1 rt2 =
-  let type_conds = List.filter_map extract_type_sidecond !sideconds in
-
-  let existing_types =
-    let eq_exps l1 l2 = List.length l1 = List.length l2 && List.for_all2 Il.Eq.eq_exp l1 l2 in
-    List.filter (fun (_, typ) ->
-      match typ.it with
-      | CaseE ([[{it = Atom "FUNC"; _}]; []], _) ->
-        print_endline (Il.Print.string_of_exp typ);
-        let arrow = nth_arg_of_case 0 typ in
-        let unwrap_listE e = match e.it with | ListE es -> es | _ -> failwith "Not a list" in
-        let rt1' = arrow |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> unwrap_listE in
-        let rt2' = arrow |> nth_arg_of_case 1 |> nth_arg_of_case 0 |> unwrap_listE in
-        eq_exps rt1 rt1' && eq_exps rt2 rt2'
-      | _ -> false
-    ) type_conds
-  in
-  let tid =
-    match existing_types with
-    | [] ->
-      let idx = alloc (List.map fst type_conds) in
-      sideconds := TypeCondC (idx, arrow_to_func rt1 rt2) :: !sideconds;
-      idx
-    | _ -> choose existing_types |> fst
-  in
-  NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
+  aux min (List.sort compare idxs)
 
 let register_typ t =
   let type_conds = List.filter_map extract_type_sidecond !sideconds in
+
+  let tids = ref [] in
+  let extract_tid e =
+    match e with
+    | {it = CaseE ([[{it = Atom "_IDX"; _}]; []], _); note = {it = VarT ({it = ("typeuse" | "heaptype"); _}, []); _}; _}  ->
+      let tid = e |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> exp_to_int in
+      tids := tid :: !tids;
+      e
+    | _ -> e
+  in
+  transform_exp extract_tid t |> ignore;
+  let tid_max = List.fold_left max 0 !tids in
 
   let existing_types = List.filter (fun (_, typ) -> Il.Eq.eq_exp t typ) type_conds in
   let tid =
     match existing_types with
     | [] ->
-      let idx = alloc (List.map fst type_conds) in
+      let idx = alloc tid_max (List.map fst type_conds) in
       sideconds := TypeCondC (idx, t) :: !sideconds;
       idx
     | _ -> choose existing_types |> fst
   in
   NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
+
+let register_func_typ rt1 rt2 = register_typ (arrow_to_func rt1 rt2)
 
 (* 4. wrap_as_func: Wrap the generated instruction sequence with func, including params and blocks *)
 let wrap_as_func (instrs: exp list) (rt: restype) =
