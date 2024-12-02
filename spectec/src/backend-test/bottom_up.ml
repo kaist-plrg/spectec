@@ -188,8 +188,8 @@ let rec unify_exp map e1 e2 =
 (** End of Helpers to handle type-family-based generation **)
 
 type sidecond =
-  | TypeLenC of int * exp * int
-  | RulePrC of (id * mixop * exp)
+  | IterLenC of int * exp * int
+  | RulePrC of id * mixop * exp
   | IfPrC of exp
   | TypeCondC of int * exp
   | ContextLenC of string * int
@@ -200,6 +200,14 @@ let as_sidecond pr =
   | IfPr e -> [IfPrC e]
   | RulePr (id, mixop, e) -> [RulePrC (id, mixop, e)]
   | _ -> []
+
+let string_of_sidecond = function
+  | IterLenC (i, e, l) -> Printf.sprintf "-- |%s*| = %d @ %d" (Il.Print.string_of_exp e) l i
+  | RulePrC (x, mixop, e) -> Printf.sprintf "-- %s: %s %s" x.it (Il.Print.string_of_mixop mixop) (Il.Print.string_of_exp e)
+  | IfPrC e -> "-- " ^ Il.Print.string_of_exp e
+  | TypeCondC (i, e) -> Printf.sprintf "-- C.TYPES[%d] = %s" i (Il.Print.string_of_exp e)
+  | ContextLenC (x, i) -> Printf.sprintf "-- |C.%s[%d]| >= i" x i
+
 
 type context = {
   typ: typ;
@@ -371,11 +379,13 @@ let apply_unify_result result e =
   List.fold_left (fun e (x, e_x) ->
     transform_exp (replace_id_with x e_x) e
   ) e result
+  |> Il.Eval.reduce_exp !il_env
 
 let apply_unify_result_prem result p =
   List.fold_left (fun p (x, e_x) ->
     transform_prem (replace_id_with x e_x) p
   ) p result
+  |> transform_prem (Il.Eval.reduce_exp !il_env)
 
 let fix_free_var ess =
   let free_vars = ref [] in
@@ -405,7 +415,7 @@ let fix_rts (cases: string list): restype list =
         let l = Random.int 3 in (* 0, 1, 2 *)
         length_cache := (e, l) :: !length_cache;
 
-        let sidecond = TypeLenC (i, e, l) in
+        let sidecond = IterLenC (i, e, l) in
         sideconds := sidecond :: !sideconds;
 
         l
@@ -519,17 +529,37 @@ let accumulate_rtss rtss =
   ) [[]] rtss
 let values_cnt = ref 0
 
+let register_iterlen_cond i result p =
+  match p.it with
+  | IfPr ({it = CmpE (
+      LtOp _,
+      l,
+      ({it = LenE {it = IterE (e, _); _}; _})
+    ); _}) ->
+    (match l.it with
+    | VarE l ->
+      let j = Random.int 3 in (* TODO: Check if l is already in unify result *)
+      let sidecond = IterLenC (i, e, j + 1 + Random.int 2) in
+      sideconds := sidecond :: !sideconds;
+      (l.it, exp_of_int j) :: result
+    | _ ->
+      sideconds := IterLenC (i, e, exp_to_int l + 1 + Random.int 2) :: !sideconds;
+      result)
+  | _ -> result
+
 let rec simplify_equality prems =
   (* If there is equality prems within these prems, where one side is a variable, simplify the whole prems *)
   (* Assumption: No cyclic binding *)
   let is_eq_prem prem =
     match prem.it with
-    | IfPr ({it = CmpE (EqOp, {it = VarE x; _}, e); _})
-    | IfPr ({it = CmpE (EqOp, e, {it = VarE x; _}); _}) ->
+    | IfPr ({it = CmpE (EqOp, {it = VarE x; _}, ({it = CaseE _; _} as e)); _})
+    | IfPr ({it = CmpE (EqOp, ({it = CaseE _; _} as e), {it = VarE x; _}); _}) ->
       Either.Left ((x, e), prem)
+    (*
     | RulePr (id, _, {it = TupE [_C; {it = VarE x; _}; e]; _}) when String.ends_with ~suffix:"_sub" id.it ->
       (* TODO: subtype is currently considered eq *)
       Either.Left((x, e), prem)
+    *)
     | _ -> Either.Right prem
   in
   match List.partition_map is_eq_prem prems with
@@ -560,13 +590,13 @@ let fix_immediate (cases: string list) rts: exp list =
   let rts = List.tl rts in
 
   List.fold_left2 (fun (acc, rt1) case rt2 ->
-    let i = List.length acc in
+    let i = List.length acc - !values_cnt in
 
     let (rt1', rt2') = List.assoc case !arrow_map in
 
     let get_cached_length e =
       List.find_map (function
-      | TypeLenC (i', e', l) when i = (i' + !values_cnt) && Il.Eq.eq_exp e e' -> Some l
+      | IterLenC (i', e', l) when i = i' && Il.Eq.eq_exp e e' -> Some l
       | _ -> None) !sideconds
     in
     let rec mk_vts rt =
@@ -609,6 +639,7 @@ let fix_immediate (cases: string list) rts: exp list =
         let it = ListE es in
         { e with it }
       | IterE (e', (Opt, _)) ->
+        (* TODO: Entangle *)
         { e with it =
           if Random.bool () then
             OptE None
@@ -631,8 +662,9 @@ let fix_immediate (cases: string list) rts: exp list =
     let trule = {trule with it =
       match trule.it with
       | RuleD (id, binds, mixop, exp, prems) ->
-        let exp' = exp |> iter_to_list |> apply_unify_result unify_result in
-        let prems' = prems |> List.map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result) in
+        let unify_result' = List.fold_left (register_iterlen_cond i) unify_result prems in
+        let exp' = exp |> iter_to_list |> apply_unify_result unify_result' in
+        let prems' = prems |> List.map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result') in
         RuleD (id, binds, mixop, exp', prems')
     } in
 
@@ -641,7 +673,7 @@ let fix_immediate (cases: string list) rts: exp list =
 
     sideconds := (
       rule_to_prems trule
-      (* |> simplify_equality *) (* TODO: This should be moved to someting like unify *)
+      |> simplify_equality (* TODO: This should be moved to someting like unify *)
       |> concretize_prems
       |> List.concat_map as_sidecond
     ) @ !sideconds;
@@ -770,6 +802,14 @@ let extract_context_sidecond field f_elem sidecond =
     if field' <> field then
       None
     else
+      (match f_elem elem with
+      | None -> None
+      | Some x -> Some (exp_to_int index, x))
+  | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
+      _C;
+      {it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _};
+      elem
+    ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
       (match f_elem elem with
       | None -> None
       | Some x -> Some (exp_to_int index, x))
