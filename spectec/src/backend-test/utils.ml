@@ -102,3 +102,9 @@ let rec walk_value f v =
   | TupV vl -> TupV (List.map new_ vl)
 
 let copy_value = walk_value (fun v -> v)
+
+(* Stack utils *)
+let push v s = s := v :: !s
+let pop s = s := List.tl !s
+let top s = List.hd !s
+let string_of_stack s = String.concat "," !s

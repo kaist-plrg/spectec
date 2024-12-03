@@ -41,13 +41,15 @@ let to_phrase ty x = x $$ no_region % ty
 let mk_VarT x = VarT (x $ no_region, []) $ no_region
 let il_case name tname args =
   CaseE (
-    (if name = "" then [] else [El.Atom.Atom name $$ no_region % (El.Atom.info name)]) :: (List.map (fun _ -> []) args),
-    TupE args $$ no_region % (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
-  ) $$ no_region % (mk_VarT tname)
+    (if name = "" then [] else [El.Atom.Atom name |> to_phrase (El.Atom.info name)]) :: (List.map (fun _ -> []) args),
+    TupE args |> to_phrase (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
+  ) |> to_phrase (mk_VarT tname)
 let il_list es t =
-  ListE es $$ no_region % (IterT (t, List) $ no_region)
+  ListE es |> to_phrase (IterT (t, List) $ no_region)
+let il_opt e_opt t =
+  OptE e_opt |> to_phrase (IterT (t, Opt) $ no_region)
 let il_tup es =
-  TupE es $$ no_region % (TupT (List.map (fun e -> e, e.note) es) $ no_region)
+  TupE es |> to_phrase (TupT (List.map (fun e -> e, e.note) es) $ no_region)
 let some_opt = OptE (Some (il_tup [])) |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
 let none_opt = OptE None |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
 let il_some x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.Atom.Quest |> to_phrase (El.Atom.info "?")]], il_tup [some_opt]) |> to_phrase (mk_VarT t)
@@ -97,6 +99,11 @@ let exp_to_int e =
   | _ -> failwith (Il.Print.string_of_exp e ^ " is not an integer")
 let exp_of_int i =
   NatE (Z.of_int i) |> to_phrase (NumT NatT $ no_region)
+
+let exp_to_list e =
+  match e.it with
+  | ListE es -> es
+  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a list")
 
 let rec unify_exp map e1 e2 =
   let rec resolve e =
@@ -208,6 +215,126 @@ let string_of_sidecond = function
   | TypeCondC (i, e) -> Printf.sprintf "-- C.TYPES[%d] = %s" i (Il.Print.string_of_exp e)
   | ContextLenC (x, i) -> Printf.sprintf "-- |C.%s[%d]| >= i" x i
 
+(* Helper for extracting sidecond *)
+let extract_context_sidecond field f_elem sidecond =
+  match sidecond with
+  | IfPrC {it = CmpE (
+      EqOp,
+      {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _},
+      elem
+    ); _}
+  | IfPrC {it = CmpE (
+      EqOp,
+      elem,
+      {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _}
+    ); _}
+  ->
+    if field' <> field then
+      None
+    else
+      (match f_elem elem with
+      | None -> None
+      | Some x -> Some (exp_to_int index, x))
+  | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
+      _C;
+      {it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _};
+      elem
+    ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
+      (match f_elem elem with
+      | None -> None
+      | Some x -> Some (exp_to_int index, x))
+  | _ -> None
+
+let extract_context_len_sidecond field sidecond =
+  match sidecond with
+  | IfPrC {it = CmpE (
+      LtOp _,
+      len,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
+    ); _}
+  | IfPrC {it = CmpE (
+      GtOp _,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
+      len
+    ); _}
+  when field = field'
+  ->
+    Some (exp_to_int len + 1)
+  | IfPrC {it = CmpE (
+      LeOp _,
+      len,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
+    ); _}
+  | IfPrC {it = CmpE (
+      GeOp _,
+      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
+      len
+    ); _}
+  when field = field'
+  ->
+    Some (exp_to_int len)
+  | ContextLenC (field', len) when field = field' -> Some len
+  | _ -> None
+
+let extract_type_sidecond sidecond =
+  (* TODO: Handle (or not) Wasm 2.0 *)
+  match sidecond with
+  | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
+      { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
+      typ
+    ]; _}) -> Some (exp_to_int idx, typ)
+  | TypeCondC (idx, typ) -> Some (idx, typ)
+  | _ -> None
+
+let alloc min idxs =
+  let rec aux expected = function
+    | [] -> expected
+    | x :: xs ->
+        if x = expected then aux (expected + 1) xs
+        else if x > expected then expected
+        else aux expected xs
+  in
+  aux min (List.sort compare idxs)
+
+let register_typ t =
+  let type_conds = List.filter_map extract_type_sidecond !sideconds in
+
+  let tids = ref [] in
+  let extract_tid e =
+    match e with
+    | {it = CaseE ([[{it = Atom "_IDX"; _}]; []], _); note = {it = VarT ({it = ("typeuse" | "heaptype"); _}, []); _}; _}  ->
+      let tid = e |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> exp_to_int in
+      tids := tid :: !tids;
+      e
+    | _ -> e
+  in
+  transform_exp extract_tid t |> ignore;
+  let tid_max = List.fold_left max 0 !tids in
+
+  let existing_types = List.filter (fun (_, typ) -> Il.Eq.eq_exp t typ) type_conds in
+  let tid =
+    match existing_types with
+    | [] ->
+      let idx = alloc tid_max (List.map fst type_conds) in
+      sideconds := TypeCondC (idx, t) :: !sideconds;
+      idx
+    | _ -> choose existing_types |> fst
+  in
+  NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
+
+let arrow_to_func rt1 rt2 =
+  let f_rt rt = il_case "" "resulttype" [il_list rt (mk_VarT "valtype")] in
+  let func = CaseE (
+    [[]; [El.Atom.Arrow |> to_phrase (El.Atom.info "->")]; []],
+    il_tup [f_rt rt1; f_rt rt2]
+  ) |> to_phrase (mk_VarT "functype") in
+  match !Flag.version with
+  | 3 -> il_case "FUNC" "comptype" [func]
+  | _ -> func
+
+let register_func_typ rt1 rt2 = register_typ (arrow_to_func rt1 rt2)
+
+(* Helpers for Top Down Gen *)
 
 type context = {
   typ: typ;
@@ -467,32 +594,6 @@ let fix_rts (cases: string list): restype list =
   |> List.rev
   |> fix_free_var
 
-let concretize_instr trule instr =
-  let free_vars = ref [] in
-  transform_exp (fun e ->
-    match e.it with
-    | VarE id when id.it <> "_" -> free_vars := e :: !free_vars; e
-    | _ -> e
-  ) instr |> ignore;
-
-  let replaces = ref [] in
-
-  dedup Il.Eq.eq_exp (List.rev !free_vars)
-  |> List.fold_left (fun (trule, instr) e ->
-    let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
-    let e' = gen_typ t in
-    replaces := (e, e') :: !replaces;
-    let trule' = {trule with it =
-      match trule.it with
-      | RuleD (id, binds, mixop, exp, prems) ->
-        let exp' = exp |> transform_exp (replace e e') in
-        let prems' = prems |> List.map (transform_prem (replace e e')) in
-        RuleD (id, binds, mixop, exp', prems')
-    } in
-    let instr' = transform_exp (replace e e') instr in
-    trule', instr'
-  ) (trule, instr)
-
 (* 2. fix_values: generate necessary values in front of main instrs *)
 let fix_values vt: string list * restype list =
   match vt.it with
@@ -547,6 +648,32 @@ let register_iterlen_cond i result p =
       result)
   | _ -> result
 
+let concretize_instr trule instr =
+  let free_vars = ref [] in
+  transform_exp (fun e ->
+    match e.it with
+    | VarE id when id.it <> "_" -> free_vars := e :: !free_vars; e
+    | _ -> e
+  ) instr |> ignore;
+
+  let replaces = ref [] in
+
+  dedup Il.Eq.eq_exp (List.rev !free_vars)
+  |> List.fold_left (fun (trule, instr) e ->
+    let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
+    let e' = gen_typ t in
+    replaces := (e, e') :: !replaces;
+    let trule' = {trule with it =
+      match trule.it with
+      | RuleD (id, binds, mixop, exp, prems) ->
+        let exp' = exp |> transform_exp (replace e e') in
+        let prems' = prems |> List.map (transform_prem (replace e e')) in
+        RuleD (id, binds, mixop, exp', prems')
+    } in
+    let instr' = transform_exp (replace e e') instr in
+    trule', instr'
+  ) (trule, instr)
+
 let rec simplify_equality prems =
   (* If there is equality prems within these prems, where one side is a variable, simplify the whole prems *)
   (* Assumption: No cyclic binding *)
@@ -585,7 +712,7 @@ let concretize_prems prems =
   ) prems
 
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
-let fix_immediate (cases: string list) rts: exp list =
+let rec fix_immediate (cases: string list) rts: exp list =
   let rt = List.hd rts in
   let rts = List.tl rts in
 
@@ -627,6 +754,7 @@ let fix_immediate (cases: string list) rts: exp list =
     let iter_to_list' e =
       match e.it with
       | IterE (e', (List, xes)) ->
+        if Il.Eq.eq_typ e'.note (mk_VarT "instr") then e else
         let l =
           match get_cached_length e' with
           | None -> Random.int 3
@@ -668,6 +796,7 @@ let fix_immediate (cases: string list) rts: exp list =
         RuleD (id, binds, mixop, exp', prems')
     } in
 
+    let trule = handle_special_prems trule in
     let instr = rule_to_instr trule in
     let trule, instr = concretize_instr trule instr in
 
@@ -680,6 +809,79 @@ let fix_immediate (cases: string list) rts: exp list =
 
     instr :: acc, rt2
   ) ([], rt) cases rts |> fst |> List.rev
+
+(* Hardcoded handlers for special kinds of relations *)
+and handle_special_prems trule =
+  let RuleD (id, binds, mixop, exp, prems) = trule.it in
+
+  (* 1. Handle Instrs_ok *)
+  let is_instrs_ok p =
+    match p.it with
+    | RulePr ({it = "Instrs_ok"; _}, _, {it = TupE [
+        _C;
+        {it = IterE _; _} as instrs;
+        arrow
+      ]; _}) ->
+      (* Assumption: Arrow is already concretized *)
+      let rt1 = nth_arg_of_case 0 arrow |> nth_arg_of_case 0 |> exp_to_list in
+      let rt2 = nth_arg_of_case (if !Flag.version = 3 then 2 else 1) arrow |> nth_arg_of_case 0 |> exp_to_list in
+      Either.Left (instrs, rt1, rt2)
+    | _ ->
+      Either.Right p
+  in
+  let oks, prems = List.partition_map is_instrs_ok prems in
+
+  let exp, prems = List.fold_left (fun (exp, prems) (instrs, rt1, rt2) ->
+    let instrs' = il_list (gen_default_instrs rt1 rt2) (mk_VarT "instr") in
+    let f = replace instrs instrs' in
+    transform_exp f exp,
+    List.map (transform_prem f) prems
+  ) (exp, prems) oks in
+
+  (* 2. Handle Blocktype_ok *)
+  let is_blocktype_ok p =
+    match p.it with
+    | RulePr ({it = "Blocktype_ok"; _}, _, {it = TupE [
+        _C;
+        bt;
+        arrow
+      ]; _}) ->
+      (* Assumption: Arrow is already concretized *)
+      let rt1 = nth_arg_of_case 0 arrow |> nth_arg_of_case 0 |> exp_to_list in
+      let rt2 = nth_arg_of_case (if !Flag.version = 3 then 2 else 1) arrow |> nth_arg_of_case 0 |> exp_to_list in
+      Either.Left (bt, rt1, rt2)
+    | _ ->
+      Either.Right p
+  in
+  let oks, prems = List.partition_map is_blocktype_ok prems in
+  
+  let exp, prems = List.fold_left (fun (exp, prems) (bt, rt1, rt2) ->
+    let bt' =
+      match rt1, rt2 with
+      | [], [] when Random.bool () -> il_case "_RESULT" "blocktype" [il_opt None (mk_VarT "valtype")]
+      | [], [vt] when Random.bool () -> il_case "_RESULT" "blocktype" [il_opt (Some vt) (mk_VarT "valtype")]
+      | _ -> il_case "_IDX" "blocktype" [register_func_typ rt1 rt2]
+    in
+    let f = replace bt bt' in
+    transform_exp f exp,
+    List.map (transform_prem f) prems
+  ) (exp, prems) oks in
+
+  (* re-construct *)
+  let it = RuleD (id, binds, mixop, exp, prems) in
+  {trule with it}
+
+(* TODO: This code heavily overlaps with fix_value. Do something. *)
+and gen_default_instr' vt =
+  let names, rts = fix_values vt in
+  fix_immediate names ([] :: rts)
+
+and gen_default_instrs rt1 rt2 =
+  match rt1, rt2 with
+  | hd1 :: tl1, hd2 :: tl2 when Il.Eq.eq_exp hd1 hd2 -> gen_default_instrs tl1 tl2
+  | _ ->
+    List.map (fun _ -> il_case "DROP" "instr" []) rt1
+    @ List.concat_map gen_default_instr' rt2
 
 (* 3.5 patch: Make manual, syntactic patch to instrs. Eventually should be removed, or automated *)
 let rec patch instrs =
@@ -784,138 +986,6 @@ let rec patch instrs =
     |> transform_exp patch_shape
     |> transform_exp patch_sz
   ) instrs
-
-(* Helper for extracting sidecond *)
-let extract_context_sidecond field f_elem sidecond =
-  match sidecond with
-  | IfPrC {it = CmpE (
-      EqOp,
-      {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _},
-      elem
-    ); _}
-  | IfPrC {it = CmpE (
-      EqOp,
-      elem,
-      {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _}
-    ); _}
-  ->
-    if field' <> field then
-      None
-    else
-      (match f_elem elem with
-      | None -> None
-      | Some x -> Some (exp_to_int index, x))
-  | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
-      _C;
-      {it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _};
-      elem
-    ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
-      (match f_elem elem with
-      | None -> None
-      | Some x -> Some (exp_to_int index, x))
-  | _ -> None
-
-let extract_context_len_sidecond field sidecond =
-  match sidecond with
-  | IfPrC {it = CmpE (
-      LtOp _,
-      len,
-      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
-    ); _}
-  | IfPrC {it = CmpE (
-      GtOp _,
-      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
-      len
-    ); _}
-  when field = field'
-  ->
-    Some (exp_to_int len + 1)
-  | IfPrC {it = CmpE (
-      LeOp _,
-      len,
-      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
-    ); _}
-  | IfPrC {it = CmpE (
-      GeOp _,
-      {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
-      len
-    ); _}
-  when field = field'
-  ->
-    Some (exp_to_int len)
-  | ContextLenC (field', len) when field = field' -> Some len
-  | _ -> None
-
-
-(* TODO: This code heavily overlaps with fix_value. Do something. *)
-let gen_default_instr' vt =
-  let names, rts = fix_values vt in
-  fix_immediate names ([] :: rts)
-
-let rec gen_default_instrs rt1 rt2 =
-  match rt1, rt2 with
-  | hd1 :: tl1, hd2 :: tl2 when Il.Eq.eq_exp hd1 hd2 -> gen_default_instrs tl1 tl2
-  | _ ->
-    List.map (fun _ -> il_case "DROP" "instr" []) rt1
-    @ List.concat_map gen_default_instr' rt2
-
-let extract_type_sidecond sidecond =
-  (* TODO: Handle (or not) Wasm 2.0 *)
-  match sidecond with
-  | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
-      { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
-      typ
-    ]; _}) -> Some (exp_to_int idx, typ)
-  | TypeCondC (idx, typ) -> Some (idx, typ)
-  | _ -> None
-
-let arrow_to_func rt1 rt2 =
-  let f_rt rt = il_case "" "resulttype" [il_list rt (mk_VarT "valtype")] in
-  let func = CaseE (
-    [[]; [El.Atom.Arrow $$ no_region % El.Atom.info "->"]; []],
-    il_tup [f_rt rt1; f_rt rt2]
-  ) |> to_phrase (mk_VarT "functype") in
-  match !Flag.version with
-  | 3 -> il_case "FUNC" "comptype" [func]
-  | _ -> func
-
-let alloc min idxs =
-  let rec aux expected = function
-    | [] -> expected
-    | x :: xs ->
-        if x = expected then aux (expected + 1) xs
-        else if x > expected then expected
-        else aux expected xs
-  in
-  aux min (List.sort compare idxs)
-
-let register_typ t =
-  let type_conds = List.filter_map extract_type_sidecond !sideconds in
-
-  let tids = ref [] in
-  let extract_tid e =
-    match e with
-    | {it = CaseE ([[{it = Atom "_IDX"; _}]; []], _); note = {it = VarT ({it = ("typeuse" | "heaptype"); _}, []); _}; _}  ->
-      let tid = e |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> exp_to_int in
-      tids := tid :: !tids;
-      e
-    | _ -> e
-  in
-  transform_exp extract_tid t |> ignore;
-  let tid_max = List.fold_left max 0 !tids in
-
-  let existing_types = List.filter (fun (_, typ) -> Il.Eq.eq_exp t typ) type_conds in
-  let tid =
-    match existing_types with
-    | [] ->
-      let idx = alloc tid_max (List.map fst type_conds) in
-      sideconds := TypeCondC (idx, t) :: !sideconds;
-      idx
-    | _ -> choose existing_types |> fst
-  in
-  NatE (Z.of_int tid) |> to_phrase (mk_VarT "typeidx")
-
-let register_func_typ rt1 rt2 = register_typ (arrow_to_func rt1 rt2)
 
 (* 4. wrap_as_func: Wrap the generated instruction sequence with func, including params and blocks *)
 let wrap_as_func (instrs: exp list) (rt: restype) =
@@ -1186,13 +1256,10 @@ let gen_module (cases: string list): Al.Ast.value =
   let cases = cases' @ cases in
   let rts = (accumulate_rtss rtss) @ List.tl rts in
   values_cnt := List.length cases';
-
+  
   (* 3. Fix immediates *)
   Log.debug ("===3===");
   let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
-  List.iter (fun e ->
-    Log.debug (Il.Print.string_of_exp e);
-  ) instrs;
 
   (* 3.5 Manual patch *)
   Log.debug ("===3.5===");
@@ -1201,7 +1268,7 @@ let gen_module (cases: string list): Al.Ast.value =
   (* 4. Wrap as a function *)
   Log.debug ("===4===");
   let func = wrap_as_func instrs (List.rev (List.hd (List.rev rts))) in (* TODO: It's too confusing to decide when to rev or not *)
-
+  
   (* 5. Wrap as a module *)
   Log.debug ("===5===");
   let module_ = wrap_as_module func |> Il.Eval.reduce_exp !il_env in

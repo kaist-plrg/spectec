@@ -301,7 +301,7 @@ let gen_test el' il' al' =
 
   (* Initialize *)
   Top_down.rts := List.map Top_down.get_rt (get_typing_rules ());
-  Top_down.estimate_const ();
+  Langs.estimate_const ();
   let st = Sys.time () in
   let times = ref [] in
 
