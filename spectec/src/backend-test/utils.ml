@@ -108,3 +108,13 @@ let push v s = s := v :: !s
 let pop s = s := List.tl !s
 let top s = List.hd !s
 let string_of_stack s = String.concat "," !s
+
+(* Rejection sampling *)
+exception OutOfLife
+let rec try_n n f =
+  if n <= 0 then
+    raise OutOfLife
+  else
+    match f () with
+    | Some x -> x
+    | None -> try_n (n-1) f

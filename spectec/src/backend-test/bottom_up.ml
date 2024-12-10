@@ -797,26 +797,26 @@ let register_iterlen_cond i result p =
 
 let concretize_instr trule instr =
   (* 1. Generate from syntax *)
-  let unify_result =
-    let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
-    unify_exp [] instr instr'
-  in
-  let trule, instr =
-    apply_unify_result_rule unify_result trule,
-    apply_unify_result unify_result instr
-  in
-  (*
-  ignore unify_result;
-  print_unify_result unify_result;
-  *)
+  let trule, instr = try_n 10 (fun () ->
+    let unify_result =
+      let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
+      unify_exp [] instr instr'
+    in
+    let trule, instr =
+      apply_unify_result_rule unify_result trule,
+      apply_unify_result unify_result instr
+    in
 
-  let prems = rule_to_prems trule in
-  let prems' = List.filter_map (fun p ->
-    match p.it with
-    | IfPr e -> Some {p with it = IfPr (Il.Eval.reduce_exp !il_env e)}
-    | _ -> None
-  ) prems in
-  List.iter (fun p -> print_endline @@ Il.Print.string_of_prem p) prems';
+    let prems = rule_to_prems trule in
+    if List.exists (fun p ->
+      match p.it with
+      | IfPr e -> (Il.Eval.reduce_exp !il_env e).it = BoolE false
+      | _ -> false
+    ) prems then
+      None
+    else
+      Some (trule, instr)
+  ) in
 
   (* 2. Fill in all free variables with random value *)
   let free_vars = ref [] in
