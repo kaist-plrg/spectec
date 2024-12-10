@@ -304,6 +304,11 @@ let gen_test el' il' al' =
   Langs.estimate_const ();
   let st = Sys.time () in
   let times = ref [] in
+  Printexc.register_printer (function
+    | Bottom_up.UnifyFail (e1, e2) ->
+      Some (Printf.sprintf "UnifyFail(%s, %s)" (Il.Print.string_of_exp e1) (Il.Print.string_of_exp e2))
+    | _ -> None
+  );
 
   List.init !Flag.n (fun i -> !Flag.seed + i)
   |> List.iter (fun seed -> try (

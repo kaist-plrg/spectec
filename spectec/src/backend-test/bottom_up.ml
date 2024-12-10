@@ -105,8 +105,9 @@ let exp_to_list e =
   | ListE es -> es
   | _ -> failwith (Il.Print.string_of_exp e ^ " is not a list")
 
+exception UnifyFail of exp * exp
 let unify_fail _map e1 e2 =
-  failwith ("Unification fail of " ^ (Il.Print.string_of_exp e1) ^ ", " ^ (Il.Print.string_of_exp e2))
+  raise @@ UnifyFail (e1, e2)
 let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
   let rec resolve e =
     match e.it with
@@ -136,6 +137,10 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
       && List.length xes1 = List.length xes2
       && List.for_all2 (fun (x1, e1) (x2, e2) -> Il.Eq.eq_id x1 x2 && Il.Eq.eq_exp e1 e2) xes1 xes2 ->
     f e1 e2
+  | ListE es1, ListE es2 when List.length es1 = List.length es2 ->
+    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
+  | OptE None, OptE None -> map
+  | OptE (Some e1), OptE (Some e2) -> f e1 e2
   | _, _ -> on_fail map e1 e2
 
 
@@ -151,7 +156,7 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
   let type_of_arg a =
     match a.it with
     | ExpA e -> type_of_exp e
-    | TypA t -> t
+    | TypA _ -> failwith "TODO"
     | DefA _ -> failwith "TODO"
     | GramA _ -> failwith "TODO"
   let typ_of_bind bind =
@@ -160,6 +165,12 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
     | TypB _
     | DefB _
     | GramB _ -> failwith "typ_of_bind"
+  let a2e a =
+    match a.it with
+    | ExpA e -> e
+    | _ -> failwith "Expected an ExpA"
+  let e2a e =
+    ExpA e $ e.at
 
   exception DispatchFail of string
 
@@ -180,7 +191,13 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
     | _, VarT (name, []) -> has_deftyp a (dispatch_deftyp name.it [] |> snd)
     | _ -> Il.Eq.eq_typ a.note t
   and has_argtype a p =
-    has_type a (type_of_arg p)
+    match a.it, (a2e p).it with
+    | CaseE (mixop1, {it = TupE args1; _}), CaseE (mixop2, {it = TupE args2; _}) ->
+      Il.Mixop.eq mixop1 mixop2
+      && List.for_all2 has_argtype args1 (List.map e2a args2)
+      && has_type a (type_of_arg p)
+    | _ ->
+      has_type a (type_of_arg p)
 
   and match_params args inst =
     match inst.it with
@@ -193,7 +210,10 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
     | Some insts ->
       ( match List.find_map (match_params args) insts with
         | Some matched -> matched
-        | None -> raise (DispatchFail name) )
+        | None -> raise (DispatchFail (
+          name ^ "(" ^ (args |> List.map (fun e -> Il.Print.string_of_exp e) |> String.concat ", ") ^ ")"
+        ))
+      )
     | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 (** End of Helpers to handle type-family-based generation **)
 
@@ -343,7 +363,16 @@ type context = {
   typ: typ;
   args: arg list;
   prems: prem list;
+  refer: exp option;
 }
+
+let has_same_mixop e_opt tc =
+  match e_opt, tc with
+  | None, _ -> true
+  | Some e, (mixop, _, _) ->
+    match e.it with
+    | CaseE (mixop', _) -> Il.Mixop.eq mixop mixop'
+    | _ -> true
 
 (* HARDCODE: force valid expressions + append sidecondtions by this expression *)
 let validate x e =
@@ -360,7 +389,9 @@ let validate x e =
     e
   | _ -> e
 
-let try_gen_from_prems prems e =
+let try_gen_from_prems c e =
+  let prems = c.prems in
+
   match e.it with
   | VarE id when id.it <> "_" ->
     let rec is_choose e' =
@@ -380,17 +411,18 @@ let try_gen_from_prems prems e =
       | _ -> None
     in
 
-    (match prems |> List.find_map (is_choose_prem) with
-    | Some es -> Some (choose es)
-    | None -> None)
+    (match (prems |> List.find_map (is_choose_prem), c.refer) with
+    | None, _ -> None
+    | Some es, None -> Some (choose es)
+    | Some es, Some r ->
+      (match List.find_opt (fun e -> Il.Eq.eq_exp e r) es with
+      | None -> Some (choose es)
+      | some -> some
+      )
+    )
   | _ -> None
 
 let rec gen c x =
-  (* HARDCODE: list *)
-  if x = "list" then
-    let t = (List.hd c.args) |> (fun a -> match a.it with | TypA t -> t | _ -> failwith "syntax list(syntax X)") in
-    gen_typ c (IterT (t, List) $ no_region)
-  else
   let a2e a =
     match a.it with
     | ExpA e -> Il.Eval.reduce_exp !Langs.il_env e
@@ -408,13 +440,19 @@ let rec gen c x =
   (match deftyp.it with
   | AliasT typ -> gen_typ c (transform_typ replace_params typ)
   | StructT typfields ->
-    let gen_typfield (atom, (_binds, typ, _prems), _hints) =
-      atom, gen_typ c (transform_typ replace_params typ)
+    let ref_fields =
+      match c.refer with
+      | Some ({it = StrE fs; _}) -> List.map (fun (_atom, e) -> Some e) fs
+      | _ -> List.init (List.length typfields) (fun _ -> None)
     in
-    StrE (List.map gen_typfield typfields) |> to_phrase c.typ
+    let gen_typfield (atom, (_binds, typ, _prems), _hints) refer =
+      atom, gen_typ {c with refer} (transform_typ replace_params typ)
+    in
+    StrE (List.map2 gen_typfield typfields ref_fields) |> to_phrase c.typ (* TODO: The order of fields may be different *)
   | VariantT typcases ->
     let typcases = Lib.List.filter_not (has_subid_hint "sem") typcases in
     let typcases = Lib.List.filter_not (has_subid_hint "admin") typcases in
+    let typcases = List.filter (has_same_mixop c.refer) typcases in
     let typcase = Utils.choose typcases in
     let typcase' =
       let (m, (bs, t, ps), hs) = typcase in
@@ -422,34 +460,79 @@ let rec gen c x =
       m, (bs, t', ps), hs
     in
     gen_typcase c typcase'
-  ) |> validate x
+  ) |> validate x (* TODO: This will destroy the entanglement with reference *)
 and gen_typcase c (mixop, (_binds, typs, prems), _hints) =
-  let args = il_tup (gen_typs {c with prems} typs) in
+  let refer = Option.bind c.refer (fun e ->
+    match e.it with CaseE (_, args) -> Some args
+    | _ -> None
+  ) in
+  let args = il_tup (gen_typs {c with prems; refer} typs) in
   CaseE (mixop, args) |> to_phrase c.typ
 and gen_typs c typs =
   match typs.it with
-  | TupT typs' -> List.fold_left_map (fun replaces (e, t) ->
+  | TupT typs' ->
+    let refs =
+      match c.refer with
+      | Some {it = TupE es; _} -> List.map Option.some es
+      | _ -> List.init (List.length typs') (fun _ -> None)
+    in
+    List.fold_left_map (fun replaces ((e, t), refer) ->
       let e' =
-        match try_gen_from_prems c.prems e with
-        | None -> gen_typ c (List.fold_left (fun t (e, e') -> transform_typ  (replace e e') t) t replaces)
+        match try_gen_from_prems {c with refer} e with
+        | None ->
+          let t' = List.fold_left (fun t (e, e') -> transform_typ  (replace e e') t) t replaces in
+          gen_typ {c with refer} t'
         | Some e -> e
       in
       (e, e') :: replaces, e'
-    ) [] typs' |> snd
+    ) [] (List.combine typs' refs) |> snd
   | _ -> [ gen_typ c typs ]
 and gen_typ c typ =
+  let refer = c.refer in
+  let c = { c with refer = None } in
   match typ.it with
-  | NumT NatT -> NatE (Random.int 3 |> Z.of_int) |> to_phrase typ (* 0, 1, 2 *)
-  | VarT (id, args) -> gen {typ; args; prems = []} id.it
+  | VarT (id, [{it = TypA t; _}]) when id.it = "list" -> (* HARDCODE: list *)
+    (match refer with
+    | Some {it = CaseE ([[]; []], {it = TupE [el]; _}); _} ->
+      CaseE ([[]; []], il_tup [gen_typ {c with refer = Some el} (IterT (t, List) $ no_region)])
+        |> to_phrase typ
+    | _ ->
+      CaseE ([[]; []], il_tup [gen_typ c (IterT (t, List) $ no_region)])
+        |> to_phrase typ
+    )
+  | VarT (id, args) -> gen {typ; args; prems = []; refer} id.it
+  | NumT NatT ->
+    (match refer with
+    | Some ({it = NatE _; _} as r) -> r
+    | _ -> NatE (Random.int 3 |> Z.of_int) |> to_phrase typ (* 0, 1, 2 *)
+    )
   | IterT (typ', List) ->
-    let len = Random.int 3 in (* 0, 1, 2 *)
-    ListE (List.init len (fun _ -> gen_typ c typ')) |> to_phrase typ
+    (match refer with
+    | Some {it = ListE rs; _} ->
+      ListE (List.map (fun r -> gen_typ {c with refer = Some r} typ') rs) |> to_phrase typ
+    | _ ->
+      let len = Random.int 3 in (* 0, 1, 2 *)
+      ListE (List.init len (fun _ -> gen_typ c typ')) |> to_phrase typ
+    )
   | IterT (typ', Opt) ->
-    if Random.bool() then OptE None |> to_phrase typ
-    else OptE (Some (gen_typ c typ')) |> to_phrase typ
-  | TupT ets -> TupE (ets |> List.map (fun (_, t) -> gen_typ c t)) |> to_phrase typ
+    (match refer with
+    | Some ({it = OptE None; _} as r) -> r
+    | Some ({it = OptE (Some r); _}) -> OptE (Some (gen_typ {c with refer = Some r} typ')) |> to_phrase typ
+    | _ ->
+      if Random.bool() then
+        OptE None |> to_phrase typ
+      else
+        OptE (Some (gen_typ c typ')) |> to_phrase typ
+    )
+  | TupT ets ->
+    (match refer with
+    | Some {it = TupE rs; _} ->
+      TupE (List.map2 (fun (_, t) r -> gen_typ {c with refer = Some r} t) ets rs) |> to_phrase typ
+    | _ ->
+      TupE (ets |> List.map (fun (_, t) -> gen_typ c t)) |> to_phrase typ
+    )
   | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
-let gen_typ typ = gen_typ {typ; args = []; prems = []} typ
+let gen_typ typ = gen_typ {typ; args = []; prems = []; refer = None} typ
 
 (** End of Helpers **)
 
@@ -536,6 +619,14 @@ let apply_unify_result_prem result p =
     transform_prem (replace_id_with x e_x) p
   ) p result
   |> transform_prem (Il.Eval.reduce_exp !il_env)
+
+let apply_unify_result_rule result r =
+  match r.it with
+  | RuleD (id, binds, mixop, e, ps) ->
+    let e' = apply_unify_result result e in
+    let ps' = List.map (apply_unify_result_prem result) ps in
+    let it = RuleD (id, binds, mixop, e', ps') in
+    {r with it}
 
 let fix_free_var ess =
   let free_vars = ref [] in
@@ -705,6 +796,29 @@ let register_iterlen_cond i result p =
   | _ -> result
 
 let concretize_instr trule instr =
+  (* 1. Generate from syntax *)
+  let unify_result =
+    let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
+    unify_exp [] instr instr'
+  in
+  let trule, instr =
+    apply_unify_result_rule unify_result trule,
+    apply_unify_result unify_result instr
+  in
+  (*
+  ignore unify_result;
+  print_unify_result unify_result;
+  *)
+
+  let prems = rule_to_prems trule in
+  let prems' = List.filter_map (fun p ->
+    match p.it with
+    | IfPr e -> Some {p with it = IfPr (Il.Eval.reduce_exp !il_env e)}
+    | _ -> None
+  ) prems in
+  List.iter (fun p -> print_endline @@ Il.Print.string_of_prem p) prems';
+
+  (* 2. Fill in all free variables with random value *)
   let free_vars = ref [] in
   transform_exp (fun e ->
     match e.it with
@@ -714,6 +828,7 @@ let concretize_instr trule instr =
 
   let replaces = ref [] in
 
+  let trule, instr =
   dedup Il.Eq.eq_exp (List.rev !free_vars)
   |> List.fold_left (fun (trule, instr) e ->
     let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
@@ -729,6 +844,18 @@ let concretize_instr trule instr =
     let instr' = transform_exp (replace e e') instr in
     trule', instr'
   ) (trule, instr)
+  in
+
+  (*
+  let prems = rule_to_prems trule in
+  let prems' = List.filter_map (fun p ->
+    match p.it with
+    | IfPr e -> Some {p with it = IfPr (Il.Eval.reduce_exp !il_env e)}
+    | _ -> None
+  ) prems in
+  List.iter (fun p -> print_endline @@ Il.Print.string_of_prem p) prems';
+  *)
+  trule, instr
 
 let rec simplify_equality prems =
   (* If there is equality prems within these prems, where one side is a variable, simplify the whole prems *)

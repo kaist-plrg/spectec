@@ -1,6 +1,6 @@
 let choosei l =
   let n = List.length l in
-  assert (n > 0);
+  if n = 0 then failwith "Cannot choose from an empty list";
   let i = Random.int n in
   i, List.nth l i
 let choose l = choosei l |> snd
