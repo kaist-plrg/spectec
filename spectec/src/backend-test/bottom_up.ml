@@ -105,6 +105,15 @@ let exp_to_list e =
   | ListE es -> es
   | _ -> failwith (Il.Print.string_of_exp e ^ " is not a list")
 
+let contains_false =
+  List.exists (fun p ->
+    match p.it with
+    | IfPr e ->
+      let e' = Il.Eval.reduce_exp !il_env e in
+      e'.it = BoolE false
+    | _ -> false
+  )
+
 exception UnifyFail of exp * exp
 let unify_fail _map e1 e2 =
   raise @@ UnifyFail (e1, e2)
@@ -552,7 +561,7 @@ let rule_to_arrow rule =
     | _ -> e
   in
 
-  let RuleD (id, _, _, exp, _) = rule.it in
+  let RuleD (id, _, _, exp, prems) = rule.it in
   match exp.it with
   | TupE [_c; _lhs; rhs] ->
     (match rhs.it with
@@ -560,7 +569,7 @@ let rule_to_arrow rule =
       (match args.it with
       | TupE [t1; t2] | TupE [t1; _; t2] ->
         let name = id.it |> String.split_on_char '-' |> List.hd |> String.uppercase_ascii in
-        name, (unwrap t1, unwrap t2)
+        name, (unwrap t1, unwrap t2, prems)
       | _ -> expected_shape args "t1, t2 or t1, x*, t2"
       )
     | _ -> expected_shape rhs "e1 -> e2"
@@ -628,19 +637,28 @@ let apply_unify_result_rule result r =
     let it = RuleD (id, binds, mixop, e', ps') in
     {r with it}
 
-let fix_free_var ess =
-  let free_vars = ref [] in
-  List.map (transform_exp (fun e ->
-    match e.it with
-    | VarE x -> push (x.it, e.note) free_vars; e
-    | _ -> e
-  )) (List.flatten ess) |> ignore;
-  dedup (fun x y -> (fst x) = (fst y)) !free_vars
-  |>
-  List.fold_left (fun ess (x, typ) ->
-    let e = gen_typ typ in
-    List.map (List.map (transform_exp (replace_id_with x e))) ess
-  ) ess
+let fix_free_var prems ess =
+  try_n 10 "Fixing free vars of rt" (fun () ->
+    let free_vars = ref [] in
+    List.map (transform_exp (fun e ->
+      match e.it with
+      | VarE x -> push (x.it, e.note) free_vars; e
+      | _ -> e
+    )) (List.flatten ess) |> ignore;
+    dedup (fun x y -> (fst x) = (fst y)) !free_vars
+    |>
+    List.fold_left (fun acc (x, typ) ->
+      match acc with
+      | None -> None
+      | Some (ess, prems) ->
+        let e = gen_typ typ in
+        let prems' = List.map (transform_prem (replace_id_with x e)) prems in
+        if contains_false prems' then
+          None
+        else
+          Some (List.map (List.map (transform_exp (replace_id_with x e))) ess, prems')
+    ) (Some (ess, prems))
+  ) |> fst
 
 let get_cached_length i e =
   List.find_map (function
@@ -650,7 +668,7 @@ let get_cached_length i e =
 
 exception RejectedSample of string
 
-let fix_lengths i es =
+let fix_lengths i max es =
   let len_opts = List.map (get_cached_length i) es in
   let len_opt = List.fold_left (fun acc cur ->
     match acc, cur with
@@ -663,7 +681,7 @@ let fix_lengths i es =
   let l =
     match len_opt with
     | Some l -> l
-    | None -> Random.int 3 (* 0, 1, 2 *)
+    | None -> Random.int max (* [0, max) *)
   in
 
   List.iter2 (fun e o -> if o = None then push (IterLenC (i, e, l)) sideconds) es len_opts;
@@ -671,10 +689,10 @@ let fix_lengths i es =
 
 (* 1. fix_rts: pre-determine concrete types of each cases *)
 let fix_rts (cases: string list): restype list =
-  List.fold_left (fun rts case ->
+  let rts, premss = List.fold_left (fun (rts, premss) case ->
     let i = List.length rts - 1 in
 
-    let (rt1, rt2) = !arrow_map |> List.assoc case in
+    let (rt1, rt2, prems) = !arrow_map |> List.assoc case in
 
     let rec mk_vts rt =
       match rt.it with
@@ -682,7 +700,7 @@ let fix_rts (cases: string list): restype list =
       | CatE (e1, e2) -> mk_vts e1 @ mk_vts e2
       | IterE (e, (List, xes)) ->
         let xs, es = List.split xes in
-        let length = fix_lengths i es in
+        let length = fix_lengths i 3 es in
         List.init length (fun i ->
           List.fold_left (fun e x ->
             transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
@@ -691,10 +709,13 @@ let fix_rts (cases: string list): restype list =
       | _ -> [rt]
     in
 
-    let append_idx = transform_exp (replace_id_using (fun x -> x ^ "@" ^ (string_of_int i))) in
+    let append_idx = replace_id_using (fun x -> x ^ "@" ^ (string_of_int i)) in
+    let append_idx_exp = transform_exp append_idx in
+    let append_idx_prem = transform_prem append_idx in
 
-    let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx in
-    let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx in
+    let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx_exp in
+    let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx_exp in
+    let prems = prems |> List.map append_idx_prem in
 
     let rt = List.hd rts in
     let rts = List.tl rts in
@@ -715,12 +736,22 @@ let fix_rts (cases: string list): restype list =
       []
     in
 
-    let unify_result = unify_vts rt (List.rev vts1) in
+    let unify_result, premss = try_n 10 "Fixing rts" (fun () ->
+      let unify_result = unify_vts rt (List.rev vts1) in
+      let premss = (prems :: premss) |> (List.map @@ List.map @@ apply_unify_result_prem unify_result) in
+      if premss |> List.exists contains_false then
+        None
+      else
+        Some (unify_result, premss)
+    ) in
 
-    (List.rev (prefix @ vts2) :: rt :: rts) |> List.map (List.map (apply_unify_result unify_result))
-  ) [[]] cases
+    (List.rev (prefix @ vts2) :: rt :: rts) |> List.map (List.map (apply_unify_result unify_result)),
+    premss
+  ) ([[]], []) cases in
+
+  rts
   |> List.rev
-  |> fix_free_var
+  |> fix_free_var (List.concat premss)
 
 (* 2. fix_values: generate necessary values in front of main instrs *)
 let fix_values vt: string list * restype list =
@@ -794,25 +825,28 @@ let register_iterlen_cond i result p =
       push sidecond sideconds;
       result)
   | _ -> result
+let reset_iterlen_cond i =
+  sideconds := List.filter (fun sc ->
+    match sc with
+    | IterLenC (j, _, _) -> i <> j (* TODO: This deletes typelen cond, which is OK for now *)
+    | _ -> true
+  ) !sideconds
 
 let concretize_instr trule instr =
   (* 1. Generate from syntax *)
-  let trule, instr = try_n 10 (fun () ->
+  let trule, instr = try_n 10 "concretizing instr" (fun () ->
     let unify_result =
       let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
       unify_exp [] instr instr'
     in
+
     let trule, instr =
       apply_unify_result_rule unify_result trule,
       apply_unify_result unify_result instr
     in
 
     let prems = rule_to_prems trule in
-    if List.exists (fun p ->
-      match p.it with
-      | IfPr e -> (Il.Eval.reduce_exp !il_env e).it = BoolE false
-      | _ -> false
-    ) prems then
+    if contains_false prems then
       None
     else
       Some (trule, instr)
@@ -846,15 +880,6 @@ let concretize_instr trule instr =
   ) (trule, instr)
   in
 
-  (*
-  let prems = rule_to_prems trule in
-  let prems' = List.filter_map (fun p ->
-    match p.it with
-    | IfPr e -> Some {p with it = IfPr (Il.Eval.reduce_exp !il_env e)}
-    | _ -> None
-  ) prems in
-  List.iter (fun p -> print_endline @@ Il.Print.string_of_prem p) prems';
-  *)
   trule, instr
 
 let rec simplify_equality prems =
@@ -865,11 +890,9 @@ let rec simplify_equality prems =
     | IfPr ({it = CmpE (EqOp, {it = VarE x; _}, ({it = CaseE _; _} as e)); _})
     | IfPr ({it = CmpE (EqOp, ({it = CaseE _; _} as e), {it = VarE x; _}); _}) ->
       Either.Left ((x, e), prem)
-    (*
     | RulePr (id, _, {it = TupE [_C; {it = VarE x; _}; e]; _}) when String.ends_with ~suffix:"_sub" id.it ->
       (* TODO: subtype is currently considered eq *)
       Either.Left((x, e), prem)
-    *)
     | _ -> Either.Right prem
   in
   match List.partition_map is_eq_prem prems with
@@ -885,14 +908,24 @@ let concretize_prems prems =
     | VarE _ -> push e free_vars; e
     | _ -> e
   )) prems |> ignore;
-  dedup Il.Eq.eq_exp !free_vars
-  |> List.fold_left (fun prems e ->
-    match e.it with
-    | VarE {it = "C"; _} -> prems
-    | _ ->
-      let e' = gen_typ e.note in
-      prems |> List.map (transform_prem (replace e e'))
-  ) prems
+  let free_vars = dedup Il.Eq.eq_exp !free_vars in
+
+  try_n 1000 "Concretizing premise" (fun () ->
+    List.fold_left (fun prems_opt e ->
+      match e.it with
+      | VarE {it = "C"; _} -> prems_opt
+      | _ ->
+        match prems_opt with
+        | None -> None
+        | Some prems ->
+          let e' = gen_typ e.note in
+          let prems' = List.map (transform_prem (replace e e')) prems in
+          if contains_false prems' then
+            None
+          else
+            Some prems'
+    ) (Some prems) free_vars
+  )
 
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
 let rec fix_immediate (cases: string list) rts: exp list =
@@ -902,7 +935,7 @@ let rec fix_immediate (cases: string list) rts: exp list =
   List.fold_left2 (fun (acc, rt1) case rt2 ->
     let i = List.length acc - !values_cnt in
 
-    let (rt1', rt2') = List.assoc case !arrow_map in
+    let (rt1', rt2', _) = List.assoc case !arrow_map in
 
     let rec mk_vts rt =
       match rt.it with
@@ -910,7 +943,7 @@ let rec fix_immediate (cases: string list) rts: exp list =
       | CatE (e1, e2) -> mk_vts e1 @ mk_vts e2
       | IterE (e, (List, xes)) ->
         let xs, es = List.split xes in
-        let length = fix_lengths i es in
+        let length = fix_lengths i 3 es in
         List.init length (fun i ->
           List.fold_left (fun e x ->
             transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
@@ -936,7 +969,7 @@ let rec fix_immediate (cases: string list) rts: exp list =
         if Il.Eq.eq_typ e'.note (mk_VarT "instr") then e else (* instr* will be handled manaully *)
 
         let xs, es = List.split xes in
-        let l = fix_lengths i es in
+        let l = fix_lengths i 3 es in
         let es = List.init l (fun i ->
           List.fold_left (fun e x ->
             transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
@@ -944,10 +977,12 @@ let rec fix_immediate (cases: string list) rts: exp list =
         ) in
         let it = ListE es in
         { e with it }
-      | IterE (e', (Opt, _)) ->
-        (* TODO: Entangle *)
+      | IterE (e', (Opt, xes)) ->
+        let _xs, es = List.split xes in
+        let l = fix_lengths i 1 es in (* l is 0 or 1 *)
+
         { e with it =
-          if Random.bool () then
+          if l = 0 then
             OptE None
           else
             OptE (Some e') }
@@ -965,14 +1000,20 @@ let rec fix_immediate (cases: string list) rts: exp list =
       = case
     ) !trules |> choose in
 
-    let trule = {trule with it =
-      match trule.it with
-      | RuleD (id, binds, mixop, exp, prems) ->
-        let unify_result' = List.fold_left (register_iterlen_cond i) unify_result prems in
-        let exp' = exp |> iter_to_list |> apply_unify_result unify_result' in
-        let prems' = prems |> List.map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result') in
-        RuleD (id, binds, mixop, exp', prems')
-    } in
+    let trule = try_n 10 "fixing iter len" (fun () ->
+      let RuleD (id, binds, mixop, exp, prems) = trule.it in
+
+      let unify_result' = List.fold_left (register_iterlen_cond i) unify_result prems in
+      let exp' = exp |> iter_to_list |> apply_unify_result unify_result' in
+      let prems' = prems |> List.map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result') in
+
+      if contains_false prems' then
+        let _ = reset_iterlen_cond i in
+        None
+      else
+        let it = RuleD (id, binds, mixop, exp', prems') in
+        Some {trule with it}
+    ) in
 
     let trule = handle_special_prems trule in
     let instr = rule_to_instr trule in

@@ -110,11 +110,11 @@ let top s = List.hd !s
 let string_of_stack s = String.concat "," !s
 
 (* Rejection sampling *)
-exception OutOfLife
-let rec try_n n f =
+exception OutOfLife of string
+let rec try_n n msg f =
   if n <= 0 then
-    raise OutOfLife
+    raise @@ OutOfLife msg
   else
     match f () with
     | Some x -> x
-    | None -> try_n (n-1) f
+    | None -> try_n (n-1) msg f
