@@ -1402,6 +1402,7 @@ let wrap_as_module (func: exp) =
 
   (* 7. Generate datas *)
   let extract_data_sidecond = (fun _ -> None) in (* Only number matters *)
+  (* TODO: Generate various data *)
   let default_data () = List.init (Random.int 3) (fun _ -> gen_typ (mk_VarT "byte")), il_case "PASSIVE" "datamode" [] in
   let datas = gen_stuffs
     "DATAS"
@@ -1411,6 +1412,32 @@ let wrap_as_module (func: exp) =
     "data"
     (fun (bs, datamode) -> [il_list bs (mk_VarT "byte"); datamode])
   in
+
+  (* 8. Generate funcs *)
+  let extract_func_sidecond = function
+    | RulePrC ({it = "Expand"; _}, [[]; _; []], {it = TupE [
+        { it = IdxE ({ it = DotE (_C, {it = Atom "FUNCS"; _}); _ }, idx); _ };
+        func
+      ]; _}) ->
+      let arrow = func |> nth_arg_of_case 0 in
+      let nth i arrow = nth_arg_of_case i arrow |> nth_arg_of_case 0 |> exp_to_list in
+      Some (exp_to_int idx, (nth 0 arrow, nth 1 arrow))
+    | _ -> None
+  in
+  let default_func () = [], [] in
+  let funcs = gen_stuffs
+    "FUNCS"
+    extract_func_sidecond
+    default_func
+    "FUNC"
+    "func"
+    (fun (rt1, rt2) -> [
+      register_func_typ rt1 rt2;
+      il_list [] (mk_VarT "local");
+      il_list (gen_default_instrs rt1 rt2) (mk_VarT "instr");
+    ])
+  in
+  let funcs = funcs @ [func] in
 
   (* 1. Generate types *)
   let to_rectype comptype =
@@ -1435,8 +1462,6 @@ let wrap_as_module (func: exp) =
       | _ -> t
     ])
   in
-
-  let funcs = [func] in (* TODO *)
 
   let imports = [] in
   let exports = [] in
