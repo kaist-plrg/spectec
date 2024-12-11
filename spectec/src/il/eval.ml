@@ -215,6 +215,8 @@ and reduce_exp env e : exp =
     | GeOp _, UnE (MinusOp _, {it = NatE n1; _}), UnE (MinusOp _, {it = NatE n2; _}) -> BoolE (n2 >= n1)
     | GeOp _, UnE (MinusOp _, {it = NatE _; _}), NatE _ -> BoolE false
     | GeOp _, NatE _, UnE (MinusOp _, {it = NatE _; _}) -> BoolE true
+    | EqOp, CaseE _, _ when match_exp' env Subst.empty e1' e2' = None -> BoolE false
+    | NeOp, CaseE _, _ when match_exp' env Subst.empty e1' e2' = None -> BoolE true
     | _ -> CmpE (op, e1', e2')
     ) $> e
   | IdxE (e1, e2) ->

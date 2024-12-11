@@ -35,6 +35,12 @@ let rec dedup eq = function
 | [] -> []
 | hd :: tl -> hd :: dedup eq (Lib.List.filter_not (eq hd) tl)
 
+let rec count_freq eq = function
+| [] -> []
+| hd :: tl ->
+  let sames, diffs = List.partition (eq hd) tl in
+  (hd, 1 + List.length sames) :: count_freq eq diffs
+
 let to_phrase ty x = x $$ no_region % ty
 
 (* Smart Constructors *)
@@ -908,13 +914,14 @@ let concretize_prems prems =
     | VarE _ -> push e free_vars; e
     | _ -> e
   )) prems |> ignore;
-  let free_vars = dedup Il.Eq.eq_exp !free_vars in
+  let freq = count_freq Il.Eq.eq_exp !free_vars in
 
   try_n 1000 "Concretizing premise" (fun () ->
-    List.fold_left (fun prems_opt e ->
+    List.fold_left (fun prems_opt (e, cnt) ->
       match e.it with
       | VarE {it = "C"; _} -> prems_opt
       | _ ->
+        if cnt = 1 then prems_opt else
         match prems_opt with
         | None -> None
         | Some prems ->
@@ -924,7 +931,7 @@ let concretize_prems prems =
             None
           else
             Some prems'
-    ) (Some prems) free_vars
+    ) (Some prems) freq
   )
 
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
@@ -988,8 +995,22 @@ let rec fix_immediate (cases: string list) rts: exp list =
             OptE (Some e') }
       | _ -> e
     in
+    let expand_iterpr p =
+      match p.it with
+      | IterPr (p, (List, xes)) ->
+        print_endline @@ Il.Print.string_of_prem p;
+        let xs, es = List.split xes in
+        let l = fix_lengths i 3 es in
+        List.init l (fun i ->
+          List.fold_left (fun p x ->
+            transform_prem (replace_id x.it (x.it ^ "." ^ string_of_int i)) p
+          ) p xs
+        )
+      | _ -> [p]
+    in
+
     let iter_to_list = transform_exp iter_to_list' in
-    let iter_to_list_prem = transform_prem iter_to_list' in (* TODO: Handle IterPr *)
+    let iter_to_list_prem p = transform_prem iter_to_list' p |> expand_iterpr in
 
     (* Transform trule *)
     let trule = List.filter (fun r ->
@@ -1005,7 +1026,7 @@ let rec fix_immediate (cases: string list) rts: exp list =
 
       let unify_result' = List.fold_left (register_iterlen_cond i) unify_result prems in
       let exp' = exp |> iter_to_list |> apply_unify_result unify_result' in
-      let prems' = prems |> List.map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result') in
+      let prems' = prems |> List.concat_map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result') in
 
       if contains_false prems' then
         let _ = reset_iterlen_cond i in
@@ -1439,7 +1460,7 @@ let wrap_as_module (func: exp) =
   in
   let funcs = funcs @ [func] in
 
-  (* 1. Generate types *)
+  (* 9. Generate types *)
   let to_rectype comptype =
     il_case "REC" "rectype" [
       il_list [il_case "SUB" "subtype" [
@@ -1480,6 +1501,23 @@ let wrap_as_module (func: exp) =
     il_list exports (mk_VarT "export");
   ]
 
+let concretize_free exp =
+  let free_vars = ref [] in
+  transform_exp (fun e ->
+    match e.it with
+    | VarE id when id.it <> "_" -> push e free_vars; e
+    | _ -> e
+  ) exp |> ignore;
+
+  let replaces = ref [] in
+
+  dedup Il.Eq.eq_exp (List.rev !free_vars)
+  |> List.fold_left (fun exp e ->
+    let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
+    let e' = gen_typ t in
+    push (e, e') replaces;
+    transform_exp (replace e e') exp
+  ) exp
 
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
 let gen_module (cases: string list): Al.Ast.value =
@@ -1521,6 +1559,7 @@ let gen_module (cases: string list): Al.Ast.value =
   (* 6. IL2AL *)
   Log.debug ("===6===");
   let al_module = module_
+  |> concretize_free
   |> Il2al.Translate.translate_exp
   |> Backend_interpreter.Interpreter.eval_expr Backend_interpreter.Ds.Env.empty
   in
