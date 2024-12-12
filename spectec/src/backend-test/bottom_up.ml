@@ -896,6 +896,32 @@ let concretize_instr trule instr =
 
   trule, instr
 
+(* HARDCODE: premise rewriter for `Resulttype_sub: C |- t1* <: t2*` of RETURN_CALL *)
+let handle_trivial_equality r =
+  let rec is_simple_var e =
+    match e.it with
+    | VarE _ -> true
+    | IterE (e, (_, [_, _])) -> is_simple_var e
+    | _ -> false
+  in
+  let is_trivial_equality prem =
+    match prem.it with
+    | IfPr ({it = CmpE (EqOp, l, r); _})
+        when is_simple_var l && is_simple_var r ->
+      Some (l, r)
+    | RulePr (id, _, {it = TupE [_C; l; r]; _})
+        when String.ends_with ~suffix:"_sub" id.it && is_simple_var l && is_simple_var r ->
+      Some (l, r)
+    | _ -> None
+  in
+
+  let RuleD (id, binds, mixop, exp, prems) = r.it in
+  let eqs = List.filter_map is_trivial_equality prems in
+  let aux e = List.fold_left (fun e (e1, e2) -> replace e1 e2 e) e eqs in
+  let exp' = transform_exp aux exp in
+  let prems' = List.map (transform_prem aux) prems in
+  {r with it = RuleD (id, binds, mixop, exp', prems')}
+
 let rec simplify_equality prems =
   (* If there is equality prems within these prems, where one side is a variable, simplify the whole prems *)
   (* Assumption: No cyclic binding *)
@@ -1121,6 +1147,8 @@ let rec fix_immediate (cases: string list) rts: exp list =
       |> List.hd
       = case
     ) !trules |> choose in
+
+    let trule = handle_trivial_equality trule in
 
     let trule = try_n 10 "fixing iter len" (fun () ->
       let RuleD (id, binds, mixop, exp, prems) = trule.it in
@@ -1381,6 +1409,25 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
 
   let instrs, rt = wrap_as_block 0 instrs rt in
 
+  (* 3. If sidecondtion contains something about C.RETURN, append instrs and change the return type *)
+  let extract_return_cond cond =
+    match cond with
+    | IfPrC {it = CmpE (EqOp, {it = DotE (_C, {it = Atom "RETURN"; _}); _}, {it = OptE (Some rt); _}); _} -> Some rt
+    | IfPrC {it = CmpE (EqOp, {it = OptE (Some rt); _}, {it = DotE (_C, {it = Atom "RETURN"; _}); _}); _} -> Some rt
+    | _ -> None
+  in
+  let return_conds = List.filter_map extract_return_cond !sideconds in
+  let instrs, rt =
+    match return_conds with
+    | rt' :: _ -> (* TODO: What if there are multiple 'rt''s? *)
+      let rt' = rt' |> nth_arg_of_case 0 |> exp_to_list in
+      let suffix = gen_default_instrs rt rt' in
+      instrs @ suffix, rt'
+    | _ ->
+      instrs, rt
+  in
+
+  (* Wrap as function *)
   let typeidx = register_func_typ
     (List.init param_num (fun i ->
       match List.assoc_opt i local_conds with
