@@ -9,6 +9,13 @@ let orig_il: Il.Ast.script ref = ref []
 
 let il_env: Il.Env.t ref = ref Il.Env.empty
 
+let get_rules rid =
+  List.find_map (fun def ->
+    match def.it with
+    | Il.Ast.RelD (id, _, _, rules) when Il.Eq.eq_id rid id -> Some rules
+    | _ -> None
+  ) !il |> Option.get
+
 let get_typing_rules () =
   List.concat_map (fun def ->
     match def.it with

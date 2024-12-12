@@ -242,8 +242,8 @@ let sideconds: sidecond list ref = ref []
 
 let as_sidecond pr =
   match pr.it with
-  | IfPr e -> [IfPrC e]
-  | RulePr (id, mixop, e) -> [RulePrC (id, mixop, e)]
+  | IfPr e -> [IfPrC (Il.Eval.reduce_exp !il_env e)]
+  | RulePr (id, mixop, e) -> [RulePrC (id, mixop, (Il.Eval.reduce_exp !il_env e))]
   | _ -> []
 
 let string_of_sidecond = function
@@ -277,6 +277,14 @@ let extract_context_sidecond field f_elem sidecond =
       _C;
       {it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _};
       elem
+    ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
+      (match f_elem elem with
+      | None -> None
+      | Some x -> Some (exp_to_int index, x))
+  | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
+      _C;
+      elem;
+      {it = ProjE ({it = UncaseE ({it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _}, [[]; []]); _}, 0); _}
     ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
       (match f_elem elem with
       | None -> None
@@ -907,7 +915,71 @@ let rec simplify_equality prems =
     List.map (transform_prem @@ replace_id_with x.it e) (prems' @ prems) |> simplify_equality
   | _ -> prems
 
-let concretize_prems prems =
+let fix_iterlen_prems prems =
+  let lens = ref [] in
+  let get_len e =
+    List.find_map (fun (e', l) -> if Il.Eq.eq_exp e e' then Some l else None) !lens
+  in
+  let fix_lens es =
+    let ls = List.map get_len es in
+    let l_opt = List.fold_left (fun acc cur ->
+      match acc, cur with
+      | None, None -> None
+      | None, s
+      | s, None -> s
+      | Some l1, Some l2 -> if l1 = l2 then Some l1 else raise (RejectedSample "iter len for new prems")
+    ) None ls in
+    let l =
+      match l_opt with
+      | Some l -> l
+      | None -> Random.int 3
+    in
+    List.iter2 (fun e l_opt -> if l_opt = None then push (e, l) lens) es ls;
+    l
+  in
+  let iter_to_list e =
+    match e.it with
+    | IterE (e', (List, xes)) ->
+      let xs, es = List.split xes in
+      let l = fix_lens es in
+      let es = List.init l (fun i ->
+        List.fold_left (fun e x ->
+          transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+        ) e' xs
+      ) in
+      {e with it = ListE es}
+    | _ -> e
+  in
+  List.map (transform_prem iter_to_list) prems
+
+let unroll_rule p =
+  match p.it with
+  | RulePr (id, _mixop, exp) when id.it <> "Expand" ->
+    let rules = get_rules id in
+
+    let rules = List.filter_map (fun r ->
+      let RuleD (_, _, _, exp', _) = r.it in
+      try
+        Some (r, unify_exp [] exp exp') (* TODO: disable match with subtype *)
+      with
+        | UnifyFail _ -> None
+    ) rules in
+
+    (match rules with
+    | [r, unify_result] ->
+      let RuleD (_, _, _, _, prems) = r.it in
+      List.map (apply_unify_result_prem unify_result) prems
+      |> fix_iterlen_prems
+      |> sideeffect (List.iter (fun p -> print_endline @@ Il.Print.string_of_prem p))
+    | _ -> [p]
+    )
+  | _ -> [p]
+
+let rec concretize_prems prems =
+  (* 1. Unroll RulePr *)
+  let prems = List.concat_map unroll_rule prems in
+
+  (* 2. Concretize free vars *)
   let free_vars = ref [] in
   List.map (transform_prem (fun e ->
     match e.it with
@@ -915,13 +987,16 @@ let concretize_prems prems =
     | _ -> e
   )) prems |> ignore;
   let freq = count_freq Il.Eq.eq_exp !free_vars in
+  let free_vars = List.filter_map (fun (e, cnt) ->
+    match e.it with
+    | VarE {it = "C"; _} -> None
+    | _ -> if cnt = 1 then None else Some e
+  ) freq in
 
-  try_n 1000 "Concretizing premise" (fun () ->
-    List.fold_left (fun prems_opt (e, cnt) ->
-      match e.it with
-      | VarE {it = "C"; _} -> prems_opt
-      | _ ->
-        if cnt = 1 then prems_opt else
+  if free_vars = [] then prems else
+
+  let prems' = try_n 1000 "Concretizing premise" (fun () ->
+    List.fold_left (fun prems_opt e ->
         match prems_opt with
         | None -> None
         | Some prems ->
@@ -931,8 +1006,35 @@ let concretize_prems prems =
             None
           else
             Some prems'
-    ) (Some prems) freq
-  )
+    ) (Some prems) free_vars
+  ) in
+
+  concretize_prems prems'
+
+(* Unconditioned concretization of free vars *)
+let concretize_free exp =
+  let free_vars = ref [] in
+  transform_exp (fun e ->
+    match e.it with
+    | VarE id when not @@ List.mem id.it ["_"; "C"] -> push e free_vars; e
+    | _ -> e
+  ) exp |> ignore;
+
+  let replaces = ref [] in
+
+  dedup Il.Eq.eq_exp (List.rev !free_vars)
+  |> List.fold_left (fun exp e ->
+    let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
+    let e' = gen_typ t in
+    push (e, e') replaces;
+    transform_exp (replace e e') exp
+  ) exp
+
+let concretize_free_prem prem =
+  match prem.it with
+  | IfPr e -> {prem with it = IfPr (concretize_free e)}
+  | RulePr (id, mixop, e) -> {prem with it = RulePr (id, mixop, concretize_free e)}
+  | _ -> prem
 
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
 let rec fix_immediate (cases: string list) rts: exp list =
@@ -998,7 +1100,6 @@ let rec fix_immediate (cases: string list) rts: exp list =
     let expand_iterpr p =
       match p.it with
       | IterPr (p, (List, xes)) ->
-        print_endline @@ Il.Print.string_of_prem p;
         let xs, es = List.split xes in
         let l = fix_lengths i 3 es in
         List.init l (fun i ->
@@ -1040,11 +1141,15 @@ let rec fix_immediate (cases: string list) rts: exp list =
     let instr = rule_to_instr trule in
     let trule, instr = concretize_instr trule instr in
 
-    sideconds := (
+    let prems =
       rule_to_prems trule
       |> simplify_equality (* TODO: This should be moved to someting like unify *)
       |> concretize_prems
-      |> List.concat_map as_sidecond
+      |> List.map concretize_free_prem
+    in
+
+    sideconds := (
+      prems |> List.concat_map as_sidecond
     ) @ !sideconds;
 
     instr :: acc, rt2
@@ -1252,6 +1357,7 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
   let extract_label_sidecond = extract_context_sidecond "LABELS" (fun e ->
     match e.it with
     | CaseE ([[]; []], {it = TupE [{it = ListE rt; _}]; _}) -> Some rt
+    | ListE rt -> Some rt
     | _ -> None)
   in
   let label_conds = List.filter_map extract_label_sidecond !sideconds in
@@ -1501,24 +1607,6 @@ let wrap_as_module (func: exp) =
     il_list exports (mk_VarT "export");
   ]
 
-let concretize_free exp =
-  let free_vars = ref [] in
-  transform_exp (fun e ->
-    match e.it with
-    | VarE id when id.it <> "_" -> push e free_vars; e
-    | _ -> e
-  ) exp |> ignore;
-
-  let replaces = ref [] in
-
-  dedup Il.Eq.eq_exp (List.rev !free_vars)
-  |> List.fold_left (fun exp e ->
-    let t = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) e.note !replaces in
-    let e' = gen_typ t in
-    push (e, e') replaces;
-    transform_exp (replace e e') exp
-  ) exp
-
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
 let gen_module (cases: string list): Al.Ast.value =
   (* 0. Init *)
@@ -1559,7 +1647,6 @@ let gen_module (cases: string list): Al.Ast.value =
   (* 6. IL2AL *)
   Log.debug ("===6===");
   let al_module = module_
-  |> concretize_free
   |> Il2al.Translate.translate_exp
   |> Backend_interpreter.Interpreter.eval_expr Backend_interpreter.Ds.Env.empty
   in
