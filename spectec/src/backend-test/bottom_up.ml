@@ -896,32 +896,6 @@ let concretize_instr trule instr =
 
   trule, instr
 
-(* HARDCODE: premise rewriter for `Resulttype_sub: C |- t1* <: t2*` of RETURN_CALL *)
-let handle_trivial_equality r =
-  let rec is_simple_var e =
-    match e.it with
-    | VarE _ -> true
-    | IterE (e, (_, [_, _])) -> is_simple_var e
-    | _ -> false
-  in
-  let is_trivial_equality prem =
-    match prem.it with
-    | IfPr ({it = CmpE (EqOp, l, r); _})
-        when is_simple_var l && is_simple_var r ->
-      Some (l, r)
-    | RulePr (id, _, {it = TupE [_C; l; r]; _})
-        when String.ends_with ~suffix:"_sub" id.it && is_simple_var l && is_simple_var r ->
-      Some (l, r)
-    | _ -> None
-  in
-
-  let RuleD (id, binds, mixop, exp, prems) = r.it in
-  let eqs = List.filter_map is_trivial_equality prems in
-  let aux e = List.fold_left (fun e (e1, e2) -> replace e1 e2 e) e eqs in
-  let exp' = transform_exp aux exp in
-  let prems' = List.map (transform_prem aux) prems in
-  {r with it = RuleD (id, binds, mixop, exp', prems')}
-
 let rec simplify_equality prems =
   (* If there is equality prems within these prems, where one side is a variable, simplify the whole prems *)
   (* Assumption: No cyclic binding *)
@@ -1147,8 +1121,6 @@ let rec fix_immediate (cases: string list) rts: exp list =
       |> List.hd
       = case
     ) !trules |> choose in
-
-    let trule = handle_trivial_equality trule in
 
     let trule = try_n 10 "fixing iter len" (fun () ->
       let RuleD (id, binds, mixop, exp, prems) = trule.it in
@@ -1655,10 +1627,36 @@ let wrap_as_module (func: exp) =
     il_list exports (mk_VarT "export");
   ]
 
+(* HARDCODE: premise rewriter for `Resulttype_sub: C |- t1* <: t2*` of RETURN_CALL *)
+let handle_trivial_equality r =
+  let rec is_simple_var e =
+    match e.it with
+    | VarE _ -> true
+    | IterE (e, (_, [_, _])) -> is_simple_var e
+    | _ -> false
+  in
+  let is_trivial_equality prem =
+    match prem.it with
+    | IfPr ({it = CmpE (EqOp, l, r); _})
+        when is_simple_var l && is_simple_var r ->
+      Some (l, r)
+    | RulePr (id, _, {it = TupE [_C; l; r]; _})
+        when String.ends_with ~suffix:"_sub" id.it && is_simple_var l && is_simple_var r ->
+      Some (l, r)
+    | _ -> None
+  in
+
+  let RuleD (id, binds, mixop, exp, prems) = r.it in
+  let eqs = List.filter_map is_trivial_equality prems in
+  let aux e = List.fold_left (fun e (e1, e2) -> replace e1 e2 e) e eqs in
+  let exp' = transform_exp aux exp in
+  let prems' = List.map (transform_prem aux) prems in
+  {r with it = RuleD (id, binds, mixop, exp', prems')}
+
 (* Generates the simplest module, which contains the instruction sequence with whose names are `cases` *)
 let gen_module (cases: string list): Al.Ast.value =
   (* 0. Init *)
-  trules := get_typing_rules ();
+  trules := get_typing_rules () |> List.map handle_trivial_equality;
   arrow_map := !trules |> List.map rule_to_arrow;
   sideconds := [];
   let cases = List.map (fun x -> if x = "" then choose !arrow_map |> fst else x) cases in
