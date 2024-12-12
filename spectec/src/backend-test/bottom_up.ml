@@ -1599,6 +1599,7 @@ let wrap_as_module (func: exp) =
     | _ -> None
   in
   let default_func () = [], [] in
+  let local_get i = il_case "LOCAL.GET" "instr" [exp_of_int i] in
   let funcs = gen_stuffs
     "FUNCS"
     extract_func_sidecond
@@ -1608,7 +1609,7 @@ let wrap_as_module (func: exp) =
     (fun (rt1, rt2) -> [
       register_func_typ rt1 rt2;
       il_list [] (mk_VarT "local");
-      il_list (gen_default_instrs rt1 rt2) (mk_VarT "instr");
+      il_list (List.mapi (fun i _ -> local_get i) rt1 @ gen_default_instrs rt1 rt2) (mk_VarT "instr");
     ])
   in
   let funcs = funcs @ [func] in
