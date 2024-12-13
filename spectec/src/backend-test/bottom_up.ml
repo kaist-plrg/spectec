@@ -605,16 +605,17 @@ let rule_to_prems rule =
 let unify_vt map vt1 vt2 =
   let on_fail map e1 e2 =
     match e1.it, e2.it with
-    | CaseE ([[atom]], _), CaseE ([[{it = Atom "_IDX"; _}]; []], {it = TupE [{it = VarE x; _}]; _}) ->
-      let t =
-        match atom.it with
-        | Atom "STRUCT" -> il_case "STRUCT" "comptype" [gen_typ (mk_VarT "structtype")]
-        | Atom "ARRAY" -> il_case "ARRAY" "comptype" [gen_typ (mk_VarT "arraytype")]
-        | Atom "FUNC" -> il_case "FUNC" "comptype" [gen_typ (mk_VarT "functype")]
-        | _ -> unify_fail map e1 e2
-      in
-      let idx = register_typ t in
-      (x.it, idx) :: map
+    | CaseE ([[atom]], _), CaseE ([[{it = Atom "_IDX"; _}]; []], {it = TupE [{it = VarE _; _}]; _}) ->
+      (match atom.it with
+      | Atom "ANY"
+      | Atom "EQ"
+      | Atom "STRUCT"
+      | Atom "ARRAY"
+      | Atom "FUNC" -> map
+      | _ -> unify_fail map e1 e2
+      )
+    | CaseE ([[{it = Atom ("EQ" | "ANY"); _}]], _), CaseE ([[{it = Atom "I31"; _}]], _) ->
+      map
     | _ ->
       unify_fail map e1 e2
   in
@@ -785,6 +786,12 @@ let fix_values vt: string list * restype list =
     (match nul with
     | Some _ -> ["REF.NULL"], [[vt]]
     | None ->
+      let ht =
+        match ht.it with
+        | CaseE ([[{it = Atom ("ANY" | "EQ"); _}]], {it = TupE []; _}) ->
+          choose [il_case "I31" "heaptype" []; il_case "STRUCT" "heaptype" []; il_case "ARRAY" "heaptype" []]
+        | _ -> ht
+      in
       (match ht.it with
       (* TODO: Add more cases? *)
       | CaseE ([[{it = Atom "I31"; _}]], {it = TupE []; _}) ->
@@ -801,9 +808,9 @@ let fix_values vt: string list * restype list =
           ["CONST"; "ARRAY.NEW_DEFAULT"], [[il_case "I32" "valtype" []]; [vt]]
         | Some (_, t) ->
           (match case_of_case t with
-          | Atom "STRUCT" -> failwith "TODO: fix_values, STRUCT"
+          | Atom "STRUCT" -> ["STRUCT.NEW_DEFAULT"], [[vt]]
           | Atom "ARRAY" -> ["CONST"; "ARRAY.NEW_DEFAULT"], [[il_case "I32" "valtype" []]; [vt]]
-          | Atom "FUNC" -> failwith "TODO: fix_values, FUNC"
+          | Atom "FUNC" -> ["REF.FUNC"], [[vt]]
           | _ -> failwith "unreachable"
           )
         )
