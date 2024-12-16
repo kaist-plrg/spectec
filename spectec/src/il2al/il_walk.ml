@@ -59,3 +59,8 @@ let rec transform_prem f p =
     | LetPr (e1, e2, xs) -> LetPr (transform_exp f e1, transform_exp f e2, xs)
     | ElsePr -> ElsePr
     | IterPr (p, iterexp) -> IterPr (transform_prem f p, iterexp) } (* TODO: iterexp *)
+
+let transform_rule f r =
+  { r with it = match r.it with
+    | RuleD (id, binds, mixop, e, ps) -> RuleD (id, binds, mixop, transform_exp f e, List.map (transform_prem f) ps)
+  }

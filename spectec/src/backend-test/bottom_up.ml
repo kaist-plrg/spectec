@@ -12,6 +12,8 @@ open Il.Ast
 
 open Il2al.Il_walk
 
+let (let*) = Option.bind
+
 (** Helpers **)
 let replace old_e new_e e =
   if Il.Eq.eq_exp old_e e then new_e else e
@@ -270,25 +272,22 @@ let extract_context_sidecond field f_elem sidecond =
     if field' <> field then
       None
     else
-      (match f_elem elem with
-      | None -> None
-      | Some x -> Some (exp_to_int index, x))
+      let* x = f_elem elem in
+      Some (exp_to_int index, x)
   | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
       _C;
       {it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _};
       elem
     ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
-      (match f_elem elem with
-      | None -> None
-      | Some x -> Some (exp_to_int index, x))
+      let* x = f_elem elem in
+      Some (exp_to_int index, x)
   | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
       _C;
       elem;
       {it = ProjE ({it = UncaseE ({it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _}, [[]; []]); _}, 0); _}
     ]; _}) when field' = field && String.ends_with ~suffix:"_sub" id.it ->
-      (match f_elem elem with
-      | None -> None
-      | Some x -> Some (exp_to_int index, x))
+      let* x = f_elem elem in
+      Some (exp_to_int index, x)
   | _ -> None
 
 let extract_context_len_sidecond field sidecond =
@@ -575,21 +574,18 @@ let rule_to_arrow rule =
     | _ -> e
   in
 
-  let RuleD (id, _, _, exp, prems) = rule.it in
+  let RuleD (_, _, _, exp, _) = rule.it in
   match exp.it with
   | TupE [_c; _lhs; rhs] ->
     (match rhs.it with
     | CaseE (_, args) ->
       (match args.it with
-      | TupE [t1; t2] | TupE [t1; _; t2] ->
-        let name = id.it |> String.split_on_char '-' |> List.hd |> String.uppercase_ascii in
-        name, (unwrap t1, unwrap t2, prems)
+      | TupE [t1; t2] | TupE [t1; _; t2] -> unwrap t1, unwrap t2
       | _ -> expected_shape args "t1, t2 or t1, x*, t2"
       )
     | _ -> expected_shape rhs "e1 -> e2"
     )
   | _ -> expected_shape exp "C |- lhs : rhs"
-let arrow_map = ref []
 
 let rule_to_instr rule =
   let RuleD (_, _, _, exp, _) = rule.it in
@@ -600,6 +596,24 @@ let rule_to_instr rule =
 let rule_to_prems rule =
   let RuleD (_, _, _, _, prems) = rule.it in
   prems
+
+let find_trules case =
+  List.filter (fun r ->
+    let RuleD (id, _, _, _, _) = r.it in
+    let case' =
+      String.uppercase_ascii id.it
+      |> String.split_on_char '-'
+      |> List.hd
+    in
+    case = case'
+  ) !trules
+
+(* 0.5. Fix the typing rules to be used for the instruction *)
+let fix_trules cases =
+  List.map (fun case ->
+    let trules = if case = "" then !trules else find_trules case in
+    choose trules
+  ) cases
 
 (* TODO: This should eventually consider subtype, automatically *)
 let unify_vt map vt1 vt2 =
@@ -638,21 +652,11 @@ let apply_unify_result result e =
   ) e result
   |> Il.Eval.reduce_exp !il_env
 
-let apply_unify_result_prem result p =
-  List.fold_left (fun p (x, e_x) ->
-    transform_prem (replace_id_with x e_x) p
-  ) p result
-  |> transform_prem (Il.Eval.reduce_exp !il_env)
+let apply_unify_result_prem result = transform_prem @@ apply_unify_result result
 
-let apply_unify_result_rule result r =
-  match r.it with
-  | RuleD (id, binds, mixop, e, ps) ->
-    let e' = apply_unify_result result e in
-    let ps' = List.map (apply_unify_result_prem result) ps in
-    let it = RuleD (id, binds, mixop, e', ps') in
-    {r with it}
+let apply_unify_result_rule result = transform_rule @@ apply_unify_result result
 
-let fix_free_var prems ess =
+let fix_free_var_of_rt trules ess =
   try_n 10 "Fixing free vars of rt" (fun () ->
     let free_vars = ref [] in
     List.map (transform_exp (fun e ->
@@ -663,17 +667,16 @@ let fix_free_var prems ess =
     dedup (fun x y -> (fst x) = (fst y)) !free_vars
     |>
     List.fold_left (fun acc (x, typ) ->
-      match acc with
-      | None -> None
-      | Some (ess, prems) ->
-        let e = gen_typ typ in
-        let prems' = List.map (transform_prem (replace_id_with x e)) prems in
-        if contains_false prems' then
-          None
-        else
-          Some (List.map (List.map (transform_exp (replace_id_with x e))) ess, prems')
-    ) (Some (ess, prems))
-  ) |> fst
+      let* (ess, trules) = acc in
+      let e = gen_typ typ in
+      let trules = List.map (transform_rule (replace_id_with x e)) trules in
+      let prems = List.concat_map rule_to_prems trules in
+      if contains_false prems then
+        None
+      else
+        Some (List.map (List.map (transform_exp (replace_id_with x e))) ess, trules)
+    ) (Some (ess, trules))
+  )
 
 let get_cached_length i e =
   List.find_map (function
@@ -703,11 +706,11 @@ let fix_lengths i max es =
   l
 
 (* 1. fix_rts: pre-determine concrete types of each cases *)
-let fix_rts (cases: string list): restype list =
-  let rts, premss = List.fold_left (fun (rts, premss) case ->
-    let i = List.length rts - 1 in
+let fix_rts (trules: rule list): restype list * rule list =
+  let rts, trules = List.fold_left (fun (rts, trules) trule ->
+    let i = List.length trules in
 
-    let (rt1, rt2, prems) = !arrow_map |> List.assoc case in
+    let (rt1, rt2) = rule_to_arrow trule in
 
     let rec mk_vts rt =
       match rt.it with
@@ -724,13 +727,31 @@ let fix_rts (cases: string list): restype list =
       | _ -> [rt]
     in
 
-    let append_idx = replace_id_using (fun x -> x ^ "@" ^ (string_of_int i)) in
+    let iter_to_list e =
+      match e.it with
+      | IterE (e', (List, xes)) ->
+        let xs, es = List.split xes in
+        (match get_cached_length i (List.hd es) with
+        | None -> e
+        | Some l ->
+          let es = List.init l (fun i ->
+            List.fold_left (fun e x ->
+              transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+            ) e' xs
+          ) in
+          let it = ListE es in
+          { e with it }
+        )
+      | _ -> e
+    in
+
+    let append_idx = replace_id_using (fun x -> if x = "C" then x else x ^ "@" ^ (string_of_int i)) in
     let append_idx_exp = transform_exp append_idx in
-    let append_idx_prem = transform_prem append_idx in
+    let append_idx_rule = transform_rule append_idx in
 
     let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx_exp in
     let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx_exp in
-    let prems = prems |> List.map append_idx_prem in
+    let trule = trule |> transform_rule iter_to_list |> append_idx_rule in
 
     let rt = List.hd rts in
     let rts = List.tl rts in
@@ -751,31 +772,41 @@ let fix_rts (cases: string list): restype list =
       []
     in
 
-    let unify_result, premss = try_n 10 "Fixing rts" (fun () ->
+    let unify_result, trules = try_n 10 "Fixing rts" (fun () ->
       let unify_result = unify_vts rt (List.rev vts1) in
-      let premss = (prems :: premss) |> (List.map @@ List.map @@ apply_unify_result_prem unify_result) in
-      if premss |> List.exists contains_false then
+      let trules = (trule :: trules) |> (List.map @@ apply_unify_result_rule unify_result) in
+      let prems = trules |> List.concat_map rule_to_prems in
+      if contains_false prems then
         None
       else
-        Some (unify_result, premss)
+        Some (unify_result, trules)
     ) in
 
     (List.rev (prefix @ vts2) :: rt :: rts) |> List.map (List.map (apply_unify_result unify_result)),
-    premss
-  ) ([[]], []) cases in
+    trules
+  ) ([[]], []) trules in
 
-  rts
-  |> List.rev
-  |> fix_free_var (List.concat premss)
+  let rts, trules = List.rev rts, List.rev trules in
+  fix_free_var_of_rt trules rts
 
 (* 2. fix_values: generate necessary values in front of main instrs *)
-let fix_values vt: string list * restype list =
+let fix_values vt: rule list =
+  let f case vt =
+    let trule = find_trules case |> List.hd in
+    let _, rt = rule_to_arrow trule in
+    let vt' = Util.Lib.List.last (exp_to_list rt) in
+    let result = unify_vt [] vt vt' in
+    apply_unify_result_rule result trule
+  in
+  let g case = find_trules case |> List.hd in
   match vt.it with
   (* HARDCODE: Default instr name for each type *)
   | CaseE ([[{it = Atom nt; _}]], {it = TupE []; _}) ->
     (match nt with
-    | "I32" | "I64" | "F32" | "F64" -> ["CONST"], [[vt]]
-    | "V128" -> ["VCONST"], [[vt]]
+    | "I32" | "I64" | "F32" | "F64" ->
+      [f "CONST" vt]
+    | "V128" ->
+      [f "VCONST" vt]
     | _ -> failwith "Unknown type"
     )
   | CaseE ([[{it = Atom "REF"; _}];[];[]], {it = TupE [
@@ -784,7 +815,8 @@ let fix_values vt: string list * restype list =
     ]; _}) ->
     assert (!Flag.version = 3);
     (match nul with
-    | Some _ -> ["REF.NULL"], [[vt]]
+    | Some _ ->
+      [f "REF.NULL" vt]
     | None ->
       let ht =
         match ht.it with
@@ -792,35 +824,36 @@ let fix_values vt: string list * restype list =
           choose [il_case "I31" "heaptype" []; il_case "STRUCT" "heaptype" []; il_case "ARRAY" "heaptype" []]
         | _ -> ht
       in
+      let i32 = il_case "I32" "valtype" [] in
       (match ht.it with
       (* TODO: Add more cases? *)
       | CaseE ([[{it = Atom "I31"; _}]], {it = TupE []; _}) ->
-        ["CONST"; "REF.I31"], [[il_case "I32" "valtype" []]; [vt]]
+        [f "CONST" i32; g "REF.I31"]
       | CaseE ([[{it = Atom "STRUCT"; _}]], {it = TupE []; _}) ->
-        ["STRUCT.NEW_DEFAULT"], [[vt]]
+        [g "STRUCT.NEW_DEFAULT"]
       | CaseE ([[{it = Atom "ARRAY"; _}]], {it = TupE []; _}) ->
-        ["CONST"; "ARRAY.NEW_DEFAULT"], [[il_case "I32" "valtype" []]; [vt]]
+        [f "CONST" i32; g "ARRAY.NEW_DEFAULT"]
       | CaseE ([[{it = Atom "_IDX"; _}]; []], _) ->
         let idx = ht |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> exp_to_int in
         let conds = List.filter_map extract_type_sidecond !sideconds in
         (match List.find_opt (fun (j, _) -> idx = j) conds with
         | None ->
-          ["CONST"; "ARRAY.NEW_DEFAULT"], [[il_case "I32" "valtype" []]; [vt]]
+          [f "CONST" i32; f "ARRAY.NEW_DEFAULT" vt]
         | Some (_, t) ->
           (match case_of_case t with
-          | Atom "STRUCT" -> ["STRUCT.NEW_DEFAULT"], [[vt]]
-          | Atom "ARRAY" -> ["CONST"; "ARRAY.NEW_DEFAULT"], [[il_case "I32" "valtype" []]; [vt]]
-          | Atom "FUNC" -> ["REF.FUNC"], [[vt]]
+          | Atom "STRUCT" -> [f "STRUCT.NEW_DEFAULT" vt]
+          | Atom "ARRAY" -> [f "CONST" i32; f "ARRAY.NEW_DEFAULT" vt]
+          | Atom "FUNC" -> [f "REF.FUNC" vt]
           | _ -> failwith "unreachable"
           )
         )
       | _ ->
         let vt' = vt |> replace_caseE_arg [0; 0] some_opt in
-        ["REF.NULL"; "REF.AS_NON_NULL"], [[vt']; [vt]]
+        [f "REF.NULL" vt'; f "REF.AS_NON_NULL" vt]
       )
     )
   | _ ->
-    ["LOCAL.GET"], [[vt]]
+    [f "LOCAL.GET" vt]
 let accumulate_rtss rtss =
   List.fold_left (fun stack rts ->
     let last_rt = List.hd (List.rev stack) in
@@ -1004,15 +1037,13 @@ let rec concretize_prems prems =
 
   let prems' = try_n 1000 "Concretizing premise" (fun () ->
     List.fold_left (fun prems_opt e ->
-        match prems_opt with
-        | None -> None
-        | Some prems ->
-          let e' = gen_typ e.note in
-          let prems' = List.map (transform_prem (replace e e')) prems in
-          if contains_false prems' then
-            None
-          else
-            Some prems'
+      let* prems = prems_opt in
+      let e' = gen_typ e.note in
+      let prems' = List.map (transform_prem (replace e e')) prems in
+      if contains_false prems' then
+        None
+      else
+        Some prems'
     ) (Some prems) free_vars
   ) in
 
@@ -1044,40 +1075,9 @@ let concretize_free_prem prem =
   | _ -> prem
 
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
-let rec fix_immediate (cases: string list) rts: exp list =
-  let rt = List.hd rts in
-  let rts = List.tl rts in
-
-  List.fold_left2 (fun (acc, rt1) case rt2 ->
-    let i = List.length acc - !values_cnt in
-
-    let (rt1', rt2', _) = List.assoc case !arrow_map in
-
-    let rec mk_vts rt =
-      match rt.it with
-      | ListE es -> es
-      | CatE (e1, e2) -> mk_vts e1 @ mk_vts e2
-      | IterE (e, (List, xes)) ->
-        let xs, es = List.split xes in
-        let length = fix_lengths i 3 es in
-        List.init length (fun i ->
-          List.fold_left (fun e x ->
-            transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
-          ) e xs
-        )
-      | _ -> [rt]
-    in
-
-    let remove_sub e = match e.it with | SubE (e, _, _) -> e | _ -> e in
-
-    let vts1 = rt1' |> mk_vts |> List.map remove_sub in
-    let vts2 = rt2' |> mk_vts |> List.map remove_sub in
-
-    assert (List.length rt1 >= List.length vts1);
-    assert (List.length rt2 >= List.length vts2);
-
-    let unify_result = unify_vts rt1 (List.rev vts1) in
-    let unify_result = unify_vts' unify_result rt2 (List.rev vts2) in
+let rec fix_immediate (trules: rule list): exp list =
+  List.mapi (fun i trule ->
+    let i = i - !values_cnt in
 
     let iter_to_list' e =
       match e.it with
@@ -1120,19 +1120,10 @@ let rec fix_immediate (cases: string list) rts: exp list =
     let iter_to_list = transform_exp iter_to_list' in
     let iter_to_list_prem p = transform_prem iter_to_list' p |> expand_iterpr in
 
-    (* Transform trule *)
-    let trule = List.filter (fun r ->
-      let RuleD (id, _, _, _, _) = r.it in
-      String.uppercase_ascii id.it
-      |> String.split_on_char '-'
-      |> List.hd
-      = case
-    ) !trules |> choose in
-
     let trule = try_n 10 "fixing iter len" (fun () ->
       let RuleD (id, binds, mixop, exp, prems) = trule.it in
 
-      let unify_result' = List.fold_left (register_iterlen_cond i) unify_result prems in
+      let unify_result' = List.fold_left (register_iterlen_cond i) [] prems in
       let exp' = exp |> iter_to_list |> apply_unify_result unify_result' in
       let prems' = prems |> List.concat_map iter_to_list_prem |> List.map (apply_unify_result_prem unify_result') in
 
@@ -1159,8 +1150,8 @@ let rec fix_immediate (cases: string list) rts: exp list =
       prems |> List.concat_map as_sidecond
     ) @ !sideconds;
 
-    instr :: acc, rt2
-  ) ([], rt) cases rts |> fst |> List.rev
+    instr
+  ) trules
 
 (* Hardcoded handlers for special kinds of relations *)
 and handle_special_prems trule =
@@ -1223,10 +1214,9 @@ and handle_special_prems trule =
   let it = RuleD (id, binds, mixop, exp, prems) in
   {trule with it}
 
-(* TODO: This code heavily overlaps with fix_value. Do something. *)
 and gen_default_instr' vt =
-  let names, rts = fix_values vt in
-  fix_immediate names ([] :: rts)
+  let trules = fix_values vt in
+  fix_immediate trules
 
 and gen_default_instrs rt1 rt2 =
   match rt1, rt2 with
@@ -1664,25 +1654,26 @@ let handle_trivial_equality r =
 let gen_module (cases: string list): Al.Ast.value =
   (* 0. Init *)
   trules := get_typing_rules () |> List.map handle_trivial_equality;
-  arrow_map := !trules |> List.map rule_to_arrow;
   sideconds := [];
-  let cases = List.map (fun x -> if x = "" then choose !arrow_map |> fst else x) cases in
+
+  (* 0.5. Fix typing rules *)
+  Log.debug ("===0.5===");
+  let trules = fix_trules cases in
 
   (* 1. Fix rt *)
   Log.debug ("===1===");
-  let rts = fix_rts cases in (* May throw, if this combination is impossible *)
+  let rts, trules = fix_rts trules in (* May throw, if this combination is impossible *)
 
   (* 2. Prepend values *)
   Log.debug ("===2===");
-  let (casess, rtss) = List.map fix_values (List.hd rts |> List.rev) |> List.split in
-  let cases' = List.flatten casess in
-  let cases = cases' @ cases in
-  let rts = (accumulate_rtss rtss) @ List.tl rts in
-  values_cnt := List.length cases';
+  let truless = List.map fix_values (List.hd rts |> List.rev) in
+  let trules' = List.flatten truless in
+  let trules = trules' @ trules in
+  values_cnt := List.length trules';
 
   (* 3. Fix immediates *)
   Log.debug ("===3===");
-  let instrs = fix_immediate cases rts in (* May throw, if it is impossible to fill in immeidates *)
+  let instrs = fix_immediate trules in (* May throw, if it is impossible to fill in immeidates *)
 
   (* 3.5 Manual patch *)
   Log.debug ("===3.5===");
