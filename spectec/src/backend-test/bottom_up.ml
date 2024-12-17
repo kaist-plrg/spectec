@@ -1010,7 +1010,6 @@ let unroll_rule p =
       let RuleD (_, _, _, _, prems) = r.it in
       List.map (apply_unify_result_prem unify_result) prems
       |> fix_iterlen_prems
-      |> sideeffect (List.iter (fun p -> print_endline @@ Il.Print.string_of_prem p))
     | _ -> [p]
     )
   | _ -> [p]

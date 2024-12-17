@@ -2,6 +2,11 @@ open Util.Source
 open Il.Ast
 
 (* Walker-based transformer *)
+let transform_id f x =
+  let e = VarE x $$ no_region % (TupT [] $ no_region) in
+  match (f e).it with
+  | VarE x' -> x'
+  | _ -> x
 
 let rec transform_exp f e =
   let new_ = transform_exp f in
@@ -24,7 +29,7 @@ let rec transform_exp f e =
     | LenE e1 -> LenE (new_ e1)
     | TupE es -> TupE ((List.map new_) es)
     | CallE (id, as1) -> CallE (id, List.map (transform_arg f) as1)
-    | IterE (e1, iter) -> IterE (new_ e1, iter) (* TODO iter *)
+    | IterE (e1, iterexp) -> IterE (new_ e1, transform_iterexp f iterexp)
     | ProjE (e1, i) -> ProjE (new_ e1, i)
     | UncaseE (e1, op) -> UncaseE (new_ e1, op)
     | OptE eo -> OptE ((Option.map new_) eo)
@@ -45,6 +50,12 @@ and transform_arg f a =
     | DefA id -> DefA id
     | GramA id -> GramA id }
 
+and transform_iterexp f (iter, xes) =
+  let xs, es = List.split xes in
+  let xs' = List.map (transform_id f) xs in
+  let es' = List.map (transform_exp f) es in
+  (iter, List.combine xs' es')
+
 and transform_typ f t =
   { t with it = match t.it with
     | VarT (id, args) -> VarT (id, List.map (transform_arg f) args)
@@ -58,7 +69,7 @@ let rec transform_prem f p =
     | IfPr e -> IfPr (transform_exp f e)
     | LetPr (e1, e2, xs) -> LetPr (transform_exp f e1, transform_exp f e2, xs)
     | ElsePr -> ElsePr
-    | IterPr (p, iterexp) -> IterPr (transform_prem f p, iterexp) } (* TODO: iterexp *)
+    | IterPr (p, iterexp) -> IterPr (transform_prem f p, transform_iterexp f iterexp) }
 
 let transform_rule f r =
   { r with it = match r.it with
