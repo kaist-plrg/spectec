@@ -341,7 +341,7 @@ let alloc min idxs =
   in
   aux min (List.sort compare idxs)
 
-let register_typ t =
+let register_typ ?(dry=false) t =
   let type_conds = List.filter_map extract_type_sidecond !sideconds in
 
   let tids = ref [] in
@@ -361,7 +361,7 @@ let register_typ t =
     match existing_types with
     | [] ->
       let idx = alloc tid_max (List.map fst type_conds) in
-      push (TypeCondC (idx, t)) sideconds;
+      if not dry then push (TypeCondC (idx, t)) sideconds;
       idx
     | _ -> choose existing_types |> fst
   in
@@ -861,6 +861,30 @@ let accumulate_rtss rtss =
   ) [[]] rtss
 let values_cnt = ref 0
 
+let handle_context_type_prems trule =
+  let extract_type_prem p =
+    match p.it with
+    | RulePr ({it = "Expand"; _}, [[]; _; []], {it = TupE [
+        { it = IdxE ({ it = DotE (_C, {it = Atom "TYPES"; _}); _ }, idx); _ };
+        typ
+      ]; _}) ->
+      (match idx.it with
+      | ProjE ({it = UncaseE (case, _); _}, _) -> Some (case, typ)
+      | _ -> None
+      )
+    | _ -> None
+  in
+
+  let prems = rule_to_prems trule in
+  let type_prems = List.filter_map extract_type_prem prems in
+
+  List.fold_left (fun trule (e, t) ->
+    let dry = not Il.Free.(Set.is_empty (free_exp t).varid) in
+    let idx = register_typ ~dry t in
+    let unify_result = unify_exp [] e idx in
+    apply_unify_result_rule unify_result trule
+  ) trule type_prems
+
 let register_iterlen_cond i result p =
   match p.it with
   | IfPr ({it = CmpE (
@@ -1135,6 +1159,7 @@ let rec fix_immediate (trules: rule list): exp list =
     ) in
 
     let trule = handle_special_prems trule in
+    let trule = handle_context_type_prems trule in
     let instr = rule_to_instr trule in
     let trule, instr = concretize_instr trule instr in
 
