@@ -9,6 +9,7 @@ open Langs
 (* open Al.Ast *)
 (* open Al.Al_util *)
 open Il.Ast
+open Il.Print
 
 open Il2al.Il_walk
 
@@ -72,22 +73,22 @@ let remove_sub e =
 let mixop_of_case e =
   match (remove_sub e).it with
   | CaseE (mixop, _) -> mixop
-  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE")
+  | _ -> failwith (string_of_exp e ^ " is not a CaseE")
 
 let case_of_case e =
   match mixop_of_case e with
   | (atom :: _) :: _ -> atom.it
-  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE with at least one atom")
+  | _ -> failwith (string_of_exp e ^ " is not a CaseE with at least one atom")
 
 let args_of_case e =
   match (remove_sub e).it with
   | CaseE (_, {it = TupE args; _}) -> args
-  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE")
+  | _ -> failwith (string_of_exp e ^ " is not a CaseE")
 
 let nth_arg_of_case n e =
   match (remove_sub e).it with
   | CaseE (_, {it = TupE args; _}) -> List.nth args n
-  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a CaseE")
+  | _ -> failwith (string_of_exp e ^ " is not a CaseE")
 
 let rec replace_caseE_arg is re e =
   match is, e.it with
@@ -104,14 +105,14 @@ let rec replace_caseE_arg is re e =
 let exp_to_int e =
   match (Il.Eval.reduce_exp !il_env e).it with
   | NatE z -> Z.to_int z
-  | _ -> failwith (Il.Print.string_of_exp e ^ " is not an integer")
+  | _ -> failwith (string_of_exp e ^ " is not an integer")
 let exp_of_int i =
   NatE (Z.of_int i) |> to_phrase (NumT NatT $ no_region)
 
 let exp_to_list e =
   match e.it with
   | ListE es -> es
-  | _ -> failwith (Il.Print.string_of_exp e ^ " is not a list")
+  | _ -> failwith (string_of_exp e ^ " is not a list")
 
 let contains_false =
   List.exists (fun p ->
@@ -228,7 +229,7 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
       ( match List.find_map (match_params args) insts with
         | Some matched -> matched
         | None -> raise (DispatchFail (
-          name ^ "(" ^ (args |> List.map (fun e -> Il.Print.string_of_exp e) |> String.concat ", ") ^ ")"
+          name ^ "(" ^ (args |> List.map (fun e -> string_of_exp e) |> String.concat ", ") ^ ")"
         ))
       )
     | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
@@ -249,10 +250,10 @@ let as_sidecond pr =
   | _ -> []
 
 let string_of_sidecond = function
-  | IterLenC (i, e, l) -> Printf.sprintf "-- |%s*| = %d @ %d" (Il.Print.string_of_exp e) l i
-  | RulePrC (x, mixop, e) -> Printf.sprintf "-- %s: %s %s" x.it (Il.Print.string_of_mixop mixop) (Il.Print.string_of_exp e)
-  | IfPrC e -> "-- " ^ Il.Print.string_of_exp e
-  | TypeCondC (i, e) -> Printf.sprintf "-- C.TYPES[%d] = %s" i (Il.Print.string_of_exp e)
+  | IterLenC (i, e, l) -> Printf.sprintf "-- |%s*| = %d @ %d" (string_of_exp e) l i
+  | RulePrC (x, mixop, e) -> Printf.sprintf "-- %s: %s %s" x.it (string_of_mixop mixop) (string_of_exp e)
+  | IfPrC e -> "-- " ^ string_of_exp e
+  | TypeCondC (i, e) -> Printf.sprintf "-- C.TYPES[%d] = %s" i (string_of_exp e)
   | ContextLenC (x, i) -> Printf.sprintf "-- |C.%s[%d]| >= i" x i
 
 (* Helper for extracting sidecond *)
@@ -553,7 +554,7 @@ and gen_typ c typ =
     | _ ->
       TupE (ets |> List.map (fun (_, t) -> gen_typ c t)) |> to_phrase typ
     )
-  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ Il.Print.string_of_typ typ)
+  | _ -> failwith ("TODO: unhandled type for gen_typ: " ^ string_of_typ typ)
 let gen_typ typ = gen_typ {typ; args = []; prems = []; refer = None} typ
 
 (** End of Helpers **)
@@ -564,7 +565,7 @@ type restype = valtype list
 let trules = ref []
 
 let expected_shape e shape =
-  Printf.sprintf "Expected %s to be %s" (Il.Print.string_of_exp e) shape |> failwith
+  Printf.sprintf "Expected %s to be %s" (string_of_exp e) shape |> failwith
 
 let rule_to_arrow rule =
   let rec unwrap e =
@@ -643,7 +644,7 @@ let unify_vts es1 es2 =
   unify_vts' [] es1 es2
 let print_unify_result =
   List.iter (fun (x, e) ->
-    print_endline (x ^ ": " ^ (Il.Print.string_of_exp e))
+    print_endline (x ^ ": " ^ (string_of_exp e))
   )
 
 let apply_unify_result result e =
@@ -731,7 +732,11 @@ let fix_rts (trules: rule list): restype list * rule list =
       match e.it with
       | IterE (e', (List, xes)) ->
         let xs, es = List.split xes in
-        (match get_cached_length i (List.hd es) with
+        let length_opt = es
+          |> List.map (get_cached_length i)
+          |> List.fold_left (fun acc -> Option.fold ~none:acc ~some:Option.some) None
+        in
+        (match length_opt with
         | None -> e
         | Some l ->
           let es = List.init l (fun i ->
@@ -1710,7 +1715,7 @@ let gen_module (cases: string list): Al.Ast.value =
   (* 5. Wrap as a module *)
   Log.debug ("===5===");
   let module_ = wrap_as_module func |> Il.Eval.reduce_exp !il_env in
-  Log.debug (Il.Print.string_of_exp module_);
+  Log.debug (string_of_exp module_);
 
   (* 6. IL2AL *)
   Log.debug ("===6===");
