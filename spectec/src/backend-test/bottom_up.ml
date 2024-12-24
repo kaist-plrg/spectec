@@ -976,6 +976,9 @@ let rec simplify_equality prems =
     | RulePr (id, _, {it = TupE [_C; {it = VarE x; _}; e]; _}) when String.ends_with ~suffix:"_sub" id.it ->
       (* TODO: subtype is currently considered eq *)
       Either.Left((x, e), prem)
+    | RulePr (id, _, {it = TupE [_C; e; {it = VarE x; _}]; _}) when String.ends_with ~suffix:"_sub" id.it ->
+      (* TODO: subtype is currently considered eq *)
+      Either.Left((x, e), prem)
     | _ -> Either.Right prem
   in
   match List.partition_map is_eq_prem prems with
