@@ -728,6 +728,7 @@ let fix_rts (trules: rule list): restype list * rule list =
       | _ -> [rt]
     in
 
+    let len_cache = ref [] in
     let iter_to_list e =
       match e.it with
       | IterE (e', (List, xes)) ->
@@ -747,6 +748,14 @@ let fix_rts (trules: rule list): restype list * rule list =
           let it = ListE es in
           { e with it }
         )
+      | IterE (e', (ListN ({it = VarE {it = n; _}; _}, None), [])) ->
+        let l = match List.assoc_opt n !len_cache with
+          | Some l -> l
+          | None -> Random.int 3 |>> (fun l -> push (n, l) len_cache)
+        in
+        let es = List.init l (fun _ -> e') in
+        let it = ListE es in
+        { e with it }
       | _ -> e
     in
 
@@ -757,6 +766,7 @@ let fix_rts (trules: rule list): restype list * rule list =
     let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx_exp in
     let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx_exp in
     let trule = trule |> transform_rule iter_to_list |> append_idx_rule in
+    let unify_result = !len_cache |> List.map (fun (x, l) -> x, exp_of_int l) in
 
     let rt = List.hd rts in
     let rts = List.tl rts in
@@ -778,7 +788,7 @@ let fix_rts (trules: rule list): restype list * rule list =
     in
 
     let unify_result, trules = try_n 10 "Fixing rts" (fun () ->
-      let unify_result = unify_vts rt (List.rev vts1) in
+      let unify_result = unify_vts rt (List.rev vts1) @ unify_result in
       let trules = (trule :: trules) |> (List.map @@ apply_unify_result_rule unify_result) in
       let prems = trules |> List.concat_map rule_to_prems in
       if contains_false prems then

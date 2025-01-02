@@ -120,3 +120,4 @@ let rec try_n n msg f =
     | None -> try_n (n-1) msg f
 
 let sideeffect f v = f v; v
+let (|>>) v f = sideeffect f v

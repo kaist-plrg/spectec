@@ -54,7 +54,11 @@ and transform_iterexp f (iter, xes) =
   let xs, es = List.split xes in
   let xs' = List.map (transform_id f) xs in
   let es' = List.map (transform_exp f) es in
-  (iter, List.combine xs' es')
+  (transform_iter f iter, List.combine xs' es')
+and transform_iter f iter =
+  match iter with
+  | ListN (e, i) -> ListN (transform_exp f e, Option.map (transform_id f) i)
+  | _ -> iter
 
 and transform_typ f t =
   { t with it = match t.it with
