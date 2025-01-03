@@ -609,12 +609,9 @@ let find_trules case =
     case = case'
   ) !trules
 
-(* 0.5. Fix the typing rules to be used for the instruction *)
-let fix_trules cases =
-  List.map (fun case ->
-    let trules = if case = "" then !trules else find_trules case in
-    choose trules
-  ) cases
+let case_to_rule case =
+  let trules = if case = "" then !trules else find_trules case in
+  choose trules
 
 (* TODO: This should eventually consider subtype, automatically *)
 let unify_vt map vt1 vt2 =
@@ -707,12 +704,10 @@ let fix_lengths i max es =
   l
 
 (* 1. fix_rts: pre-determine concrete types of each cases *)
-let fix_rts (trules: rule list): restype list * rule list =
-  let rts, trules = List.fold_left (fun (rts, trules) trule ->
+let fix_rts (cases: string list): restype list * rule list =
+  let rts, trules = List.fold_left (fun (rts, trules) case ->
     let i = List.length trules in
-
-    let (rt1, rt2) = rule_to_arrow trule in
-
+    (* Helpers *)
     let rec mk_vts rt =
       match rt.it with
       | ListE es -> es
@@ -762,44 +757,51 @@ let fix_rts (trules: rule list): restype list * rule list =
     let append_idx = replace_id_using (fun x -> if x = "C" then x else x ^ "@" ^ (string_of_int i)) in
     let append_idx_exp = transform_exp append_idx in
     let append_idx_rule = transform_rule append_idx in
+    (* End of Helpers *)
 
-    let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx_exp in
-    let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx_exp in
-    let trule = trule |> transform_rule iter_to_list |> append_idx_rule in
-    let unify_result = !len_cache |> List.map (fun (x, l) -> x, exp_of_int l) in
+    let handler = if case = "" then (try_n 10 "Fixing the instruction") else (fun f -> f () |> Option.get) in
+    handler (fun () -> try(
+      let trule = case_to_rule case in
+      let (rt1, rt2) = rule_to_arrow trule in
 
-    let rt = List.hd rts in
-    let rts = List.tl rts in
+      let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx_exp in
+      let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx_exp in
+      let trule = trule |> transform_rule (len_cache := []; iter_to_list) |> append_idx_rule in
+      let pre_unify = !len_cache |> List.map (fun (x, l) -> x, exp_of_int l) in
 
-    let extra_length = List.length vts1 - List.length rt in
+      let rt = List.hd rts in
+      let rts = List.tl rts in
 
-    let rt, rts = if extra_length > 0 then
-      let vals = Lib.List.take extra_length vts1 in
-      let (@@) xs ys = List.rev (xs @ (List.rev ys)) in
-      vals @@ rt, List.map ((@@) vals) rts
-    else
-      rt, rts
-    in
+      let extra_length = List.length vts1 - List.length rt in
 
-    let prefix = if extra_length < 0 then
-      Lib.List.take (-extra_length) (List.rev rt)
-    else
-      []
-    in
-
-    let unify_result, trules = try_n 10 "Fixing rts" (fun () ->
-      let unify_result = unify_vts rt (List.rev vts1) @ unify_result in
-      let trules = (trule :: trules) |> (List.map @@ apply_unify_result_rule unify_result) in
-      let prems = trules |> List.concat_map rule_to_prems in
-      if contains_false prems then
-        None
+      let rt, rts = if extra_length > 0 then
+        let vals = Lib.List.take extra_length vts1 in
+        let (@@) xs ys = List.rev (xs @ (List.rev ys)) in
+        vals @@ rt, List.map ((@@) vals) rts
       else
-        Some (unify_result, trules)
-    ) in
+        rt, rts
+      in
 
-    (List.rev (prefix @ vts2) :: rt :: rts) |> List.map (List.map (apply_unify_result unify_result)),
-    trules
-  ) ([[]], []) trules in
+      let prefix = if extra_length < 0 then
+        Lib.List.take (-extra_length) (List.rev rt)
+      else
+        []
+      in
+
+      let unify_result, trules = try_n 10 "Fixing rts" (fun () ->
+        let unify_result = unify_vts rt (List.rev vts1) @ pre_unify in
+        let trules = (trule :: trules) |> (List.map @@ apply_unify_result_rule unify_result) in
+        let prems = trules |> List.concat_map rule_to_prems in
+        if contains_false prems then
+          None
+        else
+          Some (unify_result, trules)
+      ) in
+
+      let rts = (List.rev (prefix @ vts2) :: rt :: rts) |> List.map (List.map (apply_unify_result unify_result)) in
+      Some (rts, trules)
+    ) with | _ -> None)
+  ) ([[]], []) cases in
 
   let rts, trules = List.rev rts, List.rev trules in
   fix_free_var_of_rt trules rts
@@ -1701,13 +1703,9 @@ let gen_module (cases: string list): Al.Ast.value =
   trules := get_typing_rules () |> List.map handle_trivial_equality;
   sideconds := [];
 
-  (* 0.5. Fix typing rules *)
-  Log.debug ("===0.5===");
-  let trules = fix_trules cases in
-
   (* 1. Fix rt *)
   Log.debug ("===1===");
-  let rts, trules = fix_rts trules in (* May throw, if this combination is impossible *)
+  let rts, trules = fix_rts cases in (* May throw, if this combination is impossible *)
 
   (* 2. Prepend values *)
   Log.debug ("===2===");
