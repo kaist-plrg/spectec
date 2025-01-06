@@ -46,6 +46,13 @@ let rec count_freq eq = function
 
 let to_phrase ty x = x $$ no_region % ty
 
+let reduce_exp e = Il.Eval.reduce_exp !il_env e
+let reduce_prem pr =
+  match pr.it with
+  | IfPr e -> {pr with it = IfPr (reduce_exp e)}
+  | RulePr (id, mixop, e) -> {pr with it = RulePr (id, mixop, reduce_exp e)}
+  | _ -> pr
+
 (* Smart Constructors *)
 let mk_VarT x = VarT (x $ no_region, []) $ no_region
 let il_case name tname args =
@@ -103,7 +110,7 @@ let rec replace_caseE_arg is re e =
   | _ -> failwith "Expected a CaseE"
 
 let exp_to_int e =
-  match (Il.Eval.reduce_exp !il_env e).it with
+  match (reduce_exp e).it with
   | NatE z -> Z.to_int z
   | _ -> failwith (string_of_exp e ^ " is not an integer")
 let exp_of_int i =
@@ -118,7 +125,7 @@ let contains_false =
   List.exists (fun p ->
     match p.it with
     | IfPr e ->
-      let e' = Il.Eval.reduce_exp !il_env e in
+      let e' = reduce_exp e in
       e'.it = BoolE false
     | _ -> false
   )
@@ -257,7 +264,7 @@ type sidecond =
 let sideconds: sidecond list ref = ref []
 
 let as_sidecond pr =
-  let simplify e = Il.Eval.reduce_exp !il_env (transform_exp remove_sub e) in
+  let simplify e = reduce_exp (transform_exp remove_sub e) in
   match pr.it with
   | IfPr e -> [IfPrC (simplify e)]
   | RulePr (id, mixop, e) -> [RulePrC (id, mixop, (simplify e))]
@@ -462,7 +469,7 @@ let try_gen_from_prems c e =
 let rec gen c x =
   let a2e a =
     match a.it with
-    | ExpA e -> Il.Eval.reduce_exp !Langs.il_env e
+    | ExpA e -> reduce_exp e
     | _ -> failwith @@ "Unsupported arg for " ^ x
   in
   let args = List.map a2e c.args in
@@ -662,7 +669,7 @@ let apply_unify_result result e =
   List.fold_left (fun e (x, e_x) ->
     transform_exp (replace_id_with x e_x) e
   ) e result
-  |> Il.Eval.reduce_exp !il_env
+  |> reduce_exp
 
 let apply_unify_result_prem result = transform_prem @@ apply_unify_result result
 
@@ -1099,7 +1106,11 @@ let rec concretize_prems prems =
     List.fold_left (fun prems_opt e ->
       let* prems = prems_opt in
       let e' = gen_typ e.note in
-      let prems' = List.map (transform_prem (replace e e')) prems in
+      let prems' =
+        prems
+        |> List.map (transform_prem (replace e e'))
+        |> List.map reduce_prem
+      in
       if contains_false prems' then
         None
       else
@@ -1742,7 +1753,7 @@ let gen_module (cases: string list): Al.Ast.value =
 
   (* 5. Wrap as a module *)
   Log.debug ("===5===");
-  let module_ = wrap_as_module func |> Il.Eval.reduce_exp !il_env in
+  let module_ = wrap_as_module func |> reduce_exp in
   Log.debug (string_of_exp module_);
 
   (* 6. IL2AL *)

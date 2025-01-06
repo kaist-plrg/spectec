@@ -131,6 +131,14 @@ and is_normal_exp e =
   | StrE efs -> List.for_all (fun (_, e) -> is_normal_exp e) efs
   | _ -> false
 
+and diff_exp e1 e2 =
+  match e1.it, e2.it with
+  | ListE es1, ListE es2 -> List.length es1 <> List.length es2 || List.exists2 diff_exp es1 es2
+  | TupE es1, TupE es2 -> List.length es1 <> List.length es2 || List.exists2 diff_exp es1 es2
+  | OptE None, OptE (Some _) -> true
+  | OptE (Some _), OptE None -> true
+  | _ -> false
+
 and reduce_exp env e : exp =
   Debug.(log "il.reduce_exp"
     (fun _ -> fmt "%s" (il_exp e))
@@ -196,8 +204,10 @@ and reduce_exp env e : exp =
     let e2' = reduce_exp env e2 in
     (match op, e1'.it, e2'.it with
     | EqOp, _, _ when Eq.eq_exp e1' e2' -> BoolE true
+    | EqOp, _, _ when diff_exp e1' e2' -> BoolE false
     | EqOp, _, _ when is_normal_exp e1' && is_normal_exp e2' -> BoolE false
     | NeOp, _, _ when Eq.eq_exp e1' e2' -> BoolE false
+    | NeOp, _, _ when diff_exp e1' e2' -> BoolE true
     | NeOp, _, _ when is_normal_exp e1' && is_normal_exp e2' -> BoolE true
     | LtOp _, NatE n1, NatE n2 -> BoolE (n1 < n2)
     | LtOp _, UnE (MinusOp _, {it = NatE n1; _}), UnE (MinusOp _, {it = NatE n2; _}) -> BoolE (n2 < n1)
