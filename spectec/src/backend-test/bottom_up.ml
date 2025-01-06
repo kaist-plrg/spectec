@@ -145,6 +145,10 @@ let contains_false =
     | TypB _
     | DefB _
     | GramB _ -> failwith "typ_of_bind"
+  let extract_tup_typ typ =
+    match typ.it with
+    | TupT ets -> List.split ets |> snd
+    | _ -> failwith "extract_tup_typ"
   let a2e a =
     match a.it with
     | ExpA e -> e
@@ -157,10 +161,10 @@ let contains_false =
   let rec has_deftyp a dt =
     match a.it, dt.it with
     | CaseE (mixop, {it = TupE args; _}), VariantT typcases ->
-      List.exists (fun (mixop', (binds, _, _), _) ->
+      List.exists (fun (mixop', (_, typ, _), _) ->
         Il.Mixop.eq mixop mixop'
         &&
-        List.for_all2 has_type args (List.map typ_of_bind binds)
+        List.for_all2 has_type args (extract_tup_typ typ)
       ) typcases
     | _, AliasT t -> has_type a t
     | _, VariantT [ [[]; []], ([ bind ], _, _), _ ] -> has_type a (typ_of_bind bind)
