@@ -721,23 +721,8 @@ let fix_rts (cases: string list): restype list * rule list =
   let rts, trules = List.fold_left (fun (rts, trules) case ->
     let i = List.length trules in
     (* Helpers *)
-    let rec mk_vts rt =
-      match rt.it with
-      | ListE es -> es
-      | CatE (e1, e2) -> mk_vts e1 @ mk_vts e2
-      | IterE (e, (List, xes)) ->
-        let xs, es = List.split xes in
-        let length = fix_lengths i 3 es in
-        List.init length (fun i ->
-          List.fold_left (fun e x ->
-            transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
-          ) e xs
-        )
-      | _ -> [rt]
-    in
-
     let len_cache = ref [] in
-    let iter_to_list e =
+    let iter_to_list ?(enforce=false) e =
       match e.it with
       | IterE (e', (List, xes)) ->
         let xs, es = List.split xes in
@@ -745,17 +730,19 @@ let fix_rts (cases: string list): restype list * rule list =
           |> List.map (get_cached_length i)
           |> List.fold_left (fun acc -> Option.fold ~none:acc ~some:Option.some) None
         in
-        (match length_opt with
-        | None -> e
-        | Some l ->
-          let es = List.init l (fun i ->
-            List.fold_left (fun e x ->
-              transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
-            ) e' xs
-          ) in
-          let it = ListE es in
-          { e with it }
-        )
+        if not enforce && length_opt = None then e else
+        let length =
+          match length_opt with
+          | None -> fix_lengths i 3 es
+          | Some l -> l
+        in
+        let es = List.init length (fun i ->
+          List.fold_left (fun e x ->
+            transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e
+          ) e' xs
+        ) in
+        let it = ListE es in
+        { e with it }
       | IterE (e', (ListN ({it = VarE {it = n; _}; _}, None), [])) ->
         let l = match List.assoc_opt n !len_cache with
           | Some l -> l
@@ -764,7 +751,20 @@ let fix_rts (cases: string list): restype list * rule list =
         let es = List.init l (fun _ -> e') in
         let it = ListE es in
         { e with it }
+      | IterE _ ->
+        if enforce then
+          failwith @@ "Unhandled iter" ^ string_of_exp e ^ " for iter_to_list"
+        else
+          e
       | _ -> e
+    in
+
+    let rec mk_vts rt =
+      match rt.it with
+      | ListE es -> es
+      | CatE (e1, e2) -> mk_vts e1 @ mk_vts e2
+      | IterE _ -> mk_vts (iter_to_list rt ~enforce:true)
+      | _ -> [rt]
     in
 
     let append_idx = replace_id_using (fun x -> if x = "C" then x else x ^ "@" ^ (string_of_int i)) in
