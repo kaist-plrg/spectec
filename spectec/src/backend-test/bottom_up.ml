@@ -177,10 +177,11 @@ let contains_false =
     | _, VariantT [ [[]; []], ([ bind ], _, _), _ ] -> has_type a (typ_of_bind bind)
     | _ -> false
   and has_type a t =
+    Il.Eval.sub_typ !il_env a.note t ||
     match a.it, t.it with
     | NatE _, (NumT NatT) -> true
     | _, VarT (name, []) -> has_deftyp a (dispatch_deftyp name.it [] |> snd)
-    | _ -> Il.Eq.eq_typ a.note t
+    | _ -> false
   and has_argtype a p =
     match a.it, (a2e p).it with
     | CaseE (mixop1, {it = TupE args1; _}), CaseE (mixop2, {it = TupE args2; _}) ->
@@ -234,6 +235,8 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
       on_fail map e1 e2
   | _, VarE x -> ((x.it, e1) :: map)
   | VarE x, _ -> ((x.it, e2) :: map)
+  | SubE (e1, _t1, _), SubE (e2, _t2, _) (*when Il.Eq.eq_typ t1 t2*) ->
+    f e1 e2
   | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 ->
     f args1 args2
   | CallE (id1, args1), CallE (id2, args2) when Il.Eq.eq_id id1 id2 ->
@@ -837,7 +840,7 @@ let fix_values vt: rule list =
     apply_unify_result_rule result trule
   in
   let g case = find_trules case |> List.hd in
-  match vt.it with
+  match (remove_sub vt).it with
   (* HARDCODE: Default instr name for each type *)
   | CaseE ([[{it = Atom nt; _}]], {it = TupE []; _}) ->
     (match nt with
