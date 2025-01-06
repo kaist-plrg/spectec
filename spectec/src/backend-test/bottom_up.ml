@@ -123,44 +123,6 @@ let contains_false =
     | _ -> false
   )
 
-exception UnifyFail of exp * exp
-let unify_fail _map e1 e2 =
-  raise @@ UnifyFail (e1, e2)
-let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
-  let rec resolve e =
-    match e.it with
-    | VarE x -> (match List.assoc_opt x.it map with Some e -> resolve e | None -> e)
-    | SubE (e, _, _) -> e
-    | _ -> e
-  in
-  let e1 = resolve e1 in
-  let e2 = resolve e2 in
-  if Il.Eq.eq_exp e1 e2 then map else
-  let f = unify_exp ~on_fail:on_fail map in
-  match e1.it, e2.it with (*TODO: Generalize to more cases *)
-  | _, VarE x -> ((x.it, e1) :: map)
-  | VarE x, _ -> ((x.it, e2) :: map)
-  | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 ->
-    f args1 args2
-  | CallE (id1, args1), CallE (id2, args2) when Il.Eq.eq_id id1 id2 ->
-    List.fold_left2 (fun map a1 a2 ->
-      match a1.it, a2.it with
-      | ExpA e1, ExpA e2 -> f e1 e2
-      | _ -> map
-    ) map args1 args2
-  | TupE es1, TupE es2 when List.length es1 = List.length es2 ->
-    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
-  | IterE (e1, (iter1, xes1)), IterE (e2, (iter2, xes2))
-    when iter1 = iter2
-      && List.length xes1 = List.length xes2
-      && List.for_all2 (fun (x1, e1) (x2, e2) -> Il.Eq.eq_id x1 x2 && Il.Eq.eq_exp e1 e2) xes1 xes2 ->
-    f e1 e2
-  | ListE es1, ListE es2 when List.length es1 = List.length es2 ->
-    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
-  | OptE None, OptE None -> map
-  | OptE (Some e1), OptE (Some e2) -> f e1 e2
-  | _, _ -> on_fail map e1 e2
-
 
 (** Helpers to handle type-family-based generation **)
   let has_name name def =
@@ -234,6 +196,53 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
       )
     | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 (** End of Helpers to handle type-family-based generation **)
+
+exception UnifyFail of exp * exp
+let unify_fail _map e1 e2 =
+  raise @@ UnifyFail (e1, e2)
+let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
+  let rec resolve e =
+    match e.it with
+    | VarE x -> (match List.assoc_opt x.it map with Some e -> resolve e | None -> e)
+    | _ -> e
+  in
+  let e1 = resolve e1 in
+  let e2 = resolve e2 in
+  if Il.Eq.eq_exp e1 e2 then map else
+  let f = unify_exp ~on_fail:on_fail map in
+  match e1.it, e2.it with (*TODO: Generalize to more cases *)
+  | CaseE _, SubE (e, t, _) ->
+    if has_type e1 t then
+      unify_exp ~on_fail map e1 e
+    else
+      on_fail map e1 e2
+  | SubE (e, t, _), CaseE _ ->
+    if has_type e2 t then
+      unify_exp ~on_fail map e e2
+    else
+      on_fail map e1 e2
+  | _, VarE x -> ((x.it, e1) :: map)
+  | VarE x, _ -> ((x.it, e2) :: map)
+  | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 ->
+    f args1 args2
+  | CallE (id1, args1), CallE (id2, args2) when Il.Eq.eq_id id1 id2 ->
+    List.fold_left2 (fun map a1 a2 ->
+      match a1.it, a2.it with
+      | ExpA e1, ExpA e2 -> f e1 e2
+      | _ -> map
+    ) map args1 args2
+  | TupE es1, TupE es2 when List.length es1 = List.length es2 ->
+    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
+  | IterE (e1, (iter1, xes1)), IterE (e2, (iter2, xes2))
+    when iter1 = iter2
+      && List.length xes1 = List.length xes2
+      && List.for_all2 (fun (x1, e1) (x2, e2) -> Il.Eq.eq_id x1 x2 && Il.Eq.eq_exp e1 e2) xes1 xes2 ->
+    f e1 e2
+  | ListE es1, ListE es2 when List.length es1 = List.length es2 ->
+    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
+  | OptE None, OptE None -> map
+  | OptE (Some e1), OptE (Some e2) -> f e1 e2
+  | _, _ -> on_fail map e1 e2
 
 type sidecond =
   | IterLenC of int * exp * int
@@ -759,13 +768,13 @@ let fix_rts (cases: string list): restype list * rule list =
     let append_idx_rule = transform_rule append_idx in
     (* End of Helpers *)
 
-    let handler = if case = "" then (try_n 10 "Fixing the instruction") else (fun f -> f () |> Option.get) in
+    let handler = if case = "" then (try_n 100 "Fixing the instruction") else (fun f -> f () |> Option.get) in
     handler (fun () -> try(
       let trule = case_to_rule case in
       let (rt1, rt2) = rule_to_arrow trule in
 
-      let vts1 = mk_vts rt1 |> List.map remove_sub |> List.map append_idx_exp in
-      let vts2 = mk_vts rt2 |> List.map remove_sub |> List.map append_idx_exp in
+      let vts1 = mk_vts rt1 |> List.map append_idx_exp in
+      let vts2 = mk_vts rt2 |> List.map append_idx_exp in
       let trule = trule |> transform_rule (len_cache := []; iter_to_list) |> append_idx_rule in
       let pre_unify = !len_cache |> List.map (fun (x, l) -> x, exp_of_int l) in
 

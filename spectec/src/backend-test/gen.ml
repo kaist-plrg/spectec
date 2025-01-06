@@ -322,7 +322,7 @@ let gen_test el' il' al' =
 
     (* Generate test *)
     (* let module_ = Top_down.gen_module () *)
-    let module_ = Bottom_up.gen_module [""] in
+    let module_ = Bottom_up.gen_module [""; ""] in
 
     (* Mutatiion *)
     let module_ = patch module_ in
