@@ -257,9 +257,10 @@ type sidecond =
 let sideconds: sidecond list ref = ref []
 
 let as_sidecond pr =
+  let simplify e = Il.Eval.reduce_exp !il_env (transform_exp remove_sub e) in
   match pr.it with
-  | IfPr e -> [IfPrC (Il.Eval.reduce_exp !il_env e)]
-  | RulePr (id, mixop, e) -> [RulePrC (id, mixop, (Il.Eval.reduce_exp !il_env e))]
+  | IfPr e -> [IfPrC (simplify e)]
+  | RulePr (id, mixop, e) -> [RulePrC (id, mixop, (simplify e))]
   | _ -> []
 
 let string_of_sidecond = function
