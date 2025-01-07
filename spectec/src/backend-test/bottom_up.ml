@@ -778,7 +778,8 @@ let fix_rts (cases: string list): restype list * rule list =
       | _ -> [rt]
     in
 
-    let append_idx = replace_id_using (fun x -> if x = "C" then x else x ^ "@" ^ (string_of_int i)) in
+    let append_idx' x = x ^ "@" ^ (string_of_int i) in
+    let append_idx = replace_id_using (fun x -> if x = "C" then x else append_idx' x) in
     let append_idx_exp = transform_exp append_idx in
     let append_idx_rule = transform_rule append_idx in
     (* End of Helpers *)
@@ -788,10 +789,11 @@ let fix_rts (cases: string list): restype list * rule list =
       let trule = case_to_rule case in
       let (rt1, rt2) = rule_to_arrow trule in
 
+      len_cache := [];
       let vts1 = mk_vts rt1 |> List.map append_idx_exp in
       let vts2 = mk_vts rt2 |> List.map append_idx_exp in
-      let trule = trule |> transform_rule (len_cache := []; iter_to_list) |> append_idx_rule in
-      let pre_unify = !len_cache |> List.map (fun (x, l) -> x, exp_of_int l) in
+      let trule = trule |> transform_rule iter_to_list |> append_idx_rule in
+      let pre_unify = !len_cache |> List.map (fun (x, l) -> append_idx' x , exp_of_int l) in
 
       let rt = List.hd rts in
       let rts = List.tl rts in

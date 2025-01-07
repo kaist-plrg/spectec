@@ -122,4 +122,7 @@ let rec try_n n msg f =
 (* Ocaml Helpers *)
 let sideeffect f v = f v; v
 let (|>>) v f = sideeffect f v
-let print_list f xs = List.iter (fun x -> print_endline @@ f x) xs
+let print_list f xs =
+  print_string "[";
+  List.iter (fun x -> print_string @@ f x ^ "; ") xs;
+  print_endline "]"
