@@ -221,22 +221,22 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
   let e1 = resolve e1 in
   let e2 = resolve e2 in
   if Il.Eq.eq_exp e1 e2 then map else
-  let f = unify_exp ~on_fail:on_fail map in
+  let f = unify_exp ~on_fail map in
   match e1.it, e2.it with (*TODO: Generalize to more cases *)
-  | CaseE _, SubE (e, t, _) ->
+  | _, VarE x -> ((x.it, e1) :: map)
+  | VarE x, _ -> ((x.it, e2) :: map)
+  | SubE (e1, t1, _), SubE (e2, t2, _) when Il.Eval.sub_typ !il_env t1 t2 || Il.Eval.sub_typ !il_env t2 t1 ->
+    f e1 e2
+  | _, SubE (e, t, _) ->
     if has_type e1 t then
       unify_exp ~on_fail map e1 e
     else
       on_fail map e1 e2
-  | SubE (e, t, _), CaseE _ ->
+  | SubE (e, t, _), _ ->
     if has_type e2 t then
       unify_exp ~on_fail map e e2
     else
       on_fail map e1 e2
-  | _, VarE x -> ((x.it, e1) :: map)
-  | VarE x, _ -> ((x.it, e2) :: map)
-  | SubE (e1, _t1, _), SubE (e2, _t2, _) (*when Il.Eq.eq_typ t1 t2*) ->
-    f e1 e2
   | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 ->
     f args1 args2
   | CallE (id1, args1), CallE (id2, args2) when Il.Eq.eq_id id1 id2 ->
@@ -246,14 +246,14 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
       | _ -> map
     ) map args1 args2
   | TupE es1, TupE es2 when List.length es1 = List.length es2 ->
-    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
+    List.fold_left2 (unify_exp ~on_fail) map es1 es2
   | IterE (e1, (iter1, xes1)), IterE (e2, (iter2, xes2))
     when iter1 = iter2
       && List.length xes1 = List.length xes2
       && List.for_all2 (fun (x1, e1) (x2, e2) -> Il.Eq.eq_id x1 x2 && Il.Eq.eq_exp e1 e2) xes1 xes2 ->
     f e1 e2
   | ListE es1, ListE es2 when List.length es1 = List.length es2 ->
-    List.fold_left2 (unify_exp ~on_fail:on_fail) map es1 es2
+    List.fold_left2 (unify_exp ~on_fail) map es1 es2
   | OptE None, OptE None -> map
   | OptE (Some e1), OptE (Some e2) -> f e1 e2
   | _, _ -> on_fail map e1 e2
@@ -655,7 +655,7 @@ let unify_vt map vt1 vt2 =
     | _ ->
       unify_fail map e1 e2
   in
-  unify_exp ~on_fail:on_fail map vt1 vt2
+  unify_exp ~on_fail map vt1 vt2
 
 let rec unify_vts' map es1 es2 =
   match es1, es2 with
@@ -1071,23 +1071,33 @@ let unroll_rule p =
     let rules = List.filter_map (fun r ->
       let RuleD (_, _, _, exp', _) = r.it in
       try
-        Some (r, unify_exp [] exp exp') (* TODO: disable match with subtype *)
+        Some (r, unify_exp [] exp exp')
       with
         | UnifyFail _ -> None
     ) rules in
 
     (match rules with
-    | [r, unify_result] ->
+    | [r, unify_result] -> (* Only if there is exactly one applicable rule *)
       let RuleD (_, _, _, _, prems) = r.it in
-      List.map (apply_unify_result_prem unify_result) prems
-      |> fix_iterlen_prems
-    | _ -> [p]
+      let prems =
+        List.map (apply_unify_result_prem unify_result) prems
+        |> fix_iterlen_prems
+      in
+      prems, unify_result (* TODO: Needs variable renaming *)
+    | _ -> [p], []
     )
-  | _ -> [p]
+  | _ -> [p], []
 
 let rec concretize_prems prems =
   (* 1. Unroll RulePr *)
-  let prems = List.concat_map unroll_rule prems in
+  let premss, unify_results =
+    List.map unroll_rule prems
+    |> List.split
+  in
+  let prems = List.concat premss in
+  let unify_result = List.concat unify_results in
+  let prems = List.map (apply_unify_result_prem unify_result) prems in
+  if unify_result <> [] then concretize_prems prems else
 
   (* 2. Concretize free vars *)
   let free_vars = ref [] in
