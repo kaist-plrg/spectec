@@ -328,7 +328,11 @@ let al_to_int_cvtop: value list -> IntOp.cvtop = function
     | "F64", "S" -> IntOp.TruncSatSF64
     | "F64", "U" -> IntOp.TruncSatUF64
     | _ -> error_values "trunc_sat" l)
-  | [ _; _; CaseV ("REINTERPRET", []) ] -> IntOp.ReinterpretFloat
+  | [ CaseV (nt1, []); CaseV (nt2, []); CaseV ("REINTERPRET", []) ] as l ->
+    (match nt1, nt2 with
+    | "I32", "F32"
+    | "I64", "F64" -> IntOp.ReinterpretFloat
+    | _ -> error_values "reinterpret" l)
   | l -> error_values "integer cvtop" l
 let al_to_float_cvtop : value list -> FloatOp.cvtop = function
   | [ CaseV (_, []); CaseV (nt, []); CaseV ("CONVERT", [ CaseV (sx, []) ]) ] as l ->
@@ -340,7 +344,11 @@ let al_to_float_cvtop : value list -> FloatOp.cvtop = function
     | _ -> error_values "convert" l)
   | [ CaseV ("F64", []); CaseV ("F32", []); CaseV ("PROMOTE", []) ] -> FloatOp.PromoteF32
   | [ CaseV ("F32", []); CaseV ("F64", []); CaseV ("DEMOTE", []) ] -> FloatOp.DemoteF64
-  | [ _; _; CaseV ("REINTERPRET", []) ] -> FloatOp.ReinterpretInt
+  | [ CaseV (nt1, []); CaseV (nt2, []); CaseV ("REINTERPRET", []) ] as l ->
+    (match nt1, nt2 with
+    | "F32", "I32"
+    | "F64", "I64" -> FloatOp.ReinterpretInt
+    | _ -> error_values "reinterpret" l)
   | l -> error_values "float cvtop" l
 let al_to_cvtop: value list -> cvtop = function
   | CaseV ("I32", []) :: _ as op -> I32 (al_to_int_cvtop op)
