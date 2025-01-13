@@ -436,6 +436,8 @@ let validate x e =
     e
   | _ -> e
 
+exception SyntaxError
+
 let try_gen_from_prems c e =
   let prems = c.prems in
 
@@ -504,7 +506,10 @@ let rec gen c x =
     let typcase' =
       let (m, (bs, t, ps), hs) = typcase in
       let t' = transform_typ replace_params t in
-      m, (bs, t', ps), hs
+      let ps' = List.map (transform_prem replace_params) ps in
+      let ps' = List.map reduce_prem ps' in
+      if contains_false ps' then raise SyntaxError;
+      m, (bs, t', ps'), hs
     in
     gen_typcase c typcase'
   ) |> validate x (* TODO: This will destroy the entanglement with reference *)
@@ -527,7 +532,7 @@ and gen_typs c typs =
       let e' =
         match try_gen_from_prems {c with refer} e with
         | None ->
-          let t' = List.fold_left (fun t (e, e') -> transform_typ  (replace e e') t) t replaces in
+          let t' = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) t replaces in
           gen_typ {c with refer} t'
         | Some e -> e
       in
@@ -955,7 +960,7 @@ let reset_iterlen_cond i =
 
 let concretize_instr trule instr =
   (* 1. Generate from syntax *)
-  let trule, instr = try_n 10 "concretizing instr" (fun () ->
+  let trule, instr = try_n 100 "concretizing instr" (fun () -> try (
     let unify_result =
       let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
       unify_exp [] instr instr'
@@ -971,7 +976,7 @@ let concretize_instr trule instr =
       None
     else
       Some (trule, instr)
-  ) in
+  ) with | SyntaxError -> None) in
 
   (* 2. Fill in all free variables with random value *)
   let free_vars = ref [] in

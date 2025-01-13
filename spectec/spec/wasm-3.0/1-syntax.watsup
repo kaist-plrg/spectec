@@ -95,7 +95,7 @@ var nm : name
 ;; Indices
 ;;
 
-syntax idx hint(desc "index") = u32
+syntax idx hint(desc "index") = u8
 syntax laneidx hint(desc "lane index") = u8
 
 syntax typeidx hint(desc "type index") = idx
