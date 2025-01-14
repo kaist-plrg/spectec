@@ -441,35 +441,55 @@ exception SyntaxError
 let try_gen_from_prems c e =
   let prems = c.prems in
 
+  let rec extract_eq_cond e e' =
+    match e'.it with
+    | BinE (OrOp, e1, e2) ->
+        (match extract_eq_cond e e1, extract_eq_cond e e2 with
+        | Some es1, Some es2 -> Some (union ~eq:Il.Eq.eq_exp es1 es2)
+        | _ -> None)
+    | BinE (AndOp, e1, e2) ->
+        (match extract_eq_cond e e1, extract_eq_cond e e2 with
+        | Some es1, Some es2 -> Some (intersect ~eq:Il.Eq.eq_exp es1 es2)
+        | Some es, None -> Some es
+        | None, Some es -> Some es
+        | _ -> None)
+    | CmpE (EqOp, e1, e2) when Il.Eq.eq_exp e e1 -> Some [e2]
+    | CmpE (EqOp, e2, e1) when Il.Eq.eq_exp e e1 -> Some [e2]
+    | _ -> None
+  in
+
+  let extract_eq_cond_prem e p =
+    match p.it with
+    | IfPr e' -> extract_eq_cond e e'
+    | _ -> None
+  in
+
   match e.it with
   | VarE id when id.it <> "_" ->
-    let rec is_choose e' =
-      match e'.it with
-      | BinE (OrOp, e1, e2) ->
-          (match is_choose e1, is_choose e2 with
-          | Some es1, Some es2 -> Some (es1 @ es2)
-          | _ -> None)
-      | CmpE (EqOp, e1, e2) when Il.Eq.eq_exp e e1 -> Some [e2]
-      | CmpE (EqOp, e2, e1) when Il.Eq.eq_exp e e1 -> Some [e2]
-      | _ -> None
-    in
-
-    let is_choose_prem p =
-      match p.it with
-      | IfPr e -> is_choose e
-      | _ -> None
-    in
-
-    (match (prems |> List.find_map (is_choose_prem), c.refer) with
-    | None, _ -> None
-    | Some es, None -> Some (choose es)
-    | Some es, Some r ->
-      (match List.find_opt (fun e -> Il.Eq.eq_exp e r) es with
+    (match List.find_map (extract_eq_cond_prem e) prems with
+    | None -> c.refer
+    | Some es ->
+      match c.refer with
       | None -> Some (choose es)
-      | some -> some
-      )
+      | Some r ->
+        match List.find_opt (fun e -> Il.Eq.eq_exp e r) es with
+        | None -> Some (choose es)
+        | some -> some
     )
-  | _ -> None
+  | IterE (e', (List, [x, _]))  ->
+    let e_l = LenE e |> to_phrase (NumT NatT $ no_region) in
+    (match List.find_map (extract_eq_cond_prem e_l) prems with
+      | Some e_ns ->
+        let e_n = choose e_ns in
+        (* TODO?: This overwrites c.refer *)
+        let n = exp_to_int e_n in
+        let es = List.init n (fun i ->
+          transform_exp (replace_id x.it (x.it ^ "." ^ string_of_int i)) e'
+        ) in
+        Some {e with it = ListE es}
+      | None -> c.refer
+    )
+  | _ -> c.refer
 
 let rec gen c x =
   let a2e a =
@@ -530,11 +550,13 @@ and gen_typs c typs =
     in
     List.fold_left_map (fun replaces ((e, t), refer) ->
       let e' =
-        match try_gen_from_prems {c with refer} e with
-        | None ->
-          let t' = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) t replaces in
-          gen_typ {c with refer} t'
-        | Some e -> e
+        let refer' = try_gen_from_prems {c with refer} e in
+        let t' = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) t replaces in
+        try_n 10 "generating syntax" (fun () ->
+          let e' = gen_typ {c with refer = refer'} t' in
+          let prems' = List.map (transform_prem (replace e e')) c.prems in
+          e' |> unless (prems' |> contains_false)
+        )
       in
       (e, e') :: replaces, e'
     ) [] (List.combine typs' refs) |> snd
@@ -961,21 +983,22 @@ let reset_iterlen_cond i =
 let concretize_instr trule instr =
   (* 1. Generate from syntax *)
   let trule, instr = try_n 100 "concretizing instr" (fun () -> try (
-    let unify_result =
-      let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
-      unify_exp [] instr instr'
+    let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
+    (* HARDCODE: for VSHUFFLE *)
+    let on_fail map e1 e2 =
+      match e1.it, e2.it with
+      | ListE _, ListE _ -> map
+      | _ -> raise @@ UnifyFail (e1, e2)
     in
+    let unify_result = unify_exp ~on_fail [] instr instr' in
 
-    let trule, instr =
-      apply_unify_result_rule unify_result trule,
-      apply_unify_result unify_result instr
-    in
+    let trule = apply_unify_result_rule unify_result trule in
 
     let prems = rule_to_prems trule in
     if contains_false prems then
       None
     else
-      Some (trule, instr)
+      Some (trule, instr')
   ) with | SyntaxError -> None) in
 
   (* 2. Fill in all free variables with random value *)

@@ -119,6 +119,31 @@ let rec try_n n msg f =
     | Some x -> x
     | None -> try_n (n-1) msg f
 
+(* Helpers for set-like list *)
+let union ?(eq=(=)) lst1 lst2 =
+  let rec aux acc = function
+    | [] -> acc
+    | x :: xs ->
+        if List.exists (fun y -> eq x y) acc then
+          aux acc xs  (* Skip if x is already in the accumulator *)
+        else
+          aux (x :: acc) xs
+  in
+  (* Combine both lists and filter duplicates using eq *)
+  let union_lst = aux [] lst1 in
+  aux union_lst lst2
+
+let intersect ?(eq=(=)) lst1 lst2 =
+  let rec aux acc = function
+    | [] -> acc
+    | x :: xs ->
+        if List.exists (fun y -> eq x y) lst2 then
+          aux (x :: acc) xs  (* Add x to the accumulator if it is in lst2 *)
+        else
+          aux acc xs
+  in
+  aux [] lst1
+
 (* Ocaml Helpers *)
 let sideeffect f v = f v; v
 let (|>>) v f = sideeffect f v
@@ -126,3 +151,8 @@ let print_list f xs =
   print_string "[";
   List.iter (fun x -> print_string @@ f x ^ "; ") xs;
   print_endline "]"
+let unless cond x =
+  if cond then
+    None
+  else
+    Some x
