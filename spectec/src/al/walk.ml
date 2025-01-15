@@ -37,7 +37,7 @@ let walk_expr (walker: unit_walker) (expr: expr) : unit =
   | GetCurContextE _ | YetE _
   | TopValueE None | ContextKindE _ -> ()
 
-  | UnE (_, e) | LenE e
+  | CvtE (e, _, _) | UnE (_, e) | LiftE e | LenE e
   | IsDefinedE e | IsCaseOfE (e, _) | HasTypeE (e, _) | IsValidE e
   | TopValueE (Some e) | TopValuesE e | ChooseE e -> walker.walk_expr walker e
 
@@ -70,14 +70,14 @@ let walk_instr (walker: unit_walker) (instr: instr) : unit =
   | EnterI (e1, e2, il) ->
     walker.walk_expr walker e1; walker.walk_expr walker e2;
     List.iter (walker.walk_instr walker) il
-  | TrapI | NopI | ReturnI None | ExitI _ | YetI _ -> ()
+  | TrapI | FailI | NopI | ReturnI None | ExitI _ | YetI _ -> ()
   | AssertI e | ThrowI e | PushI e | PopI e | PopAllI e
   | ReturnI (Some e)| ExecuteI e | ExecuteSeqI e -> walker.walk_expr walker e
   | LetI (e1, e2) | AppendI (e1, e2) | FieldWiseAppendI (e1, e2) ->
     walker.walk_expr walker e1; walker.walk_expr walker e2
   | PerformI (_, al) -> List.iter (walker.walk_arg walker) al
   | ReplaceI (e1, p, e2) ->
-    walker.walk_expr walker e1; walk_path walker p; walker.walk_expr walker e2
+    walker.walk_expr walker e1; walker.walk_path walker p; walker.walk_expr walker e2
 
 let walk_algo (walker: unit_walker) (algo: algorithm) : unit =
   match algo.it with
@@ -132,6 +132,7 @@ let walk_expr (walker: walker) (expr: expr) : expr =
     match expr.it with
     | NumE _ | BoolE _ | VarE _ | SubE _ | GetCurStateE
     | GetCurContextE _ | ContextKindE _ | YetE _ -> expr.it
+    | CvtE (e, t1, t2) -> CvtE (walk_expr e, t1, t2)
     | UnE (op, e) -> UnE (op, walk_expr e)
     | BinE (op, e1, e2) -> BinE (op, walk_expr e1, walk_expr e2)
     | CallE (id, al) -> CallE (id, List.map walk_arg al)
@@ -140,6 +141,7 @@ let walk_expr (walker: walker) (expr: expr) : expr =
     | CompE (e1, e2) -> CompE (walk_expr e1, walk_expr e2)
     | CatE (e1, e2) -> CatE (walk_expr e1, walk_expr e2)
     | MemE (e1, e2) -> MemE (walk_expr e1, walk_expr e2)
+    | LiftE e -> LiftE (walk_expr e)
     | LenE e -> LenE (walk_expr e)
     | StrE r -> StrE (Record.map (fun x -> x) walk_expr r)
     | AccE (e, p) -> AccE (walk_expr e, walk_path p)
@@ -181,6 +183,7 @@ let walk_instr (walker: walker) (instr: instr) : instr list =
     | PopAllI e -> PopAllI (walk_expr e)
     | LetI (e1, e2) -> LetI (walk_expr e1, walk_expr e2)
     | TrapI -> TrapI
+    | FailI -> FailI
     | ThrowI e -> ThrowI (walk_expr e)
     | NopI -> NopI
     | ReturnI e_opt -> ReturnI (Option.map walk_expr e_opt)

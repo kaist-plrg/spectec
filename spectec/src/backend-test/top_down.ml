@@ -79,7 +79,7 @@ let version = Flag.version
   and has_type v t =
     (* print_endline (spf "has_type %s %s ?" (Al.Print.string_of_value v) (Il.Print.string_of_typ t)); *)
     match v, t.it with
-    | Al.Ast.NumV _, Il.Ast.(NumT NatT) -> true
+    | Al.Ast.NumV _, Il.Ast.(NumT `NatT) -> true
     | _, Il.Ast.VarT (name, []) -> has_deftyp v (dispatch_deftyp name.it [] |> fst)
     | _ -> false
   and has_argtype v a =
@@ -101,8 +101,8 @@ let version = Flag.version
     | None -> failwith (Printf.sprintf "The syntax named %s does not exist in the input spec" name)
 (** End of Helpers to handle type-family-based generation **)
 
-let string_of_atom = El.Atom.to_string
-let string_of_mixop = Il.Mixop.to_string
+let string_of_atom = Xl.Atom.to_string
+let string_of_mixop = Xl.Mixop.to_string
 
 let flatten_args e = match e.it with
 | Il.Ast.TupE es -> es
@@ -312,7 +312,7 @@ let get_type types tid =
 let estimate_out t types =
   let open Al.Ast in
   match t with
-  | NumV n ->
+  | NumV (`Nat n) ->
     n
     |> Z.to_int
     |> get_type types
@@ -375,11 +375,11 @@ let rec gen c name =
   | "memidx" -> zero
   (* HARDCODE: typeidx of function is already cached *)
   | "typeidx" when c.parent_case = "FUNC" ->
-    List.nth !tids_cache c.i |> numV_of_int |> do_cache type_cache
+    List.nth !tids_cache c.i |> natV_of_int |> do_cache type_cache
   (* HARDCODE: vN to be 16 bytes (128 bits) *)
-  | "vN" -> numV (gen_bytes 16)
+  | "vN" -> natV (gen_bytes 16)
   (* HARDCODE: pack_size to be 8/16/32/64 *) (* TODO: Generalize this *)
-  | "sz" -> numV_of_int (choose [8; 16; 32; 64])
+  | "sz" -> natV_of_int (choose [8; 16; 32; 64])
   | _ ->
     let deftyp, bindings = dispatch_deftyp name c.args in
     let c' = { c' with args = bindings } in
@@ -482,7 +482,7 @@ let rec gen c name =
     |> append_cache_if (name = "funcidx" && not c.is_func) refs_cache
 
 and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
-  let open El.Atom in
+  let open Xl.Atom in
   match mixop with
     (* Propagation *)
     | [[]; []] -> gen_typs c typs |> List.hd
@@ -494,8 +494,9 @@ and gen_typcase c (mixop, (_binds, typs, _prems), _hint) =
       let pair = gen_typs c typs in
       let fst = List.hd pair in
       let snd = List.hd (List.tl pair) in
+      let add x y = Xl.Num.bin `AddOp x y |> Option.get in
       (* Make snd larger than fst *)
-      let new_snd = map2 unwrap_numv numV Z.add fst snd in
+      let new_snd = map2 unwrap_numv numV add fst snd in
       Al.Ast.CaseV ("[", [ fst; new_snd ])
     (* Shape *)
     | [[]; [{it = Atom "X"; _}]; []] ->
@@ -564,7 +565,7 @@ and gen_typ c typ =
   | IterT ({ it = VarT (id, _); _ }, List) when id.it = "export" ->
     let l =
       List.init (List.length !tids_cache) (fun i ->
-        let funcidx = numV_of_int i in
+        let funcidx = natV_of_int i in
         refs_cache := funcidx :: !refs_cache;
         caseV ("EXPORT", [TextV ("f" ^ string_of_int i); caseV ("FUNC", [funcidx])])
       )
@@ -579,7 +580,7 @@ and gen_typ c typ =
     (* Helpers *)
     let rec e2v e =
       match e.it with
-      | Il.Ast.NatE z -> numV z
+      | Il.Ast.NumE n -> numV n
       | Il.Ast.SubE (e, _, _) -> e2v e
       | Il.Ast.VarE id -> List.assoc id.it c.args
       | Il.Ast.CaseE (mixop, {it = TupE args; _}) ->
@@ -593,7 +594,7 @@ and gen_typ c typ =
         | "F32" -> 32
         | "F64" -> 64
         | "V128" -> 128
-        | _ -> failwith "Invalid size" ) |> numV_of_int
+        | _ -> failwith "Invalid size" ) |> natV_of_int
       | _ -> failwith ("Can not convert ExpA " ^ (Il.Print.string_of_exp e) ^ " into value (yet)")
     and a2v a =
       match a.it with
@@ -605,7 +606,7 @@ and gen_typ c typ =
     let args' = List.map (fun a -> ("_arg", a2v a)) args in
     let c' = { c with args = args' } in
     gen c' id.it
-  | NumT NatT -> numV_of_int (Random.int 3) (* 0, 1, 2 *)
+  | NumT `NatT -> natV_of_int (Random.int 3) (* 0, 1, 2 *)
   | IterT (typ', List) ->
     let name = match typ'.it with VarT (id, _) -> id.it | _ -> "" in
     let n =
@@ -673,7 +674,7 @@ and fix_rts case const_required rt1 rt2 entangles =
       rt1' @ i32_opt, rt2', pair
     | CaseV ("_IDX", [ _ ]) when !version = 3 ->
       let tid = choose_func_type_idx !types_cache in
-      let bt = casev_replace_nth_arg 0 (numV_of_int tid) bt in
+      let bt = casev_replace_nth_arg 0 (natV_of_int tid) bt in
       let pair = [0, bt] in
       let rt1', rt2' = get_type !types_cache tid in
       rt1' @ i32_opt, rt2', pair
@@ -692,7 +693,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     else
       let lid = Random.int (List.length ls) in
       let subst = function SubT _ -> List.nth ls lid | t -> t in
-      List.map subst rt1, List.map subst rt2, [ 0, numV_of_int lid ]
+      List.map subst rt1, List.map subst rt2, [ 0, natV_of_int lid ]
 
   else if List.mem case [ "GLOBAL.GET"; "GLOBAL.SET" ] then (*TODO: Perhaps automate this? *)
     let no_mut = caseV ("MUT", [OptV None]) in
@@ -710,7 +711,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     else
       let gid = choose gids in
       let subst = function SubT _ -> T (snd (List.nth gs' gid)) | t -> t in
-      List.map subst rt1, List.map subst rt2, [ 0, numV_of_int gid ]
+      List.map subst rt1, List.map subst rt2, [ 0, natV_of_int gid ]
 
   else if List.mem case [ "TABLE.GET"; "TABLE.SET"; "TABLE.GROW"; "TABLE.FILL" ] then
     let tid, table = choosei !tables_cache in
@@ -721,7 +722,7 @@ and fix_rts case const_required rt1 rt2 entangles =
       | _ -> failwith "Unreachable: Table"
     in
     let subst = function SubT _ -> T rt | t -> t in
-    List.map subst rt1, List.map subst rt2, [ 0, numV_of_int tid ]
+    List.map subst rt1, List.map subst rt2, [ 0, natV_of_int tid ]
 
   else if case = "TABLE.COPY" then
     let get_rt = function
@@ -731,7 +732,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     in
     let groups = groupi_by get_rt !tables_cache in
     let _, tids = choose groups in
-    rt1, rt2, [ 0, numV_of_int (choose tids); 1, numV_of_int (choose tids) ]
+    rt1, rt2, [ 0, natV_of_int (choose tids); 1, natV_of_int (choose tids) ]
 
   else if case = "TABLE.INIT" then
     let get_rt = function
@@ -751,7 +752,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     if tegroups = [] then bot
     else
       let tids, eids = choose tegroups in
-      rt1, rt2, [ 0, numV_of_int (choose tids); 1, numV_of_int (choose eids) ]
+      rt1, rt2, [ 0, natV_of_int (choose tids); 1, natV_of_int (choose eids) ]
 
   else if case = "RETURN" then
     (* TODO: Signal arbitrary size better *)
@@ -767,13 +768,13 @@ and fix_rts case const_required rt1 rt2 entangles =
     (
       List.init (Random.int 3) (fun _ -> TopT) @ t,
       List.init 3 (fun _ -> TopT),
-      [ 0, numV_of_int lid ]
+      [ 0, natV_of_int lid ]
     )
 
   else if case = "BR_IF" then
     let lid = Random.int (List.length !expr_info_stack) in
     let _, _, t, _ = List.nth !expr_info_stack lid in
-    t @ [ T (nullary "I32") ], t, [ 0, numV_of_int lid ]
+    t @ [ T (nullary "I32") ], t, [ 0, natV_of_int lid ]
 
   else if case = "BR_TABLE" then
     let lid_groups = groupi_by (fun (_, _, t, _) -> t) !expr_info_stack in
@@ -783,13 +784,13 @@ and fix_rts case const_required rt1 rt2 entangles =
     (
       List.init (Random.int 3) (fun _ -> TopT) @ t @ [ T (nullary "I32") ],
       List.init 3 (fun _ -> TopT),
-      [ 0, listV_of_list (List.map numV_of_int lids); 1, numV_of_int lid ]
+      [ 0, listV_of_list (List.map natV_of_int lids); 1, natV_of_int lid ]
     )
 
   else if case = "CALL" then
     let fid, tid = choosei !tids_cache in
     let rt1', rt2' = get_type !types_cache tid in
-    rt1', rt2', [ 0, numV_of_int fid ]
+    rt1', rt2', [ 0, natV_of_int fid ]
 
   else if case = "CALL_INDIRECT" then
     let tables = find_index_all is_func_table !tables_cache in
@@ -797,7 +798,7 @@ and fix_rts case const_required rt1 rt2 entangles =
     let table = choose tables in
     let tid = Random.int (List.length !types_cache) in
     let rt1', rt2' = get_type !types_cache tid in
-    rt1' @ [ T (nullary "I32") ], rt2', [ 0, numV_of_int table; 1, numV_of_int tid ]
+    rt1' @ [ T (nullary "I32") ], rt2', [ 0, natV_of_int table; 1, natV_of_int tid ]
 
   else
     let cache = ref Record.empty in

@@ -140,10 +140,10 @@ and t_typcase env (atom, (binds, t, prems), hints) =
 and t_exp2 env x = { x with it = t_exp' env x.it; note = t_typ env x.note }
 
 and t_exp' env = function
-  | (VarE _ | BoolE _ | NatE _ | TextE _) as e -> e
-  | UnE (unop, exp) -> UnE (unop, t_exp env exp)
-  | BinE (binop, exp1, exp2) -> BinE (binop, t_exp env exp1, t_exp env exp2)
-  | CmpE (cmpop, exp1, exp2) -> CmpE (cmpop, t_exp env exp1, t_exp env exp2)
+  | (VarE _ | BoolE _ | NumE _ | TextE _) as e -> e
+  | UnE (unop, nto, exp) -> UnE (unop, nto, t_exp env exp)
+  | BinE (binop, nto, exp1, exp2) -> BinE (binop, nto, t_exp env exp1, t_exp env exp2)
+  | CmpE (cmpop, nto, exp1, exp2) -> CmpE (cmpop, nto, t_exp env exp1, t_exp env exp2)
   | IdxE (exp1, exp2) -> IdxE (t_exp env exp1, t_exp env exp2)
   | SliceE (exp1, exp2, exp3) -> SliceE (t_exp env exp1, t_exp env exp2, t_exp env exp3)
   | UpdE (exp1, path, exp2) -> UpdE (t_exp env exp1, t_path env path, t_exp env exp2)
@@ -151,7 +151,8 @@ and t_exp' env = function
   | StrE fields -> StrE (List.map (fun (a, e) -> a, t_exp env e) fields)
   | DotE (e, a) -> DotE (t_exp env e, a)
   | CompE (exp1, exp2) -> CompE (t_exp env exp1, t_exp env exp2)
-  | LenE exp -> LenE exp
+  | LiftE exp -> LiftE (t_exp env exp)
+  | LenE exp -> LenE (t_exp env exp)
   | TupE es -> TupE (List.map (t_exp env) es)
   | CallE (a, args) -> CallE (a, t_args env args)
   | IterE (e, iterexp) -> IterE (t_exp env e, t_iterexp env iterexp)
@@ -164,6 +165,7 @@ and t_exp' env = function
   | CatE (exp1, exp2) -> CatE (t_exp env exp1, t_exp env exp2)
   | MemE (exp1, exp2) -> MemE (t_exp env exp1, t_exp env exp2)
   | CaseE (mixop, e) -> CaseE (mixop, t_exp env e)
+  | CvtE (exp, t1, t2) -> CvtE (t_exp env exp, t1, t2)
   | SubE (e, t1, t2) -> SubE (e, t1, t2)
 
 and t_iter env = function
@@ -183,7 +185,7 @@ and t_path env x = { x with it = t_path' env x.it; note = t_typ env x.note }
 
 and t_sym' env = function
   | VarG (id, args) -> VarG (id, t_args env args)
-  | (NatG _ | TextG _ | EpsG) as g -> g
+  | (NumG _ | TextG _ | EpsG) as g -> g
   | SeqG syms -> SeqG (List.map (t_sym env) syms)
   | AltG syms -> AltG (List.map (t_sym env) syms)
   | RangeG (sym1, sym2) -> RangeG (t_sym env sym1, t_sym env sym2)

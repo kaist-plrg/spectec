@@ -2,12 +2,11 @@ open Util
 open Source
 open Il.Ast
 open Ast
+open Xl
 open Al_util
 open Print
 open Free
 
-
-module Atom = El.Atom
 module IlEval = Il.Eval
 
 (* Error *)
@@ -176,7 +175,7 @@ and ground_typ_of (typ: typ) : typ =
     let typ' = IlEnv.find_var !il_env id in
     if Il.Eq.eq_typ typ typ' then typ else ground_typ_of typ'
   (* NOTE: Consider `fN` as a `NumT` to prevent diverging ground type *)
-  | VarT (id, _) when id.it = "fN" -> NumT RealT $ typ.at
+  | VarT (id, _) when id.it = "fN" -> NumT `RealT $ typ.at
   | VarT (id, args) ->
     get_deftyps id args
     |> unify_deftyps_opt
@@ -269,12 +268,6 @@ let check_instr source typ =
 let check_val source typ =
   if not (sub_typ (get_base_typ typ) (varT "val")) then
     error_mismatch source typ (varT "val")
-
-let check_context source typ =
-  let context_typs = [ "callframe"; "label" ] in
-  match typ.it with
-  | VarT (id, []) when List.mem id.it context_typs -> ()
-  | _ -> error_mismatch source typ (varT "context")
 
 let check_evalctx source typ =
   match typ.it with
@@ -421,7 +414,7 @@ let check_case source exprs typ =
   | _ -> error_case source typ
 
 let find_case source cases op =
-  match List.find_opt (fun (op', _, _) -> Il.Mixop.eq op' op) cases with
+  match List.find_opt (fun (op', _, _) -> Mixop.eq op' op) cases with
   | Some (_op, x, _hints) -> x
   | None -> error_valid "unknown case" source (string_of_mixop op)
 
@@ -479,33 +472,36 @@ and valid_expr env (expr: expr) : unit =
   | NumE _ -> check_num source expr.note;
   | BoolE _  | IsCaseOfE _ | IsValidE _ | MatchE _ | HasTypeE _ | ContextKindE _ ->
     check_bool source expr.note;
-  | UnE (NotOp, expr') ->
+  | CvtE (expr', _, _) ->
+    check_num source expr.note;
+    check_num source expr'.note;
+  | UnE (#Bool.unop, expr') ->
     valid_expr env expr';
     check_bool source expr.note;
     check_bool source expr'.note;
-  | UnE (MinusOp, expr') ->
+  | UnE (#Num.unop, expr') ->
     valid_expr env expr';
     check_num source expr.note;
     check_num source expr'.note;
-  | BinE ((AddOp|SubOp|MulOp|DivOp|ModOp|ExpOp), expr1, expr2) ->
+  | BinE (#Num.binop, expr1, expr2) ->
     valid_expr env expr1;
     valid_expr env expr2;
     check_num source expr.note;
     check_num source expr1.note;
     check_num source expr2.note;
-  | BinE ((LtOp|GtOp|LeOp|GeOp), expr1, expr2) ->
+  | BinE (#Num.cmpop, expr1, expr2) ->
     valid_expr env expr1;
     valid_expr env expr2;
     check_bool source expr.note;
     check_num source expr1.note;
     check_num source expr2.note;
-  | BinE ((ImplOp|EquivOp|AndOp|OrOp), expr1, expr2) ->
+  | BinE (#Bool.binop, expr1, expr2) ->
     valid_expr env expr1;
     valid_expr env expr2;
     check_bool source expr.note;
     check_bool source expr1.note;
     check_bool source expr2.note;
-  | BinE ((EqOp|NeOp), expr1, expr2) ->
+  | BinE (#Bool.cmpop, expr1, expr2) ->
     valid_expr env expr1;
     valid_expr env expr2;
     check_bool source expr.note;
@@ -557,7 +553,7 @@ and valid_expr env (expr: expr) : unit =
       let evalctx_ids = List.filter_map (fun (mixop, _, _) ->
         let atom = mixop |> List.hd |> List.hd in
         match atom.it with
-        | El.Atom.Atom s -> Some s
+        | Atom.Atom s -> Some s
         | _ -> None
       ) (get_typcases source evalctxT) in
       List.mem id evalctx_ids
@@ -602,8 +598,15 @@ and valid_expr env (expr: expr) : unit =
     l
     |> List.map note
     |> List.iter (check_match source elem_typ)
+  | LiftE expr1 ->
+    valid_expr env expr;
+    check_list source expr.note;
+    check_opt source expr1.note;
+    let elem_typ = unwrap_iter_typ expr.note in
+    let elem1_typ = unwrap_iter_typ expr1.note in
+    check_match source elem1_typ elem_typ
   | GetCurStateE ->
-    check_context source expr.note
+    check_evalctx source expr.note
   | GetCurContextE _ ->
     check_evalctx source expr.note
   | ChooseE expr1 ->
@@ -656,8 +659,7 @@ let rec valid_instr (env: Env.t) (instr: instr) : Env.t =
   | PushI expr ->
     valid_expr env expr;
     if
-      not (sub_typ (get_base_typ expr.note) (varT "val")) &&
-      not (sub_typ (get_base_typ expr.note) (varT "callframe"))
+      not (sub_typ (get_base_typ expr.note) (varT "val"))
     then
       error_mismatch source (get_base_typ expr.note) (varT "val");
     env
@@ -665,8 +667,7 @@ let rec valid_instr (env: Env.t) (instr: instr) : Env.t =
     let new_env = Env.add_bound_vars expr env in
     valid_expr new_env expr;
     if
-      not (sub_typ (get_base_typ expr.note) (varT "val")) &&
-      not (sub_typ (get_base_typ expr.note) (varT "callframe"))
+      not (sub_typ (get_base_typ expr.note) (varT "val"))
     then
       error_mismatch source (get_base_typ expr.note) (varT "val");
     new_env
@@ -676,7 +677,7 @@ let rec valid_instr (env: Env.t) (instr: instr) : Env.t =
     valid_expr env expr2;
     check_match source expr1.note expr2.note;
     new_env
-  | TrapI | NopI | ReturnI None | ExitI _ -> env
+  | TrapI | FailI | NopI | ReturnI None | ExitI _ -> env
   | ThrowI expr ->
     if not (sub_typ (get_base_typ expr.note) (varT "val")) then
       error_mismatch source (get_base_typ expr.note) (varT "val");

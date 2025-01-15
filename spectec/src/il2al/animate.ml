@@ -68,7 +68,9 @@ let rewrite_id (_, xes) id =
   ) xes
   |> get_or_else id
 let rec rewrite_iterexp' iterexp pr =
-  let new_ = Il_walk.transform_exp (rewrite iterexp) in
+  let transformer =
+    { Il_walk.base_transformer with transform_exp = rewrite iterexp } in
+  let new_ = Il_walk.transform_exp transformer in
   match pr with
   | RulePr (id, mixop, e) -> RulePr (id, mixop, new_ e)
   | IfPr e -> IfPr (new_ e)
@@ -96,7 +98,9 @@ let recover_id (_, xes) id =
   ) xes
   |> get_or_else id
 let rec recover_iterexp' iterexp pr =
-  let new_ = Il_walk.transform_exp (recover iterexp) in
+  let transformer =
+    { Il_walk.base_transformer with transform_exp = recover iterexp } in
+  let new_ = Il_walk.transform_exp transformer in
   match pr with
   | RulePr (id, mixop, e) -> RulePr (id, mixop, new_ e)
   | IfPr e -> IfPr (new_ e)
@@ -119,7 +123,7 @@ let is_pop env row =
   match (unwrap row).it with
   | LetPr (_, {it = CallE (_, {it = ExpA n; _} :: _); note; _}, _) when Il.Print.string_of_typ note = "stackT" ->
     (match n.it with
-    | NatE i -> Z.equal i (Z.one)
+    | NumE (`Nat i) -> Z.equal i (Z.one)
     | _ -> false)
   | _ -> false
 
@@ -276,7 +280,7 @@ let rec rows_of_prem vars len i p =
   match p.it with
   | IfPr e ->
     (match e.it with
-      | CmpE (EqOp, l, r) ->
+      | CmpE (`EqOp, _, l, r) ->
         [ Condition, p, [i] ]
         @ rows_of_eq vars len i l r p.at
         @ rows_of_eq vars len i r l p.at

@@ -307,7 +307,7 @@ rule Step_pure/vswizzle:
 rule Step_pure/vshuffle:
   (VCONST V128 c_1) (VCONST V128 c_2) (VSHUFFLE (Pnn X N) i*) ~> (VCONST V128 c)
   -- var c' : iN($lsize(Pnn))
-  -- if c'* = $lanes_(Pnn X N, c_1) $lanes_(Pnn X N, c_2)
+  -- if c'* = $lanes_(Pnn X N, c_1) ++ $lanes_(Pnn X N, c_2)
   -- if c = $invlanes_(Pnn X N, c'*[$(i*[k])]^(k<N))
 
 
@@ -365,7 +365,7 @@ rule Step_pure/vcvtop-half:
 rule Step_pure/vcvtop-zero:
   (VCONST V128 c_1) (VCVTOP (nt_2 X M_2) (nt_1 X M_1) vcvtop eps zero) ~> (VCONST V128 c)
   -- if ci* = $lanes_(nt_1 X M_1, c_1)
-  -- if cj** = $setproduct_(lane_(nt_2), ($vcvtop__(nt_1 X M_1, nt_2 X M_2, vcvtop, ci)* ++ $zero(nt_2)^M_1))
+  -- if cj** = $setproduct_(lane_(nt_2), ($vcvtop__(nt_1 X M_1, nt_2 X M_2, vcvtop, ci)* ++ [$zero(nt_2)]^M_1))
   -- if c <- $invlanes_(nt_2 X M_2, cj*)*
 
 
@@ -509,11 +509,11 @@ rule Step_read/vload-val:
 
 
 rule Step_read/vload-shape-oob:
-  z; (CONST I32 i) (VLOAD V128 (SHAPE M X N sx) ao)  ~>  TRAP
+  z; (CONST I32 i) (VLOAD V128 (SHAPE M X N _ sx) ao)  ~>  TRAP
   -- if $(i + ao.OFFSET + M * N/8) > |$mem(z, 0).BYTES|
 
 rule Step_read/vload-shape-val:
-  z; (CONST I32 i) (VLOAD V128 (SHAPE M X N sx) ao)  ~>  (VCONST V128 c)
+  z; (CONST I32 i) (VLOAD V128 (SHAPE M X N _ sx) ao)  ~>  (VCONST V128 c)
   -- (if $ibytes_(M, j) = $mem(z, 0).BYTES[i + ao.OFFSET + k * M/8 : M/8])^(k<N)
   -- if $lsize(Jnn) = $(M * 2)  ;; TODO: relate implicitly
   -- if c = $invlanes_(Jnn X N, $extend__(M, $lsize(Jnn), sx, j)^N)

@@ -19,10 +19,10 @@ let eval_expr =
   (* Add function definition to AL environment *)
   let param = Il.Ast.ExpP ("_" $ no_region, ty_instrs) $ no_region in
   Al.Valid.il_env :=
-    Il.Env.bind_def !Al.Valid.il_env ("eval_expr" $ no_region) ([param], ty_vals, []);
+    Il.Env.bind_def !Al.Valid.il_env ("Eval_expr" $ no_region) ([param], ty_vals, []);
 
   FuncA (
-    "eval_expr",
+    "Eval_expr",
     [expA instrs],
     [
       executeI instrs;
@@ -41,7 +41,7 @@ let return_instrs_of_instantiate config =
   let ty'' = Il.Ast.TupT (List.map (fun t -> no_name, t) [store.note; ty']) $ no_region in
   [
     enterI (
-      frameE (numE Z.zero ~note:natT, frame) ~note:evalctxT,
+      frameE (natE Z.zero ~note:natT, frame) ~note:evalctxT,
       catE (instrs, (listE [caseE ([[atom_of_name "FRAME_" "admininstr"]], []) ~note:admininstrT] ~note:ty)) ~note:ty,
       vals
     );

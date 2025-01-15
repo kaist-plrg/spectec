@@ -124,12 +124,14 @@ and subst_exp s e =
     | None -> VarE (id, List.map (subst_arg s) args)
     | Some e' -> assert (args = []); e'.it  (* We do not support higher-order substitutions yet *)
     )
-  | AtomE _ | BoolE _ | NatE _ | TextE _ -> e.it
+  | AtomE _ | BoolE _ | NumE _ | TextE _ -> e.it
+  | CvtE (e1, nt) -> CvtE (subst_exp s e1, nt)
   | UnE (op, e1) -> UnE (op, subst_exp s e1)
   | BinE (e1, op, e2) -> BinE (subst_exp s e1, op, subst_exp s e2)
   | CmpE (e1, op, e2) -> CmpE (subst_exp s e1, op, subst_exp s e2)
   | EpsE -> EpsE
   | SeqE es -> SeqE (subst_list subst_exp s es)
+  | ListE es -> ListE (subst_list subst_exp s es)
   | IdxE (e1, e2) -> IdxE (subst_exp s e1, subst_exp s e2)
   | SliceE (e1, e2, e3) -> SliceE (subst_exp s e1, subst_exp s e2, subst_exp s e3)
   | UpdE (e1, p, e2) -> UpdE (subst_exp s e1, subst_path s p, subst_exp s e2)
@@ -141,7 +143,7 @@ and subst_exp s e =
   | MemE (e1, e2) -> MemE (subst_exp s e1, subst_exp s e2)
   | LenE e1 -> LenE (subst_exp s e1)
   | SizeE id -> SizeE (subst_gramid s id)
-  | ParenE (e1, b) -> ParenE (subst_exp s e1, b)
+  | ParenE e1 -> ParenE (subst_exp s e1)
   | TupE es -> TupE (subst_list subst_exp s es)
   | InfixE (e1, atom, e2) -> InfixE (subst_exp s e1, atom, subst_exp s e2)
   | BrackE (l, e1, r) -> BrackE (l, subst_exp s e1, r)
@@ -176,7 +178,7 @@ and subst_sym s g =
     | None -> VarG (id, List.map (subst_arg s) args)
     | Some g' -> assert (args = []); g'.it (* We do not support higher-order substitutions yet *)
     )
-  | NatG _ | TextG _ -> g.it
+  | NumG _ | TextG _ -> g.it
   | EpsG -> EpsG
   | SeqG gs -> SeqG (subst_nl_list subst_sym s gs)
   | AltG gs -> AltG (subst_nl_list subst_sym s gs)

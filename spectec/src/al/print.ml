@@ -1,9 +1,8 @@
 open Ast
+open Xl
 open Printf
 open Util
 open Source
-
-module Atom = El.Atom
 
 
 (* Helper functions *)
@@ -59,7 +58,7 @@ let rec string_of_record r =
 and string_of_value =
   function
   | ListV lv -> "[" ^ string_of_values ", " (Array.to_list !lv) ^ "]"
-  | NumV n -> "0x" ^ Z.format "%X" n
+  | NumV n -> Num.to_string n
   | BoolV b -> string_of_bool b
   | TextV s -> s
   | TupV vl -> "(" ^ string_of_values ", " vl ^ ")"
@@ -78,26 +77,14 @@ and string_of_values sep = string_of_list string_of_value sep
 (* Operators *)
 
 let string_of_unop = function
-  | NotOp -> "!"
-  | MinusOp -> "-"
+  | #Bool.unop as op -> Bool.string_of_unop op
+  | #Num.unop as op -> Num.string_of_unop op
 
 let string_of_binop = function
-  | AndOp -> "&&"
-  | OrOp -> "||"
-  | ImplOp -> "=>"
-  | EquivOp -> "<=>"
-  | AddOp -> "+"
-  | SubOp -> "-"
-  | MulOp -> "·"
-  | DivOp -> "/"
-  | ModOp -> "\\"
-  | ExpOp -> "^"
-  | EqOp -> "=="
-  | NeOp -> "!="
-  | LtOp -> "<"
-  | GtOp -> ">"
-  | LeOp -> "≤"
-  | GeOp -> "≥"
+  | #Bool.binop as op -> Bool.string_of_binop op
+  | #Num.binop as op -> Num.string_of_binop op
+  | #Bool.cmpop as op -> Bool.string_of_cmpop op
+  | #Num.cmpop as op -> Num.string_of_cmpop op
 
 
 (* Iters *)
@@ -123,8 +110,9 @@ and string_of_record_expr r =
 
 and string_of_expr expr =
   match expr.it with
-  | NumE i -> Z.to_string i
+  | NumE n -> Num.to_string n
   | BoolE b -> string_of_bool b
+  | CvtE (e, _, t) -> sprintf "$%s$(%s)" (Il.Print.string_of_numtyp t) (string_of_expr e)
   | UnE (op, e) -> sprintf "%s(%s)" (string_of_unop op) (string_of_expr e)
   | BinE (op, e1, e2) ->
     sprintf "(%s %s %s)" (string_of_expr e1) (string_of_binop op) (string_of_expr e2)
@@ -146,12 +134,13 @@ and string_of_expr expr =
   | CatE (e1, e2) ->
     sprintf "%s :: %s" (string_of_expr e1) (string_of_expr e2)
   | MemE (e1, e2) ->
-    sprintf "%s <- %s" (string_of_expr e1) (string_of_expr e2)
+    sprintf "%s is contained in %s" (string_of_expr e1) (string_of_expr e2)
   | LenE e -> sprintf "|%s|" (string_of_expr e)
   | GetCurStateE -> "current_state()"
   | GetCurContextE None -> "current_context()"
   | GetCurContextE (Some a) -> sprintf "current_context(%s)" (string_of_atom a)
   | ListE el -> "[" ^ string_of_exprs ", " el ^ "]"
+  | LiftE e -> "lift(" ^ string_of_expr e ^ ")"
   | AccE (e, p) -> sprintf "%s%s" (string_of_expr e) (string_of_path p)
   | ExtE (e1, ps, e2, dir) -> (
     match dir with
@@ -312,6 +301,7 @@ let rec string_of_instr' depth instr =
     sprintf " Let %s = %s" (string_of_expr e1)
       (string_of_expr e2)
   | TrapI -> sprintf " Trap"
+  | FailI -> sprintf " Fail"
   | ThrowI e -> sprintf " Throw %s" (string_of_expr e)
   | NopI -> sprintf " Nop"
   | ReturnI None -> sprintf " Return"
@@ -376,7 +366,7 @@ let string_of_algorithm algo =
 let rec structured_string_of_value = function
   | ListV lv -> "ListV" ^ "[" ^ string_of_values ", " (Array.to_list !lv) ^ "]"
   | BoolV b -> "BoolV (" ^ string_of_bool b ^ ")"
-  | NumV n -> "NumV (" ^ Z.to_string n ^ ")"
+  | NumV n -> "NumV (" ^ Num.to_string n ^ ")"
   | TextV s -> "TextV (" ^ s ^ ")"
   | TupV vl ->  "TupV (" ^ structured_string_of_values vl ^ ")"
   | CaseV (s, vl) -> "CaseV(" ^ s ^ ", [" ^ structured_string_of_values vl ^ "])"
@@ -402,14 +392,21 @@ let rec structured_string_of_iter = function
 
 and structured_string_of_record_expr r =
   Record.fold
-    (fun a v acc -> acc ^ string_of_atom a ^ ": " ^ string_of_expr v ^ "; ")
+    (fun a v acc -> acc ^ string_of_atom a ^ ": " ^ structured_string_of_expr v ^ "; ")
     r "{ "
   ^ "}"
 
 and structured_string_of_expr expr =
   match expr.it with
-  | NumE i -> Z.to_string i
-  | BoolE b -> string_of_bool b
+  | NumE _ | BoolE _ -> string_of_expr expr
+  | CvtE (e, t1, t2) ->
+    "CvtE ("
+    ^ structured_string_of_expr e
+    ^ ", "
+    ^ Il.Print.string_of_numtyp t1
+    ^ ", "
+    ^ Il.Print.string_of_numtyp t2
+    ^ ")"
   | UnE (op, e) ->
     "UnE ("
     ^ string_of_unop op
@@ -417,7 +414,7 @@ and structured_string_of_expr expr =
     ^ structured_string_of_expr e
     ^ ")"
   | BinE (op, e1, e2) ->
-    "BinopE ("
+    "BinE ("
     ^ string_of_binop op
     ^ ", "
     ^ structured_string_of_expr e1
@@ -453,6 +450,7 @@ and structured_string_of_expr expr =
   | GetCurContextE None -> "GetCurContextE"
   | GetCurContextE (Some a) -> sprintf "GetCurContextE (%s)" (string_of_atom a)
   | ListE el -> "ListE ([" ^ structured_string_of_exprs el ^ "])"
+  | LiftE e -> "LiftE (" ^ structured_string_of_expr e ^ ")"
   | AccE (e, p) ->
     "AccE ("
     ^ structured_string_of_expr e
@@ -487,7 +485,7 @@ and structured_string_of_expr expr =
     ^ ", ("
     ^ structured_string_of_iter iter
     ^ ", {"
-    ^ string_of_list (fun (x, e) -> x ^ structured_string_of_expr e) ", " xes
+    ^ string_of_list (fun (x, e) -> x ^ ": " ^ structured_string_of_expr e) ", " xes
     ^ "}))"
   | CaseE (op, el) ->
     "CaseE (" ^ string_of_mixop op
@@ -571,6 +569,7 @@ let rec structured_string_of_instr' depth instr =
     ^ structured_string_of_expr e2
     ^ ")"
   | TrapI -> "TrapI"
+  | FailI -> "FailI"
   | ThrowI e -> "ThrowI (" ^ structured_string_of_expr e ^ ")"
   | NopI -> "NopI"
   | ReturnI None -> "ReturnI"

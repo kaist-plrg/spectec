@@ -2,80 +2,133 @@ open Util.Source
 open Il.Ast
 
 (* Walker-based transformer *)
-let transform_id f x =
+
+type transformer = {
+  transform_exp: exp -> exp;
+  transform_bind: bind -> bind;
+  transform_prem: prem -> prem;
+  transform_iterexp: iterexp -> iterexp;
+  }
+
+let id = Fun.id
+let base_transformer = {
+  transform_exp = id;
+  transform_bind = id;
+  transform_prem = id;
+  transform_iterexp = id;
+}
+
+let transform_id t x =
   let e = VarE x $$ no_region % (TupT [] $ no_region) in
+  let f = t.transform_exp in
   match (f e).it with
   | VarE x' -> x'
   | _ -> x
 
-let rec transform_exp f e =
-  let new_ = transform_exp f in
+let rec transform_exp t e =
+  let f = t.transform_exp in
+  let t_exp = transform_exp t in
   let it =
     match e.it with
     | VarE _
     | BoolE _
-    | NatE _
+    | NumE _
     | TextE _ -> e.it
-    | UnE (op, e1) -> UnE (op, new_ e1)
-    | BinE (op, e1, e2) -> BinE (op, new_ e1, new_ e2)
-    | CmpE (op, e1, e2) -> CmpE (op, new_ e1, new_ e2)
-    | IdxE (e1, e2) -> IdxE (new_ e1, new_ e2)
-    | SliceE (e1, e2, e3) -> SliceE (new_ e1, new_ e2, new_ e3)
-    | UpdE (e1, p, e2) -> UpdE (new_ e1, p, new_ e2)
-    | ExtE (e1, p, e2) -> ExtE (new_ e1, p, new_ e2)
-    | StrE efs -> StrE efs (* TODO efs *)
-    | DotE (e1, atom) -> DotE (new_ e1, atom)
-    | CompE (e1, e2) -> CompE (new_ e1, new_ e2)
-    | LenE e1 -> LenE (new_ e1)
-    | TupE es -> TupE ((List.map new_) es)
-    | CallE (id, as1) -> CallE (id, List.map (transform_arg f) as1)
-    | IterE (e1, iterexp) -> IterE (new_ e1, transform_iterexp f iterexp)
-    | ProjE (e1, i) -> ProjE (new_ e1, i)
-    | UncaseE (e1, op) -> UncaseE (new_ e1, op)
-    | OptE eo -> OptE ((Option.map new_) eo)
-    | TheE e1 -> TheE (new_ e1)
-    | ListE es -> ListE ((List.map new_) es)
-    | CatE (e1, e2) -> CatE (new_ e1, new_ e2)
-    | MemE (e1, e2) -> MemE (new_ e1, new_ e2)
-    | CaseE (mixop, e1) -> CaseE (mixop, new_ e1)
-    | SubE (e1, _t1, t2) -> SubE (new_ e1, _t1, t2)
+    | CvtE (e1, nt1, nt2) -> CvtE (t_exp e1, nt1, nt2)
+    | UnE (op, nt, e1) -> UnE (op, nt, t_exp e1)
+    | BinE (op, nt, e1, e2) -> BinE (op, nt, t_exp e1, t_exp e2)
+    | CmpE (op, nt, e1, e2) -> CmpE (op, nt, t_exp e1, t_exp e2)
+    | IdxE (e1, e2) -> IdxE (t_exp e1, t_exp e2)
+    | SliceE (e1, e2, e3) -> SliceE (t_exp e1, t_exp e2, t_exp e3)
+    | UpdE (e1, p, e2) -> UpdE (t_exp e1, p, t_exp e2)
+    | ExtE (e1, p, e2) -> ExtE (t_exp e1, p, t_exp e2)
+    | StrE efs -> StrE (List.map (fun (a, e) -> (a, t_exp e)) efs)
+    | DotE (e1, atom) -> DotE (t_exp e1, atom)
+    | CompE (e1, e2) -> CompE (t_exp e1, t_exp e2)
+    | LenE e1 -> LenE (t_exp e1)
+    | TupE es -> TupE ((List.map t_exp) es)
+    | CallE (id, as1) -> CallE (id, List.map (transform_arg t) as1)
+    | IterE (e1, iterexp) -> IterE (t_exp e1, transform_iterexp t iterexp)
+    | ProjE (e1, i) -> ProjE (t_exp e1, i)
+    | UncaseE (e1, op) -> UncaseE (t_exp e1, op)
+    | OptE eo -> OptE ((Option.map t_exp) eo)
+    | TheE e1 -> TheE (t_exp e1)
+    | ListE es -> ListE ((List.map t_exp) es)
+    | LiftE e1 -> LiftE (t_exp e1)
+    | CatE (e1, e2) -> CatE (t_exp e1, t_exp e2)
+    | MemE (e1, e2) -> MemE (t_exp e1, t_exp e2)
+    | CaseE (mixop, e1) -> CaseE (mixop, t_exp e1)
+    | SubE (e1, _t1, t2) -> SubE (t_exp e1, _t1, t2)
   in
-  let note = transform_typ f e.note in
+  let note = transform_typ t e.note in
   f { e with it; note }
 
-and transform_arg f a =
-  { a with it = match a.it with
-    | ExpA e -> ExpA (transform_exp f e)
-    | TypA t -> TypA t
-    | DefA id -> DefA id
-    | GramA id -> GramA id }
+and transform_iterexp t (iter, ides) =
+  let f = t.transform_iterexp in
+  let iterexp' = (transform_iter t iter, List.map (fun (id, e) -> (transform_id t id, transform_exp t e)) ides) in
+  f iterexp'
 
-and transform_iterexp f (iter, xes) =
-  let xs, es = List.split xes in
-  let xs' = List.map (transform_id f) xs in
-  let es' = List.map (transform_exp f) es in
-  (transform_iter f iter, List.combine xs' es')
-and transform_iter f iter =
+and transform_iter t iter =
   match iter with
-  | ListN (e, i) -> ListN (transform_exp f e, Option.map (transform_id f) i)
+  | ListN (e, i) -> ListN (transform_exp t e, Option.map (transform_id t) i)
   | _ -> iter
 
-and transform_typ f t =
-  { t with it = match t.it with
-    | VarT (id, args) -> VarT (id, List.map (transform_arg f) args)
-    | TupT ets -> TupT (ets |> List.map (fun (e, t) -> e, transform_typ f t))
-    | IterT (t, iter) -> IterT (transform_typ f t, iter) (* TODO: iter *)
+and transform_arg t a =
+  { a with it = match a.it with
+    | ExpA e -> ExpA (transform_exp t e)
+    | TypA ty -> TypA (transform_typ t ty)
+    | DefA id -> DefA id
+    | GramA sym -> GramA sym }
+
+
+and transform_typ t ty =
+  { ty with it = match ty.it with
+    | VarT (id, args) -> VarT (id, List.map (transform_arg t) args)
+    | TupT ets -> TupT (ets |> List.map (fun (e, ty) -> e, transform_typ t ty))
+    | IterT (ty, iter) -> IterT (transform_typ t ty, iter) (* TODO: iter *)
     | t' -> t' }
 
-let rec transform_prem f p =
-  { p with it = match p.it with
-    | RulePr (id, mixop, e) -> RulePr (id, mixop, transform_exp f e)
-    | IfPr e -> IfPr (transform_exp f e)
-    | LetPr (e1, e2, xs) -> LetPr (transform_exp f e1, transform_exp f e2, xs)
+and transform_prem t p =
+  let f = t.transform_prem in
+  let it = match p.it with
+    | RulePr (id, op, e) -> RulePr (id, op, transform_exp t e)
+    | IfPr e -> IfPr (transform_exp t e)
+    | LetPr (e1, e2, ss) -> LetPr (transform_exp t e1, transform_exp t e2, ss)
     | ElsePr -> ElsePr
-    | IterPr (p, iterexp) -> IterPr (transform_prem f p, transform_iterexp f iterexp) }
+    | IterPr (p, ie) -> IterPr (transform_prem t p, transform_iterexp t ie)
+  in
+  f { p with it }
 
-let transform_rule f r =
+and transform_bind t b =
+  let f = t.transform_bind in
+  let it = match b.it with
+    | ExpB (id, typ) -> ExpB (id, typ)
+    | TypB id -> TypB id
+    | DefB (id, params, typ) -> DefB (id, params, typ)
+    | GramB (id, params, typ) -> GramB (id, params, typ)
+  in
+  f { b with it }
+
+and transform_clause t c =
+  { c with it = match c.it with
+    | DefD (bs, args, e, ps) ->
+      DefD (List.map (transform_bind t) bs, List.map (transform_arg t) args, transform_exp t e, List.map (transform_prem t) ps) }
+
+let transform_rule t r =
   { r with it = match r.it with
-    | RuleD (id, binds, mixop, e, ps) -> RuleD (id, binds, mixop, transform_exp f e, List.map (transform_prem f) ps)
+    | RuleD (id, binds, mixop, e, ps) -> RuleD (id, binds, mixop, transform_exp t e, List.map (transform_prem t) ps)
   }
+
+(* For unification *)
+
+let transform_rule_clause t rc =
+  match rc with
+  | (e1, e2, ps) -> (transform_exp t e1, transform_exp t e2, List.map (transform_prem t) ps)
+
+let transform_rule_def t rd =
+  { rd with it = match rd.it with
+    | (s, id, rcs) -> (s, id, List.map (transform_rule_clause t) rcs) }
+
+let transform_helper_def t hd =
+  { hd with it = match hd.it with
+    | (id, cs, partial) -> (id, List.map (transform_clause t) cs, partial) }

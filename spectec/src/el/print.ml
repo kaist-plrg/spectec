@@ -1,6 +1,8 @@
 open Util.Source
 open Ast
 open Convert
+open Xl
+open Util
 
 
 (* Helpers *)
@@ -26,31 +28,18 @@ let string_of_gramid id = id.it
 let string_of_atom = Atom.to_string
 
 let string_of_unop = function
-  | NotOp -> "~"
-  | PlusOp -> "+"
-  | MinusOp -> "-"
-  | PlusMinusOp -> "+-"
-  | MinusPlusOp -> "-+"
+  | #Bool.unop as op -> Bool.string_of_unop op
+  | #Num.unop as op -> Num.string_of_unop op
+  | `PlusMinusOp -> "+-"
+  | `MinusPlusOp -> "-+"
 
 let string_of_binop = function
-  | AndOp -> "/\\"
-  | OrOp -> "\\/"
-  | ImplOp -> "=>"
-  | EquivOp -> "<=>"
-  | AddOp -> "+"
-  | SubOp -> "-"
-  | MulOp -> "*"
-  | DivOp -> "/"
-  | ModOp -> "\\"
-  | ExpOp -> "^"
+  | #Bool.binop as op -> Bool.string_of_binop op
+  | #Num.binop as op -> Num.string_of_binop op
 
 let string_of_cmpop = function
-  | EqOp -> "="
-  | NeOp -> "=/="
-  | LtOp -> "<"
-  | GtOp -> ">"
-  | LeOp -> "<="
-  | GeOp -> ">="
+  | #Bool.cmpop as op -> Bool.string_of_cmpop op
+  | #Num.cmpop as op -> Num.string_of_cmpop op
 
 let strings_of_dots = function
   | Dots -> ["..."]
@@ -70,13 +59,9 @@ let rec string_of_iter iter =
 
 (* Types *)
 
-and string_of_numtyp = function
-  | NatT -> "nat"
-  | IntT -> "int"
-  | RatT -> "rat"
-  | RealT -> "real"
+and string_of_numtyp = Num.string_of_typ
 
-and string_of_typ t =
+and string_of_typ ?(short=false) t =
   match t.it with
   | VarT (id, args) -> string_of_typid id ^ string_of_args args
   | BoolT -> "bool"
@@ -85,13 +70,21 @@ and string_of_typ t =
   | ParenT t -> "(" ^ string_of_typ t ^ ")"
   | TupT ts -> "(" ^ string_of_typs ", " ts ^ ")"
   | IterT (t1, iter) -> string_of_typ t1 ^ string_of_iter iter
+  | StrT tfs when short && List.length tfs > 3 ->
+    "{" ^ concat ", " (map_filter_nl_list (string_of_typfield ~short) (Lib.List.take 3 tfs)) ^ ", ..}"
   | StrT tfs ->
-    "{" ^ concat ", " (map_filter_nl_list string_of_typfield tfs) ^ "}"
-  | CaseT (dots1, ts, tcases, dots2) ->
+    "{" ^ concat ", " (map_filter_nl_list (string_of_typfield ~short) tfs) ^ "}"
+  | CaseT (dots1, ts, tcs, dots2) when short && List.length tcs > 3 ->
     "| " ^ concat " | "
       (strings_of_dots dots1 @ map_filter_nl_list string_of_typ ts @
-        map_filter_nl_list string_of_typcase tcases @ strings_of_dots dots2)
-  | ConT tc -> string_of_typcon tc
+        map_filter_nl_list (string_of_typcase ~short) (Lib.List.take 3 tcs) @ ".." :: strings_of_dots dots2)
+  | CaseT (dots1, ts, tcs, dots2) ->
+    "| " ^ concat " | "
+      (strings_of_dots dots1 @ map_filter_nl_list string_of_typ ts @
+        map_filter_nl_list (string_of_typcase ~short) tcs @ strings_of_dots dots2)
+  | ConT tc -> string_of_typcon ~short tc
+  | RangeT tes when short && List.length tes > 3 ->
+    concat " | " (map_filter_nl_list string_of_typenum (Lib.List.take 3 tes)) ^ " | .."
   | RangeT tes -> concat " | " (map_filter_nl_list string_of_typenum tes)
   | AtomT atom -> string_of_atom atom
   | SeqT ts -> "{" ^ string_of_typs " " ts ^ "}"
@@ -103,16 +96,19 @@ and string_of_typ t =
 and string_of_typs sep ts =
   concat sep (List.map string_of_typ ts)
 
-and string_of_typfield (atom, (t, prems), _hints) =
+and string_of_typfield ?(short=false) (atom, (t, prems), _hints) =
   string_of_atom atom ^ " " ^ string_of_typ t ^
+  if short && prems <> [] then " -- .." else
     concat "" (map_filter_nl_list (prefix "\n  -- " string_of_prem) prems)
 
-and string_of_typcase (_atom, (t, prems), _hints) =
+and string_of_typcase ?(short=false) (_atom, (t, prems), _hints) =
   string_of_typ t ^
+  if short && prems <> [] then " -- .." else
     concat "" (map_filter_nl_list (prefix "\n  -- " string_of_prem) prems)
 
-and string_of_typcon ((t, prems), _hints) =
+and string_of_typcon ?(short=false) ((t, prems), _hints) =
   string_of_typ t ^
+  if short && prems <> [] then " -- .." else
     concat "" (map_filter_nl_list (prefix "\n  -- " string_of_prem) prems)
 
 and string_of_typenum (e, eo) =
@@ -129,18 +125,21 @@ and string_of_exp e =
   | VarE (id, args) -> string_of_varid id ^ string_of_args args
   | AtomE atom -> string_of_atom atom
   | BoolE b -> string_of_bool b
-  | NatE (DecOp, n) -> Z.to_string n
-  | NatE (HexOp, n) -> "0x" ^ Z.format "%X" n
-  | NatE (CharOp, n) -> "U+" ^ Z.format "%X" n
-  | NatE (AtomOp, n) -> "`" ^ Z.to_string n
+  | NumE (`DecOp, `Nat n) -> Z.to_string n
+  | NumE (`HexOp, `Nat n) -> "0x" ^ Z.format "%X" n
+  | NumE (`CharOp, `Nat n) -> "U+" ^ Z.format "%X" n
+  | NumE (`AtomOp, `Nat n) -> "`" ^ Z.to_string n
+  | NumE (_, n) -> Num.to_string n
   | TextE t -> "\"" ^ String.escaped t ^ "\""
+  | CvtE (e1, nt) -> "$" ^ string_of_numtyp nt ^ "(" ^ string_of_exp e1 ^ ")"
   | UnE (op, e2) -> string_of_unop op ^ " " ^ string_of_exp e2
   | BinE (e1, op, e2) ->
     string_of_exp e1 ^ space string_of_binop op ^ string_of_exp e2
   | CmpE (e1, op, e2) ->
     string_of_exp e1 ^ space string_of_cmpop op ^ string_of_exp e2
   | EpsE -> "eps"
-  | SeqE es -> "{" ^ string_of_exps " " es ^ "}"
+  | SeqE es -> string_of_exps " " es
+  | ListE es -> "[" ^ string_of_exps " " es ^ "]"
   | IdxE (e1, e2) -> string_of_exp e1 ^ "[" ^ string_of_exp e2 ^ "]"
   | SliceE (e1, e2, e3) ->
     string_of_exp e1 ^
@@ -158,8 +157,7 @@ and string_of_exp e =
   | MemE (e1, e2) -> string_of_exp e1 ^ " <- " ^ string_of_exp e2
   | LenE e1 -> "|" ^ string_of_exp e1 ^ "|"
   | SizeE id -> "||" ^ string_of_gramid id ^ "||"
-  | ParenE (e, signif) ->
-    "(" ^ string_of_exp e ^ ")" ^ (match signif with `Sig -> "!" | `Insig -> "")
+  | ParenE e -> "(" ^ string_of_exp e ^ ")"
   | TupE es -> "(" ^ string_of_exps ", " es ^ ")"
   | InfixE (e1, atom, e2) ->
     string_of_exp e1 ^ space string_of_atom atom ^ string_of_exp e2
@@ -198,10 +196,10 @@ and string_of_path p =
 and string_of_sym g =
   match g.it with
   | VarG (id, args) -> string_of_gramid id ^ string_of_args args
-  | NatG (DecOp, n) -> Z.to_string n
-  | NatG (HexOp, n) -> "0x" ^ Z.format "%X" n
-  | NatG (CharOp, n) -> "U+" ^ Z.format "%X" n
-  | NatG (AtomOp, n) -> "`" ^ Z.to_string n
+  | NumG (`DecOp, n) -> Z.to_string n
+  | NumG (`HexOp, n) -> "0x" ^ Z.format "%X" n
+  | NumG (`CharOp, n) -> "U+" ^ Z.format "%X" n
+  | NumG (`AtomOp, n) -> "`" ^ Z.to_string n
   | TextG t -> "\"" ^ String.escaped t ^ "\""
   | EpsG -> "eps"
   | SeqG gs -> "{" ^ concat " " (map_filter_nl_list string_of_sym gs) ^ "}"

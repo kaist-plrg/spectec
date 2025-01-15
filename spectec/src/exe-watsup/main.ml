@@ -18,7 +18,6 @@ type pass =
   | Sub
   | Totalize
   | Unthe
-  | Wild
   | Sideconditions
 
 (* This list declares the intended order of passes.
@@ -28,7 +27,7 @@ passers (--all-passes, some targets), we do _not_ want to use the order of
 flags on the command line.
 *)
 let _skip_passes = [ Sub; Unthe ]  (* Not clear how to extend them to indexed types *)
-let all_passes = [ Totalize; Wild; Sideconditions ]
+let all_passes = [ Totalize; Sideconditions ]
 
 type file_kind =
   | Spec
@@ -72,21 +71,18 @@ let pass_flag = function
   | Sub -> "sub"
   | Totalize -> "totalize"
   | Unthe -> "the-elimination"
-  | Wild -> "wildcards"
   | Sideconditions -> "sideconditions"
 
 let pass_desc = function
   | Sub -> "Synthesize explicit subtype coercions"
   | Totalize -> "Run function totalization"
   | Unthe -> "Eliminate the ! operator in relations"
-  | Wild -> "Eliminate wildcards and equivalent expressions"
   | Sideconditions -> "Infer side conditions"
 
 let run_pass : pass -> Il.Ast.script -> Il.Ast.script = function
   | Sub -> Middlend.Sub.transform
   | Totalize -> Middlend.Totalize.transform
   | Unthe -> Middlend.Unthe.transform
-  | Wild -> Middlend.Wild.transform
   | Sideconditions -> Middlend.Sideconditions.transform
 
 
@@ -108,7 +104,7 @@ let add_arg source =
 let pass_argspec pass : Arg.key * Arg.spec * Arg.doc =
   "--" ^ pass_flag pass, Arg.Unit (fun () -> enable_pass pass), " " ^ pass_desc pass
 
-let argspec = Arg.align
+let argspec = Arg.align (
 [
   "-v", Arg.Unit banner, " Show version";
   "-p", Arg.Unit (fun () -> file_kind := Patch), " Patch files";
@@ -138,6 +134,8 @@ let argspec = Arg.align
     " Debug interpreter";
   "--test", Arg.Unit (fun () -> target := Test), " Generate test suite";
 
+  "--no-unified-vars", Arg.Unit (fun () -> Il2al.Unify.rename := true),
+    " Do not use unified variables in AL";
   "--latex-macros", Arg.Set latex_macros, " Splice Latex with macro invocations";
 
   "--print-el", Arg.Set print_el, " Print EL";
@@ -150,8 +148,9 @@ let argspec = Arg.align
 ] @ List.map pass_argspec all_passes @ [
   "--all-passes", Arg.Unit (fun () -> List.iter enable_pass all_passes)," Run all passes";
 
+  "--test-version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " Wasm version to assume for tests (default: 3)";
+  
   (* flags for test generation *)
-  "--test-version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " The version of wasm, default to 3";
   "--test:out", Arg.String (fun s -> Backend_test.Flag.out := s), " Set the output directory of test generation, default to `out`";
   "--test:n", Arg.Int (fun i -> Backend_test.Flag.n := i), "  Set the number of test cases to generate, default to 100";
   "--test:seed", Arg.Int (fun i -> Backend_test.Flag.(seed := i; n := 1)), "  Generate specific test case";
@@ -160,7 +159,7 @@ let argspec = Arg.align
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";
-]
+] )
 
 
 (* Main *)
@@ -212,16 +211,19 @@ let () =
       if not (!print_al || !print_al_o <> "") && (!target = Check || !target = Latex) then []
       else (
         log "Translating to AL...";
-        (Il2al.Translate.translate il @ Il2al.Manual.manual_algos)
+        let interp = match !target with
+        | Interpreter _ -> true
+        | _ -> false in
+        Il2al.Translate.translate il interp @ Il2al.Manual.manual_algos
       )
     in
 
     let match_algo_name algo_name al_elt =
       algo_name = "" ||
       (match al_elt.Util.Source.it with
-      | Al.Ast.RuleA (a, _, _, _) -> 
+      | Al.Ast.RuleA (a, _, _, _) ->
         Al.Print.string_of_atom a = String.uppercase_ascii algo_name
-      | Al.Ast.FuncA (id , _, _) -> 
+      | Al.Ast.FuncA (id , _, _) ->
         id = String.lowercase_ascii algo_name)
     in
 

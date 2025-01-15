@@ -729,12 +729,12 @@ Vector constant instructions have a mandatory :ref:`shape <syntax-shape>` descri
 .. math::
    \begin{array}{llclll}
    \phantom{\production{instruction}} & \phantom{\Tplaininstr_I} &\phantom{::=}& \phantom{averylonginstructionnameforvectext} && \phantom{vechasreallylonginstructionnames} \\[-2ex] &&|&
-     \text{v128.const}~~\text{i8x16}~~(n{:}\Ti8)^{16} &\Rightarrow& \V128.\VCONST~\bytes_{i128}^{-1}(\bytes_{i8}(n)^{16}) \\ &&|&
-     \text{v128.const}~~\text{i16x8}~~(n{:}\Ti16)^{8} &\Rightarrow& \V128.\VCONST~\bytes_{i128}^{-1}(\bytes_{i16}(n)^8) \\ &&|&
-     \text{v128.const}~~\text{i32x4}~~(n{:}\Ti32)^{4} &\Rightarrow& \V128.\VCONST~\bytes_{i128}^{-1}(\bytes_{i32}(n)^4) \\ &&|&
-     \text{v128.const}~~\text{i64x2}~~(n{:}\Ti64)^{2} &\Rightarrow& \V128.\VCONST~\bytes_{i128}^{-1}(\bytes_{i64}(n)^2) \\ &&|&
-     \text{v128.const}~~\text{f32x4}~~(z{:}\Tf32)^{4} &\Rightarrow& \V128.\VCONST~\bytes_{i128}^{-1}(\bytes_{f32}(z)^4) \\ &&|&
-     \text{v128.const}~~\text{f64x2}~~(z{:}\Tf64)^{2} &\Rightarrow& \V128.\VCONST~\bytes_{i128}^{-1}(\bytes_{f64}(z)^2)
+     \text{v128.const}~~\text{i8x16}~~(n{:}\Ti8)^{16} &\Rightarrow& \V128.\VCONST~\bytes_{\I128}^{-1}(\bytes_{i8}(n)^{16}) \\ &&|&
+     \text{v128.const}~~\text{i16x8}~~(n{:}\Ti16)^{8} &\Rightarrow& \V128.\VCONST~\bytes_{\I128}^{-1}(\bytes_{i16}(n)^8) \\ &&|&
+     \text{v128.const}~~\text{i32x4}~~(n{:}\Ti32)^{4} &\Rightarrow& \V128.\VCONST~\bytes_{\I128}^{-1}(\bytes_{i32}(n)^4) \\ &&|&
+     \text{v128.const}~~\text{i64x2}~~(n{:}\Ti64)^{2} &\Rightarrow& \V128.\VCONST~\bytes_{\I128}^{-1}(\bytes_{i64}(n)^2) \\ &&|&
+     \text{v128.const}~~\text{f32x4}~~(z{:}\Tf32)^{4} &\Rightarrow& \V128.\VCONST~\bytes_{\I128}^{-1}(\bytes_{f32}(z)^4) \\ &&|&
+     \text{v128.const}~~\text{f64x2}~~(z{:}\Tf64)^{2} &\Rightarrow& \V128.\VCONST~\bytes_{\I128}^{-1}(\bytes_{f64}(z)^2)
    \end{array}
 
 .. math::
@@ -1051,6 +1051,31 @@ Vector constant instructions have a mandatory :ref:`shape <syntax-shape>` descri
      \text{f64x2.convert\_low\_i32x4\_u} &\Rightarrow& \F64X2.\VCONVERT\K{\_low\_i32x4\_u}\\ &&|&
      \text{f32x4.demote\_f64x2\_zero} &\Rightarrow& \F32X4.\VDEMOTE\K{\_f64x2\_zero}\\ &&|&
      \text{f64x2.promote\_low\_f32x4} &\Rightarrow& \F64X2.\VPROMOTE\K{\_low\_f32x4}\\
+   \end{array}
+
+.. math::
+   \begin{array}{llclll}
+   \phantom{\production{instruction}} & \phantom{\Tplaininstr_I} &\phantom{::=}& \phantom{averylonginstructionnameforvectext} && \phantom{vechasreallyreallyreallylonginstructionnames} \\[-2ex] &&|&
+     \text{i16x8.relaxed\_swizzle} &\Rightarrow& \I16X8.\VRELAXEDSWIZZLE \\ &&|&
+     \text{i32x4.relaxed\_trunc\_f32x4\_s} &\Rightarrow& \I32X4.\VRELAXEDTRUNC\K{\_f32x4\_s} \\ &&|&
+     \text{i32x4.relaxed\_trunc\_f32x4\_u} &\Rightarrow& \I32X4.\VRELAXEDTRUNC\K{\_f32x4\_u} \\ &&|&
+     \text{i32x4.relaxed\_trunc\_f32x4\_s\_zero} &\Rightarrow& \I32X4.\VRELAXEDTRUNC\K{\_f32x4\_s\_zero} \\ &&|&
+     \text{i32x4.relaxed\_trunc\_f32x4\_u\_zero} &\Rightarrow& \I32X4.\VRELAXEDTRUNC\K{\_f32x4\_u\_zero} \\ &&|&
+     \text{f32x4.relaxed\_madd} &\Rightarrow& \F32X4.\VRELAXEDMADD \\ &&|&
+     \text{f32x4.relaxed\_nmadd} &\Rightarrow& \F32X4.\VRELAXEDNMADD \\ &&|&
+     \text{f64x2.relaxed\_madd} &\Rightarrow& \F64X2.\VRELAXEDMADD \\ &&|&
+     \text{f64x2.relaxed\_nmadd} &\Rightarrow& \F64X2.\VRELAXEDNMADD \\ &&|&
+     \text{i8x16.relaxed\_laneselect} &\Rightarrow& \I8X16.\VRELAXEDLANESELECT \\ &&|&
+     \text{i16x8.relaxed\_laneselect} &\Rightarrow& \I16X8.\VRELAXEDLANESELECT \\ &&|&
+     \text{i32x4.relaxed\_laneselect} &\Rightarrow& \I32X4.\VRELAXEDLANESELECT \\ &&|&
+     \text{i64x2.relaxed\_laneselect} &\Rightarrow& \I64X2.\VRELAXEDLANESELECT \\ &&|&
+     \text{f32x4.relaxed\_min} &\Rightarrow& \F32X4.\VRELAXEDMIN \\ &&|&
+     \text{f32x4.relaxed\_max} &\Rightarrow& \F32X4.\VRELAXEDMAX \\ &&|&
+     \text{f64x2.relaxed\_min} &\Rightarrow& \F64X2.\VRELAXEDMIN \\ &&|&
+     \text{f64x2.relaxed\_max} &\Rightarrow& \F64X2.\VRELAXEDMAX \\ &&|&
+     \text{i16x8.relaxed\_q15mulr\_s} &\Rightarrow& \I16X8.\VRELAXEDQ15MULR\K{\_s} \\ &&|&
+     \text{i16x8.relaxed\_dot\_i8x16\_i7x16\_s} &\Rightarrow& \I16X8.\VRELAXEDDOT\K{\_i8x16\_i7x16\_s} \\ &&|&
+     \text{i16x8.relaxed\_dot\_i8x16\_i7x16\_add\_s} &\Rightarrow& \I16X8.\VRELAXEDDOT\K{\_i8x16\_i7x16\_add\_s}
    \end{array}
 
 

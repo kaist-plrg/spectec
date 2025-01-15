@@ -19,8 +19,8 @@ let f64T = nullary "F64"
 let v128T = nullary "V128"
 
 (* Helper *)
-let make_ishape i = CaseV ("X", [ nullary ("I"^(string_of_int i)); numV_of_int (128/i) ])
-let make_fshape i = CaseV ("X", [ nullary ("F"^(string_of_int i)); numV_of_int (128/i) ])
+let make_ishape i = CaseV ("X", [ nullary ("I"^(string_of_int i)); natV_of_int (128/i) ])
+let make_fshape i = CaseV ("X", [ nullary ("F"^(string_of_int i)); natV_of_int (128/i) ])
 
 let rec string_of_vt = function
 | T v -> Al.Print.string_of_value v
@@ -35,22 +35,22 @@ let validate_vloadop vloadop =
   match vloadop with
   | OptV (Some (CaseV ("ZERO", _))) ->
     let n = choose [32; 64] in
-    mk_vloadop "ZERO" [ numV_of_int n ], n
+    mk_vloadop "ZERO" [ natV_of_int n ], n
   | OptV (Some (CaseV ("SPLAT", _))) ->
     let n = choose [8; 16; 32; 64] in
-    mk_vloadop "SPLAT" [ numV_of_int n ], n
+    mk_vloadop "SPLAT" [ natV_of_int n ], n
   | OptV (Some (CaseV ("SHAPE", [_; _; sx]))) ->
     let n1 = choose [8; 16; 32] in
     let n2 = 64 / n1 in
-    mk_vloadop "SHAPE" [ numV_of_int n1; numV_of_int n2; sx ], 64
+    mk_vloadop "SHAPE" [ natV_of_int n1; natV_of_int n2; sx ], 64
   | OptV None -> OptV None, 128
   | v -> failwith ("Invalid vloadop: " ^ Print.string_of_value v)
 
 let decompose_memop s = (
-    s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_numv_to_int,
-    s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_numv_to_int
+    s |> unwrap_strv |> Record.find "ALIGN" |> unwrap_natv_to_int,
+    s |> unwrap_strv |> Record.find "OFFSET" |> unwrap_natv_to_int
   )
-let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (numV_of_int a) |> Record.add "OFFSET" (numV_of_int o))
+let compose_memop a o = StrV (Record.empty |> Record.add "ALIGN" (natV_of_int a) |> Record.add "OFFSET" (natV_of_int o))
 
 let rec dec_align a n =
   if 1 lsl a <= n then a else
@@ -123,8 +123,8 @@ let correct_cvtop = function
 | _ -> false
 
 let validate_if_extend = function
-| [ CaseV ("I32", []) as nt; CaseV ("EXTEND", _) ] -> [ nt; CaseV ("EXTEND", [ numV_of_int (choose ([8; 16])) ]) ];
-| [ CaseV ("I64", []) as nt; CaseV ("EXTEND", _) ] -> [ nt; CaseV ("EXTEND", [ numV_of_int (choose ([8; 16; 32])) ]) ];
+| [ CaseV ("I32", []) as nt; CaseV ("EXTEND", _) ] -> [ nt; CaseV ("EXTEND", [ natV_of_int (choose ([8; 16])) ]) ];
+| [ CaseV ("I64", []) as nt; CaseV ("EXTEND", _) ] -> [ nt; CaseV ("EXTEND", [ natV_of_int (choose ([8; 16; 32])) ]) ];
 | args -> args
 
 let validate_shape = function
@@ -139,7 +139,7 @@ let validate_shape = function
       | "F64" -> 2
       | _ -> failwith ("Invalid lane type: " ^ t)
     in 
-    CaseV ("X", [CaseV (t, []); numV_of_int n])
+    CaseV ("X", [CaseV (t, []); natV_of_int n])
   | v -> failwith ("Invalid shape: " ^ Print.string_of_value v)
 
 (* Estimate if given instruction is valid with expected type, rt1* -> rt2* *)
@@ -157,7 +157,7 @@ let validate_instr case args const (rt1, rt2) =
     | _ -> None )
   (* special vbinop *)
   | "VSWIZZLE" -> Some [ make_ishape 8; ]
-  | "VSHUFFLE" -> Some [ make_ishape 8; listV_of_list (List.init 16 (fun _ -> numV_of_int (Random.int 32))) ]
+  | "VSHUFFLE" -> Some [ make_ishape 8; listV_of_list (List.init 16 (fun _ -> natV_of_int (Random.int 32))) ]
   | "LOAD" | "STORE" -> (match args with
     | [ nt; opt; memop ] ->
       let decompose_nt = function
@@ -170,12 +170,12 @@ let validate_instr case args const (rt1, rt2) =
 
       let decompose_opt = function
       | OptV None -> false, n, ""
-      | OptV (Some (TupV [ m; s ])) -> true, unwrap_numv_to_int m, casev_get_case s
-      | OptV (Some m) -> true, unwrap_numv_to_int m, ""
+      | OptV (Some (TupV [ m; s ])) -> true, unwrap_natv_to_int m, casev_get_case s
+      | OptV (Some m) -> true, unwrap_natv_to_int m, ""
       | _ -> failwith "Unreachable" in
       let compose_opt is_some m s = match is_some, s with
-      | true, "" -> OptV (Some ( numV_of_int m ))
-      | true, _  -> OptV (Some ( TupV [ numV_of_int m; nullary s ]))
+      | true, "" -> OptV (Some ( natV_of_int m ))
+      | true, _  -> OptV (Some ( TupV [ natV_of_int m; nullary s ]))
       | false, _ -> OptV None in
       let (is_some, m, s) = decompose_opt opt in
 
@@ -229,19 +229,19 @@ let validate_instr case args const (rt1, rt2) =
   | "VLOAD_LANE" | "VSTORE_LANE" ->
     (match args with
     | [ vt; n; memop; _ ] ->
-      let i = unwrap_numv_to_int n in
+      let i = unwrap_natv_to_int n in
       let (a, o) = decompose_memop memop in
       let a' = dec_align a (i / 8) in
       let j = Random.int (128 / i) in
 
-      Some [ vt; n; compose_memop a' o; numV_of_int j ]
+      Some [ vt; n; compose_memop a' o; natV_of_int j ]
     | [ vt; n; memidx; memop; _ ] ->
-      let i = unwrap_numv_to_int n in
+      let i = unwrap_natv_to_int n in
       let (a, o) = decompose_memop memop in
       let a' = dec_align a (i / 8) in
       let j = Random.int (128 / i) in
 
-      Some [ vt; n; memidx; compose_memop a' o; numV_of_int j ]
+      Some [ vt; n; memidx; compose_memop a' o; natV_of_int j ]
     | v -> failwith ("Invalid vec load/store lane op: " ^ Print.string_of_value (listV_of_list v))
     )
   | "VUNOP"   -> let op = List.nth args 1 in Some [ get_vunop_shape op; op ]
@@ -268,28 +268,28 @@ let validate_instr case args const (rt1, rt2) =
     | T (CaseV ("I32", [])) ->
       let i = choose [8; 16; 32] in
       if i = 32 then
-        Some [ make_ishape 32; optV None; numV_of_int (Random.int (128/32)) ]
+        Some [ make_ishape 32; optV None; natV_of_int (Random.int (128/32)) ]
       else
-        Some [ make_ishape i; OptV (Some ext); numV_of_int (Random.int (128/i)) ]
+        Some [ make_ishape i; OptV (Some ext); natV_of_int (Random.int (128/i)) ]
     | T (CaseV ("I64", [])) ->
-      Some [ make_ishape 64; OptV None; numV_of_int (Random.int (128/64)) ]
+      Some [ make_ishape 64; OptV None; natV_of_int (Random.int (128/64)) ]
     | T (CaseV ("F32", [])) ->
-      Some [ make_fshape 32; OptV None; numV_of_int (Random.int (128/32)) ]
+      Some [ make_fshape 32; OptV None; natV_of_int (Random.int (128/32)) ]
     | T (CaseV ("F64", [])) ->
-      Some [ make_fshape 64; OptV None; numV_of_int (Random.int (128/64)) ]
+      Some [ make_fshape 64; OptV None; natV_of_int (Random.int (128/64)) ]
     | _ -> None
     )
   | "VREPLACE_LANE" ->
     (match List.hd (List.tl rt1) with
     | T (CaseV ("I32", [])) ->
       let i = choose [8; 16; 32] in
-      Some [ make_ishape i; numV_of_int (Random.int (128/i)) ]
+      Some [ make_ishape i; natV_of_int (Random.int (128/i)) ]
     | T (CaseV ("I64", [])) ->
-      Some [ make_ishape 64; numV_of_int (Random.int (128/64)) ]
+      Some [ make_ishape 64; natV_of_int (Random.int (128/64)) ]
     | T (CaseV ("F32", [])) ->
-      Some [ make_fshape 32; numV_of_int (Random.int (128/32)) ]
+      Some [ make_fshape 32; natV_of_int (Random.int (128/32)) ]
     | T (CaseV ("F64", [])) ->
-      Some [ make_fshape 64; numV_of_int (Random.int (128/64)) ]
+      Some [ make_fshape 64; natV_of_int (Random.int (128/64)) ]
     | _ -> None
     )
   | "VNARROW" ->
@@ -360,7 +360,7 @@ let validate_instr case args const (rt1, rt2) =
         |> IntSet.elements
         |> choose
         |> Z.logand mask
-        |> numV
+        |> natV
       in
 
       Some [ ty; n ]

@@ -34,6 +34,11 @@ let replace_id_with old_id new_e e =
   | VarE id when id.it = old_id -> new_e
   | _ -> e
 
+let transform_exp f = transform_exp {base_transformer with transform_exp = f}
+let transform_typ f = transform_typ {base_transformer with transform_exp = f}
+let transform_rule f = transform_rule {base_transformer with transform_exp = f}
+let transform_prem f = transform_prem {base_transformer with transform_exp = f}
+
 let rec dedup eq = function
 | [] -> []
 | hd :: tl -> hd :: dedup eq (Lib.List.filter_not (eq hd) tl)
@@ -57,7 +62,7 @@ let reduce_prem pr =
 let mk_VarT x = VarT (x $ no_region, []) $ no_region
 let il_case name tname args =
   CaseE (
-    (if name = "" then [] else [El.Atom.Atom name |> to_phrase (El.Atom.info name)]) :: (List.map (fun _ -> []) args),
+    (if name = "" then [] else [Xl.Atom.Atom name |> to_phrase (Xl.Atom.info name)]) :: (List.map (fun _ -> []) args),
     TupE args |> to_phrase (TupT (List.map (fun a -> (a, a.note)) args) $ no_region)
   ) |> to_phrase (mk_VarT tname)
 let il_list es t =
@@ -68,9 +73,9 @@ let il_tup es =
   TupE es |> to_phrase (TupT (List.map (fun e -> e, e.note) es) $ no_region)
 let some_opt = OptE (Some (il_tup [])) |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
 let none_opt = OptE None |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
-let il_some x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.Atom.Quest |> to_phrase (El.Atom.info "?")]], il_tup [some_opt]) |> to_phrase (mk_VarT t)
-let il_none x t = CaseE ([[El.Atom.Atom x |> to_phrase (El.Atom.info x)]; [El.Atom.Quest |> to_phrase (El.Atom.info "?")]], il_tup [none_opt]) |> to_phrase (mk_VarT t)
-let il_zero = NatE Z.zero |> to_phrase (mk_VarT "u32")
+let il_some x t = CaseE ([[Xl.Atom.Atom x |> to_phrase (Xl.Atom.info x)]; [Xl.Atom.Quest |> to_phrase (Xl.Atom.info "?")]], il_tup [some_opt]) |> to_phrase (mk_VarT t)
+let il_none x t = CaseE ([[Xl.Atom.Atom x |> to_phrase (Xl.Atom.info x)]; [Xl.Atom.Quest |> to_phrase (Xl.Atom.info "?")]], il_tup [none_opt]) |> to_phrase (mk_VarT t)
+let il_zero = NumE (Xl.Num.zero `NatT) |> to_phrase (mk_VarT "u32")
 
 let remove_sub e =
   match e.it with
@@ -111,10 +116,10 @@ let rec replace_caseE_arg is re e =
 
 let exp_to_int e =
   match (reduce_exp e).it with
-  | NatE z -> Z.to_int z
+  | NumE (`Nat z) -> Z.to_int z
   | _ -> failwith (string_of_exp e ^ " is not an integer")
 let exp_of_int i =
-  NatE (Z.of_int i) |> to_phrase (NumT NatT $ no_region)
+  NumE (`Nat (Z.of_int i)) |> to_phrase (NumT `NatT $ no_region)
 
 let exp_to_list e =
   match e.it with
@@ -169,7 +174,7 @@ let contains_false =
     match a.it, dt.it with
     | CaseE (mixop, {it = TupE args; _}), VariantT typcases ->
       List.exists (fun (mixop', (_, typ, _), _) ->
-        Il.Mixop.eq mixop mixop'
+        Xl.Mixop.eq mixop mixop'
         &&
         List.for_all2 has_type args (extract_tup_typ typ)
       ) typcases
@@ -179,13 +184,13 @@ let contains_false =
   and has_type a t =
     Il.Eval.sub_typ !il_env a.note t ||
     match a.it, t.it with
-    | NatE _, (NumT NatT) -> true
+    | NumE _, (NumT `NatT) -> true
     | _, VarT (name, []) -> has_deftyp a (dispatch_deftyp name.it [] |> snd)
     | _ -> false
   and has_argtype a p =
     match a.it, (a2e p).it with
     | CaseE (mixop1, {it = TupE args1; _}), CaseE (mixop2, {it = TupE args2; _}) ->
-      Il.Mixop.eq mixop1 mixop2
+      Xl.Mixop.eq mixop1 mixop2
       && List.for_all2 has_argtype args1 (List.map e2a args2)
       && has_type a (type_of_arg p)
     | _ ->
@@ -237,7 +242,7 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
       unify_exp ~on_fail map e e2
     else
       on_fail map e1 e2
-  | CaseE (case1, args1), CaseE (case2, args2) when Il.Mixop.eq case1 case2 ->
+  | CaseE (case1, args1), CaseE (case2, args2) when Xl.Mixop.eq case1 case2 ->
     f args1 args2
   | CallE (id1, args1), CallE (id2, args2) when Il.Eq.eq_id id1 id2 ->
     List.fold_left2 (fun map a1 a2 ->
@@ -284,12 +289,12 @@ let string_of_sidecond = function
 let extract_context_sidecond field f_elem sidecond =
   match sidecond with
   | IfPrC {it = CmpE (
-      EqOp,
+      `EqOp, `BoolT,
       {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _},
       elem
     ); _}
   | IfPrC {it = CmpE (
-      EqOp,
+      `EqOp, `BoolT,
       elem,
       {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _}
     ); _}
@@ -318,12 +323,12 @@ let extract_context_sidecond field f_elem sidecond =
 let extract_context_len_sidecond field sidecond =
   match sidecond with
   | IfPrC {it = CmpE (
-      LtOp _,
+      `LtOp, `NatT,
       len,
       {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
     ); _}
   | IfPrC {it = CmpE (
-      GtOp _,
+      `GtOp, `NatT,
       {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
       len
     ); _}
@@ -331,12 +336,12 @@ let extract_context_len_sidecond field sidecond =
   ->
     Some (exp_to_int len + 1)
   | IfPrC {it = CmpE (
-      LeOp _,
+      `LeOp, `NatT,
       len,
       {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _}
     ); _}
   | IfPrC {it = CmpE (
-      GeOp _,
+      `GeOp, `NatT,
       {it = LenE ({it = DotE (_C, {it = Atom field'; _}); _}); _},
       len
     ); _}
@@ -395,7 +400,7 @@ let register_typ ?(dry=false) t =
 let arrow_to_func rt1 rt2 =
   let f_rt rt = il_case "" "resulttype" [il_list rt (mk_VarT "valtype")] in
   let func = CaseE (
-    [[]; [El.Atom.Arrow |> to_phrase (El.Atom.info "->")]; []],
+    [[]; [Xl.Atom.Arrow |> to_phrase (Xl.Atom.info "->")]; []],
     il_tup [f_rt rt1; f_rt rt2]
   ) |> to_phrase (mk_VarT "functype") in
   match !Flag.version with
@@ -418,7 +423,7 @@ let has_same_mixop e_opt tc =
   | None, _ -> true
   | Some e, (mixop, _, _) ->
     match e.it with
-    | CaseE (mixop', _) -> Il.Mixop.eq mixop mixop'
+    | CaseE (mixop', _) -> Xl.Mixop.eq mixop mixop'
     | _ -> true
 
 (* HARDCODE: force valid expressions + append sidecondtions by this expression *)
@@ -443,18 +448,18 @@ let try_gen_from_prems c e =
 
   let rec extract_eq_cond e e' =
     match e'.it with
-    | BinE (OrOp, e1, e2) ->
+    | BinE (`OrOp, `BoolT, e1, e2) ->
         (match extract_eq_cond e e1, extract_eq_cond e e2 with
         | Some es1, Some es2 -> Some (union ~eq:Il.Eq.eq_exp es1 es2)
         | _ -> None)
-    | BinE (AndOp, e1, e2) ->
+    | BinE (`AndOp, `BoolT, e1, e2) ->
         (match extract_eq_cond e e1, extract_eq_cond e e2 with
         | Some es1, Some es2 -> Some (intersect ~eq:Il.Eq.eq_exp es1 es2)
         | Some es, None -> Some es
         | None, Some es -> Some es
         | _ -> None)
-    | CmpE (EqOp, e1, e2) when Il.Eq.eq_exp e e1 -> Some [e2]
-    | CmpE (EqOp, e2, e1) when Il.Eq.eq_exp e e1 -> Some [e2]
+    | CmpE (`EqOp, `BoolT, e1, e2) when Il.Eq.eq_exp e e1 -> Some [e2]
+    | CmpE (`EqOp, `BoolT, e2, e1) when Il.Eq.eq_exp e e1 -> Some [e2]
     | _ -> None
   in
 
@@ -477,7 +482,7 @@ let try_gen_from_prems c e =
         | some -> some
     )
   | IterE (e', (List, [x, _]))  ->
-    let e_l = LenE e |> to_phrase (NumT NatT $ no_region) in
+    let e_l = LenE e |> to_phrase (NumT `NatT $ no_region) in
     (match List.find_map (extract_eq_cond_prem e_l) prems with
       | Some e_ns ->
         let e_n = choose e_ns in
@@ -575,10 +580,10 @@ and gen_typ c typ =
         |> to_phrase typ
     )
   | VarT (id, args) -> gen {typ; args; prems = []; refer} id.it
-  | NumT NatT ->
+  | NumT `NatT ->
     (match refer with
-    | Some ({it = NatE _; _} as r) -> r
-    | _ -> NatE (Random.int 3 |> Z.of_int) |> to_phrase typ (* 0, 1, 2 *)
+    | Some ({it = NumE _; _} as r) -> r
+    | _ -> NumE (`Nat (Random.int 3 |> Z.of_int)) |> to_phrase typ (* 0, 1, 2 *)
     )
   | IterT (typ', List) ->
     (match refer with
@@ -958,7 +963,7 @@ let handle_context_type_prems trule =
 let register_iterlen_cond i result p =
   match p.it with
   | IfPr ({it = CmpE (
-      LtOp _,
+      `LtOp, `NatT,
       l,
       ({it = LenE {it = IterE (e, _); _}; _})
     ); _}) ->
@@ -1036,8 +1041,8 @@ let rec simplify_equality prems =
   (* Assumption: No cyclic binding *)
   let is_eq_prem prem =
     match prem.it with
-    | IfPr ({it = CmpE (EqOp, {it = VarE x; _}, ({it = CaseE _; _} as e)); _})
-    | IfPr ({it = CmpE (EqOp, ({it = CaseE _; _} as e), {it = VarE x; _}); _}) ->
+    | IfPr ({it = CmpE (`EqOp, `BoolT, {it = VarE x; _}, ({it = CaseE _; _} as e)); _})
+    | IfPr ({it = CmpE (`EqOp, `BoolT, ({it = CaseE _; _} as e), {it = VarE x; _}); _}) ->
       Either.Left ((x, e), prem)
     | RulePr (id, _, {it = TupE [_C; {it = VarE x; _}; e]; _}) when String.ends_with ~suffix:"_sub" id.it ->
       (* TODO: subtype is currently considered eq *)
@@ -1496,8 +1501,8 @@ let wrap_as_func (instrs: exp list) (rt: restype) =
   (* 3. If sidecondtion contains something about C.RETURN, append instrs and change the return type *)
   let extract_return_cond cond =
     match cond with
-    | IfPrC {it = CmpE (EqOp, {it = DotE (_C, {it = Atom "RETURN"; _}); _}, {it = OptE (Some rt); _}); _} -> Some rt
-    | IfPrC {it = CmpE (EqOp, {it = OptE (Some rt); _}, {it = DotE (_C, {it = Atom "RETURN"; _}); _}); _} -> Some rt
+    | IfPrC {it = CmpE (`EqOp, `BoolT, {it = DotE (_C, {it = Atom "RETURN"; _}); _}, {it = OptE (Some rt); _}); _} -> Some rt
+    | IfPrC {it = CmpE (`EqOp, `BoolT, {it = OptE (Some rt); _}, {it = DotE (_C, {it = Atom "RETURN"; _}); _}); _} -> Some rt
     | _ -> None
   in
   let return_conds = List.filter_map extract_return_cond !sideconds in
@@ -1591,7 +1596,7 @@ let wrap_as_module (func: exp) =
   in
 
   let default_table () =
-    let mixop = El.Atom.[
+    let mixop = Xl.Atom.[
       [LBrack |> to_phrase (info "[")];
       [Dot2 |> to_phrase (info "..")];
       [RBrack |> to_phrase (info "]")]
@@ -1749,7 +1754,7 @@ let handle_trivial_equality r =
   in
   let is_trivial_equality prem =
     match prem.it with
-    | IfPr ({it = CmpE (EqOp, l, r); _})
+    | IfPr ({it = CmpE (`EqOp, `BoolT, l, r); _})
         when is_simple_var l && is_simple_var r ->
       Some (l, r)
     | RulePr (id, _, {it = TupE [_C; l; r]; _})

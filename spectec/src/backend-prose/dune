@@ -4,10 +4,12 @@
   (modules
     config
     prose
+    prose_util
     print
     gen
     render
     macro
     langs
-    eq)
+    eq
+    prose_util)
 )

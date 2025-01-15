@@ -80,12 +80,14 @@ and eq_exp e1 e2 =
   match e1.it, e2.it with
   | VarE (id1, args1), VarE (id2, args2) ->
     eq_id id1 id2 && eq_list eq_arg args1 args2
+  | CvtE (e11, nt1), CvtE (e21, nt2) -> eq_exp e11 e21 && nt1 = nt2
   | UnE (op1, e11), UnE (op2, e21) -> op1 = op2 && eq_exp e11 e21
   | BinE (e11, op1, e12), BinE (e21, op2, e22) ->
     eq_exp e11 e21 && op1 = op2 && eq_exp e12 e22
   | CmpE (e11, op1, e12), CmpE (e21, op2, e22) ->
     eq_exp e11 e21 && op1 = op2 && eq_exp e12 e22
   | LenE e11, LenE e21
+  | ParenE e11, ParenE e21
   | ArithE e11, ArithE e21
   | UnparenE e11, UnparenE e21 -> eq_exp e11 e21
   | IdxE (e11, e12), IdxE (e21, e22)
@@ -98,8 +100,8 @@ and eq_exp e1 e2 =
   | UpdE (e11, p1, e12), UpdE (e21, p2, e22)
   | ExtE (e11, p1, e12), ExtE (e21, p2, e22) ->
     eq_exp e11 e21 && eq_path p1 p2 && eq_exp e12 e22
-  | ParenE (e11, b1), ParenE (e21, b2) -> eq_exp e11 e21 && b1 = b2
   | SeqE es1, SeqE es2
+  | ListE es1, ListE es2
   | TupE es1, TupE es2 -> eq_list eq_exp es1 es2
   | StrE efs1, StrE efs2 -> eq_nl_list eq_expfield efs1 efs2
   | DotE (e11, atom1), DotE (e21, atom2) -> eq_exp e11 e21 && eq_atom atom1 atom2

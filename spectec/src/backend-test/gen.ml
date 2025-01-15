@@ -50,11 +50,11 @@ let mk_assertion funcinst =
   in
   let args =
     List.map (function
-      | Al.Ast.CaseV ("I32", []) as t -> caseV ("CONST", [t; numV (gen_bytes 4)])
+      | Al.Ast.CaseV ("I32", []) as t -> caseV ("CONST", [t; natV (gen_bytes 4)])
       | Al.Ast.CaseV ("F32", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout32) (gen_bytes 4)])
-      | Al.Ast.CaseV ("I64", []) as t -> caseV ("CONST", [t; numV (gen_bytes 8)])
+      | Al.Ast.CaseV ("I64", []) as t -> caseV ("CONST", [t; natV (gen_bytes 8)])
       | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout64) (gen_bytes 8)])
-      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VCONST", [t; numV (gen_bytes 16)])
+      | Al.Ast.CaseV ("V128", []) as t -> caseV ("VCONST", [t; natV (gen_bytes 16)])
       | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
     ) arg_types
   in
@@ -192,14 +192,14 @@ let to_wast seed m result =
   in
 
   let export name var =
-    caseV ("EXPORT", [ TextV name; CaseV ("GLOBAL", [ Construct.al_of_int32 var ])])
+    caseV ("EXPORT", [ TextV name; CaseV ("GLOBAL", [ Construct.al_of_nat32 var ])])
   in
 
   let m_spectest = ("MODULE", [
     empty_list; empty_list; empty_list;
     listV_of_list [
-      global "I32" (Construct.al_of_int32 666l);
-      global "I64" (Construct.al_of_int64 666L);
+      global "I32" (Construct.al_of_nat32 666l);
+      global "I64" (Construct.al_of_nat64 666L);
       global "F32" (0x4426a666l |> Z.of_int32_unsigned |> Construct.(al_of_floatN layout32));
       global "F64" (0x4084d4cccccccccdL |> Z.of_int64_unsigned |> Construct.(al_of_floatN layout64));
     ];

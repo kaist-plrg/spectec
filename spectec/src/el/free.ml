@@ -1,5 +1,6 @@
 open Util.Source
 open Ast
+open Xl
 
 
 (* Data Structure *)
@@ -129,16 +130,15 @@ and det_typcon ((t, prems), _) = det_typ t + det_prems prems
 and free_exp e =
   match e.it with
   | VarE (id, as_) -> free_varid id + free_list free_arg as_
-  | AtomE _ | BoolE _ | NatE _ | TextE _ | EpsE | HoleE _ | LatexE _ ->
-    empty
-  | UnE (_, e1) | DotE (e1, _) | LenE e1
-  | ParenE (e1, _) | BrackE (_, e1, _) | ArithE e1 | UnparenE e1 -> free_exp e1
+  | AtomE _ | BoolE _ | NumE _ | TextE _ | EpsE | HoleE _ | LatexE _ -> empty
+  | CvtE (e1, _) | UnE (_, e1) | DotE (e1, _) | LenE e1
+  | ParenE e1 | BrackE (_, e1, _) | ArithE e1 | UnparenE e1 -> free_exp e1
   | SizeE id -> free_gramid id
   | BinE (e1, _, e2) | CmpE (e1, _, e2)
   | IdxE (e1, e2) | CommaE (e1, e2) | CatE (e1, e2) | MemE (e1, e2)
   | InfixE (e1, _, e2) | FuseE (e1, e2) -> free_exp e1 + free_exp e2
   | SliceE (e1, e2, e3) -> free_exp e1 + free_exp e2 + free_exp e3
-  | SeqE es | TupE es -> free_list free_exp es
+  | SeqE es | ListE es | TupE es -> free_list free_exp es
   | UpdE (e1, p, e2) | ExtE (e1, p, e2) ->
     free_exp e1 + free_path p + free_exp e2
   | StrE efs -> free_nl_list free_expfield efs
@@ -160,13 +160,13 @@ and det_exp e =
   match e.it with
   | VarE (id, []) -> bound_varid id
   | VarE _ -> assert false
-  | UnE ((PlusOp | MinusOp), e1)
-  | ParenE (e1, _) | BrackE (_, e1, _) | ArithE e1 -> det_exp e1
+  | CvtE (e1, _) | UnE (#Num.unop, e1)
+  | ParenE e1 | BrackE (_, e1, _) | ArithE e1 -> det_exp e1
   (* We consider arithmetic expressions determinate,
    * since we sometimes need to use invertible formulas. *)
-  | BinE (e1, (AddOp | SubOp | MulOp | DivOp | ModOp | ExpOp), e2)
+  | BinE (e1, #Num.binop, e2)
   | InfixE (e1, _, e2) -> det_exp e1 + det_exp e2
-  | SeqE es | TupE es -> free_list det_exp es
+  | SeqE es | ListE es | TupE es -> free_list det_exp es
   | StrE efs -> free_nl_list det_expfield efs
   | IterE (e1, iter) -> det_exp e1 + det_iter iter
   (* As a special hack to work with bijective functions,
@@ -175,7 +175,7 @@ and det_exp e =
   | CallE (_, as_) ->
     free_list idx_arg as_ + det_arg (Util.Lib.List.last as_)
   | TypE (e1, _) -> det_exp e1
-  | AtomE _ | BoolE _ | NatE _ | TextE _ | EpsE -> empty
+  | AtomE _ | BoolE _ | NumE _ | TextE _ | EpsE -> empty
   | UnE _ | BinE _ | CmpE _
   | IdxE _ | SliceE _ | UpdE _ | ExtE _ | CommaE _ | CatE _ | MemE _
   | DotE _ | LenE _ | SizeE _ -> idx_exp e
@@ -191,9 +191,9 @@ and det_iter iter =
 and idx_exp e =
   match e.it with
   | VarE _ -> empty
-  | ParenE (e1, _) | BrackE (_, e1, _) | ArithE e1 -> idx_exp e1
+  | ParenE e1 | BrackE (_, e1, _) | ArithE e1 -> idx_exp e1
   | InfixE (e1, _, e2) -> idx_exp e1 + idx_exp e2
-  | SeqE es | TupE es -> free_list idx_exp es
+  | SeqE es | ListE es | TupE es -> free_list idx_exp es
   | StrE efs -> free_nl_list idx_expfield efs
   | IterE (e1, iter) -> idx_exp e1 + idx_iter iter
   | CallE (_, as_) -> free_list idx_arg as_
@@ -210,10 +210,11 @@ and idx_iter iter =
 
 and det_cond_exp e =
   match e.it with
-  | UnE (NotOp, e1) -> det_cond_exp e1
-  | BinE (e1, (AndOp | OrOp | EquivOp | ImplOp), e2) -> det_cond_exp e1 + det_cond_exp e2
-  | CmpE (e1, EqOp, e2) -> det_exp e1 + det_exp e2
-  | ParenE (e1, _) | ArithE e1 -> det_cond_exp e1
+  | UnE (#Bool.unop, e1) -> det_cond_exp e1
+  | BinE (e1, #Bool.binop, e2) -> det_cond_exp e1 + det_cond_exp e2
+  | CmpE (e1, `EqOp, e2) -> det_exp e1 + det_exp e2
+  | MemE (e1, _) -> det_exp e1
+  | ParenE e1 | ArithE e1 -> det_cond_exp e1
   | _ -> empty
 
 
@@ -222,7 +223,7 @@ and det_cond_exp e =
 and free_sym g =
   match g.it with
   | VarG (id, as_) -> free_gramid id + free_args as_
-  | NatG _ | TextG _ | EpsG -> empty
+  | NumG _ | TextG _ | EpsG -> empty
   | SeqG gs | AltG gs -> free_nl_list free_sym gs
   | RangeG (g1, g2) | FuseG (g1, g2) -> free_sym g1 + free_sym g2
   | ParenG g1 | UnparenG g1 -> free_sym g1
@@ -233,7 +234,7 @@ and free_sym g =
 
 and det_sym g =
   match g.it with
-  | VarG _ | NatG _ | TextG _ | EpsG -> empty
+  | VarG _ | NumG _ | TextG _ | EpsG -> empty
   | SeqG gs | AltG gs -> free_nl_list det_sym gs
   | RangeG (g1, g2) -> det_sym g1 + det_sym g2
   | ParenG g1 -> det_sym g1

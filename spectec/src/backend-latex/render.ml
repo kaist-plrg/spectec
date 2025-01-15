@@ -2,9 +2,8 @@ open Util
 open Source
 open El.Ast
 open El.Convert
+open Xl
 open Config
-
-module Atom = El.Atom
 
 
 (* Errors *)
@@ -71,13 +70,13 @@ let as_arith_exp e =
 
 let as_paren_exp e =
   match e.it with
-  | ParenE (e1, _) -> e1
+  | ParenE e1 -> e1
   | _ -> e
 
 let as_tup_exp e =
   match e.it with
   | TupE es -> es
-  | ParenE (e1, _) -> [e1]
+  | ParenE e1 -> [e1]
   | _ -> [e]
 
 let as_seq_exp e =
@@ -87,7 +86,7 @@ let as_seq_exp e =
 
 let rec fuse_exp e deep =
   match e.it with
-  | ParenE (e1, b) when deep -> ParenE (fuse_exp e1 false, b) $ e.at
+  | ParenE e1 when deep -> ParenE (fuse_exp e1 false) $ e.at
   | IterE (e1, iter) -> IterE (fuse_exp e1 deep, iter) $ e.at
   | SeqE (e1::es) -> List.fold_left (fun e1 e2 -> FuseE (e1, e2) $ e.at) e1 es
   | _ -> e
@@ -134,6 +133,7 @@ type env =
     deco_typ : bool;
     deco_gram : bool;
     deco_rule : bool;
+    name_rel : hints ref;
     tab_rel : hints ref;
   }
 
@@ -158,6 +158,7 @@ let new_env config =
     deco_typ = false;
     deco_gram = false;
     deco_rule = false;
+    name_rel = ref Map.empty;
     tab_rel = ref Map.empty;
   }
 
@@ -229,6 +230,7 @@ let env_hintdef env hd =
   | RelH (id, hints) ->
     env_hints "macro" env.macro_rel id hints;
     env_hints "show" env.show_rel id hints;
+    env_hints "name" env.name_rel id hints;
     env_hints "tabular" env.tab_rel id hints
   | VarH (id, hints) ->
     env_hints "macro" env.macro_var id hints;
@@ -329,7 +331,7 @@ let env_def env d : (id * typ list) list =
     []
   | RelD (id, t, hints) ->
     env_hintdef env (RelH (id, hints) $ d.at);
-    env_typ env id t hints;
+    env_typcon env id ((t, []), hints);
     []
   | VarD (id, _t, hints) ->
     env.vars := Set.add id.it !(env.vars);
@@ -425,6 +427,7 @@ let rec string_of_row sep br = function
 
 let rec string_of_table vsep vbr hsep hbr = function
   | [] -> ""
+  | (Row cols)::[] -> string_of_row hsep hbr cols
   | (Row cols)::Sep::rows -> string_of_row hsep hbr cols ^ vbr ^ string_of_table vsep vbr hsep hbr rows
   | (Row cols)::rows -> string_of_row hsep hbr cols ^ vsep ^ string_of_table vsep vbr hsep hbr rows
   | Sep::rows -> vbr ^ string_of_table vsep vbr hsep hbr rows
@@ -568,6 +571,7 @@ type ctxt =
     templ : string list option;  (* current macro template *)
     args : arg list;             (* epansion arguments *)
     next : int ref;              (* argument counter *)
+    max : int ref;               (* highest used argument (to detect arity) *)
   }
 
 let macro_template env macro name =
@@ -592,7 +596,7 @@ let nonmacro_atom atom =
   | Atom s -> s = "_"
   | Dot
   | Comma | Semicolon
-  | Colon | Equal
+  | Colon | Equal | Less | Greater
   | Quest | Plus | Star
   | LParen | RParen
   | LBrack | RBrack
@@ -635,16 +639,20 @@ let rec expand_iter env ctxt iter =
   | ListN (e, id_opt) -> ListN (expand_exp env ctxt e, id_opt)
 
 and expand_exp env ctxt e =
+  (* Involves side effects, be careful to order recursive calls! *)
   (match e.it with
   | AtomE atom ->
     let atom' = expand_atom env ctxt atom in
     AtomE atom'
-  | BoolE _ | NatE _ | TextE _ | EpsE ->
+  | BoolE _ | NumE _ | TextE _ | EpsE ->
     e.it
   | VarE (id, args) ->
     let id' = expand_id env ctxt id in
     let args' = List.map (expand_arg env ctxt) args in
     VarE (id', args')
+  | CvtE (e1, nt) ->
+    let e1' = expand_exp env ctxt e1 in
+    CvtE (e1', nt)
   | UnE (op, e1) ->
     let e1' = expand_exp env ctxt e1 in
     UnE (op, e1')
@@ -659,6 +667,9 @@ and expand_exp env ctxt e =
   | SeqE es ->
     let es' = List.map (expand_exp env ctxt) es in
     SeqE es'
+  | ListE es ->
+    let es' = List.map (expand_exp env ctxt) es in
+    ListE es'
   | IdxE (e1, e2) ->
     let e1' = expand_exp env ctxt e1 in
     let e2' = expand_exp env ctxt e2 in
@@ -702,9 +713,9 @@ and expand_exp env ctxt e =
     LenE e1'
   | SizeE id ->
     SizeE id
-  | ParenE (e1, b) ->
+  | ParenE e1 ->
     let e1' = expand_exp env ctxt e1 in
-    ParenE (e1', b)
+    ParenE e1'
   | TupE es ->
     let es' = List.map (expand_exp env ctxt) es in
     TupE es'
@@ -735,7 +746,9 @@ and expand_exp env ctxt e =
   | HoleE (`Num i) ->
     (match List.nth_opt ctxt.args i with
     | None -> raise Arity_mismatch
-    | Some arg -> ctxt.next := i + 1;
+    | Some arg ->
+      ctxt.next := i + 1;
+      ctxt.max := max !(ctxt.max) i;
       match !(arg.it) with
       | ExpA eJ -> ArithE eJ
       | _ -> CallE ("" $ e.at, [arg])
@@ -748,6 +761,7 @@ and expand_exp env ctxt e =
       with Failure _ -> raise Arity_mismatch
     in
     ctxt.next := List.length ctxt.args;
+    ctxt.max := max !(ctxt.max) (!(ctxt.next) - 1);
     SeqE (List.map (function
       | {it = {contents = ExpA e}; _} ->
         (* Guard exp arguments against being reinterpreted as sym
@@ -802,7 +816,7 @@ and expand_arg env ctxt a =
  * and the function `render` for rendering the resulting expression.
  * If no hint can be found, fall back to the default of rendering `f`.
  *)
-let render_expand render env (show : hints ref) macro id args f =
+let render_expand render env (show : hints ref) macro id args f : string * arg list =
   match Map.find_opt id.it !show with
   | None ->
 (*
@@ -811,11 +825,11 @@ Printf.printf "[expand not found %s]\n%!" id.it;
 Printf.printf "%s\n%!" (String.concat " " (List.map fst (Map.bindings !show)))
 ));
 *)
-   f ()
+   f (), []
   | Some showexps ->
     let templ = macro_template env macro id.it in
     let rec attempt = function
-      | [] -> f ()
+      | [] -> f (), []
       | showexp::showexps' ->
         try
 (*
@@ -825,10 +839,12 @@ Printf.printf "[expand attempt %s %s] %s\n%!" id.it m (El.Print.string_of_exp sh
 );
 *)
           let env' = local_env env in
-          let e = expand_exp env' {macro; templ; args; next = ref 1} showexp in
+          let ctxt = {macro; templ; args; next = ref 1; max = ref 0} in
+          let e = expand_exp env' ctxt showexp in
+          let args' = Lib.List.drop (!(ctxt.max) + 1) args in
           (* Avoid cyclic expansion *)
           show := Map.remove id.it !show;
-          Fun.protect (fun () -> render env' e)
+          Fun.protect (fun () -> render env' e, args')
             ~finally:(fun () -> show := Map.add id.it showexps !show)
         with Arity_mismatch -> attempt showexps'
           (* HACK: Ignore arity mismatches, such that overloading notation works,
@@ -854,7 +870,7 @@ let render_apply render_id render_exp env show macro id args =
         "}" ^ !render_args_fwd env args'
       else
         render_id env id ^ !render_args_fwd env args
-    )
+    ) |> fst
 
 
 (* Identifiers *)
@@ -934,7 +950,7 @@ let rec render_id_sub style show macro env first at = function
       if not first then render_id' env style s2 None else
       render_expand !render_exp_fwd env show macro
         (s3 $ at) [ref (ExpA (VarE (s3 $ at, []) $ at)) $ at]
-        (fun () -> render_id' env style s2 (macro_template env macro s3))
+        (fun () -> render_id' env style s2 (macro_template env macro s3)) |> fst
     in
     let s5 = s4 ^ ticks in
     (if String.length s5 = 1 then s5 else "{" ^ s5 ^ "}") ^
@@ -961,12 +977,12 @@ let render_gramid env id = render_id `Token env.show_gram env.macro_gram env id
 
 let render_ruleid env id1 id2 =
   let id1' =
-    match Map.find_opt id1.it !(env.show_rel) with
+    match Map.find_opt id1.it !(env.name_rel) with
     | None -> id1.it
     | Some [] -> assert false
     | Some ({it = TextE s; _}::_) -> s
     | Some ({at; _}::_) ->
-      error at "malformed `show` hint for relation"
+      error at "malformed `name` hint for relation"
   in
   let id2' = if id2.it = "" then "" else "-" ^ id2.it in
   "\\textsc{\\scriptsize " ^ dash_id (quote_id (id1' ^ id2')) ^ "}"
@@ -1009,6 +1025,8 @@ Printf.eprintf "[render_atom %s @ %s] id=%s def=%s macros: %s (%s)\n%!"
       | Semicolon -> ";"
       | Colon -> ":"
       | Equal -> "="
+      | Less -> "<"
+      | Greater -> ">"
       | Quest -> "{}^?"
       | Plus -> "{}^+"
       | Star -> "{}^\\ast"
@@ -1029,6 +1047,9 @@ Printf.eprintf "[render_atom %s @ %s] id=%s def=%s macros: %s (%s)\n%!"
           | Dot2 -> ".."
           | Dot3 -> "\\ldots"
           | Assign -> ":="
+          | NotEqual -> "\\neq"
+          | LessEqual-> "\\leq"
+          | GreaterEqual -> "\\geq"
           | Arrow | ArrowSub -> "\\rightarrow"
           | Arrow2 | Arrow2Sub -> "\\Rightarrow"
           | Sub -> "\\leq"
@@ -1043,37 +1064,37 @@ Printf.eprintf "[render_atom %s @ %s] id=%s def=%s macros: %s (%s)\n%!"
           | BigMul -> "\\Pi"
           | BigCat -> "\\bigoplus"
           | _ -> "\\" ^ Atom.name atom
-    )
+    ) |> fst
 
 
 (* Operators *)
 
 let render_unop = function
-  | NotOp -> "\\neg"
-  | PlusOp -> "+"
-  | MinusOp -> "-"
-  | PlusMinusOp -> "\\pm"
-  | MinusPlusOp -> "\\mp"
+  | `NotOp -> "\\neg"
+  | `PlusOp -> "+"
+  | `MinusOp -> "-"
+  | `PlusMinusOp -> "\\pm"
+  | `MinusPlusOp -> "\\mp"
 
 let render_binop = function
-  | AndOp -> "\\land"
-  | OrOp -> "\\lor"
-  | ImplOp -> "\\Rightarrow"
-  | EquivOp -> "\\Leftrightarrow"
-  | AddOp -> "+"
-  | SubOp -> "-"
-  | MulOp -> "\\cdot"
-  | DivOp -> "/"
-  | ModOp -> "\\mathbin{\\mathrm{mod}}"
-  | ExpOp -> assert false
+  | `AndOp -> "\\land"
+  | `OrOp -> "\\lor"
+  | `ImplOp -> "\\Rightarrow"
+  | `EquivOp -> "\\Leftrightarrow"
+  | `AddOp -> "+"
+  | `SubOp -> "-"
+  | `MulOp -> "\\cdot"
+  | `DivOp -> "/"
+  | `ModOp -> "\\mathbin{\\mathrm{mod}}"
+  | `PowOp -> assert false
 
 let render_cmpop = function
-  | EqOp -> "="
-  | NeOp -> "\\neq"
-  | LtOp -> "<"
-  | GtOp -> ">"
-  | LeOp -> "\\leq"
-  | GeOp -> "\\geq"
+  | `EqOp -> "="
+  | `NeOp -> "\\neq"
+  | `LtOp -> "<"
+  | `GtOp -> ">"
+  | `LeOp -> "\\leq"
+  | `GeOp -> "\\geq"
 
 let render_dots = function
   | Dots -> [Row [Col "\\dots"]]
@@ -1086,7 +1107,7 @@ let rec render_iter env = function
   | Opt -> "^?"
   | List -> "^\\ast"
   | List1 -> "^{+}"
-  | ListN ({it = ParenE (e, _); _}, None) | ListN (e, None) ->
+  | ListN ({it = ParenE e; _}, None) | ListN (e, None) ->
     "^{" ^ render_exp env e ^ "}"
   | ListN (e, Some id) ->
     "^{" ^ render_varid env id ^ "<" ^ render_exp env e ^ "}"
@@ -1107,7 +1128,7 @@ and render_nottyp env t : table =
     [Row [Col (
       "\\{ " ^
       render_table env "@{}" ["l"; "l"] 0 0
-        (concat_table "" (render_nl_list env (`H, " ") render_typfield tfs) [Row [Col " \\}"]])
+        (concat_table "" (render_nl_list env (`H, ", ") render_typfield tfs) [Row [Col " \\}"]])
     )]]
   | CaseT (dots1, ts, tcs, dots2) ->
     let render env = function
@@ -1131,9 +1152,9 @@ and render_nottyp env t : table =
     render_typcon env tcon
   | RangeT tes ->
     render_nl_list env (`H, "~|~") render_typenum tes
-  | NumT NatT ->
+  | NumT `NatT ->
     [Row [Col "0 ~|~ 1 ~|~ 2 ~|~ \\dots"]]
-  | NumT IntT ->
+  | NumT `IntT ->
     [Row [Col "\\dots ~|~ {-2} ~|~ {-1} ~|~ 0 ~|~ 1 ~|~ 2 ~|~ \\dots"]]
   | _ ->
     [Row [Col (render_typ env t)]]
@@ -1186,27 +1207,29 @@ and render_exp env e =
     render_apply render_varid render_exp env env.show_typ env.macro_typ id args
   | BoolE b ->
     render_atom env (Atom.(Atom (string_of_bool b) $$ e.at % info "bool"))
-  | NatE (DecOp, n) -> Z.to_string n
-  | NatE (HexOp, n) ->
+  | NumE (`DecOp, `Nat n) -> Z.to_string n
+  | NumE (`HexOp, `Nat n) ->
     let fmt =
       if n < Z.of_int 0x100 then "%02X" else
       if n < Z.of_int 0x10000 then "%04X" else
       "%X"
     in "\\mathtt{0x" ^ Z.format fmt n ^ "}"
-  | NatE (CharOp, n) ->
+  | NumE (`CharOp, `Nat n) ->
     let fmt =
       if n < Z.of_int 0x100 then "%02X" else
       if n < Z.of_int 0x10000 then "%04X" else
       "%X"
     in "\\mathrm{U{+}" ^ Z.format fmt n ^ "}"
-  | NatE (AtomOp, n) ->
+  | NumE (`AtomOp, `Nat n) ->
     let atom = {it = Atom.Atom (Z.to_string n); at = e.at; note = Atom.info "nat"} in
     render_atom (without_macros true env) atom
+  | NumE _ -> assert false
   | TextE t -> "\\mbox{\\texttt{`" ^ t ^ "'}}"
+  | CvtE (e1, _) -> render_exp env e1
   | UnE (op, e2) -> "{" ^ render_unop op ^ render_exp env e2 ^ "}"
-  | BinE (e1, ExpOp, ({it = ParenE (e2, _); _ } | e2)) ->
+  | BinE (e1, `PowOp, ({it = ParenE e2; _ } | e2)) ->
     "{" ^ render_exp env e1 ^ "^{" ^ render_exp env e2 ^ "}}"
-  | BinE (({it = NatE (DecOp, _); _} as e1), MulOp,
+  | BinE (({it = NumE (`DecOp, `Nat _); _} as e1), `MulOp,
       ({it = VarE _ | CallE (_, []) | ParenE _; _ } as e2)) ->
     render_exp env e1 ^ " \\, " ^ render_exp env e2
   | BinE (e1, op, e2) ->
@@ -1223,10 +1246,18 @@ and render_exp env e =
 if atom.it = Atom.Atom "X" && String.contains e.at.left.file 'A' then
 Printf.eprintf "[render %s:X @ %s] try expansion\n%!" (Source.string_of_region e.at) atom.note.Atom.def;
 *)
-      render_expand render_exp env env.show_atom env.macro_atom
+      (match render_expand render_exp env env.show_atom env.macro_atom
         (typed_id atom) args (fun () -> render_exp_seq env es)
+      with
+      | _, args' when List.length args' + 1 = List.length args ->
+        (* HACK for nullary contructors *)
+        (* TODO(4, rossberg): handle inner constructors more generally *)
+        render_exp_seq env es
+      | s, _ -> s
+      )
     | _ -> render_exp_seq env es
     )
+  | ListE es -> "{}[" ^ render_exp_seq env es ^ "]"
   | IdxE (e1, e2) -> render_exp env e1 ^ "{}[" ^ render_exp env e2 ^ "]"
   | SliceE (e1, e2, e3) ->
     render_exp env e1 ^
@@ -1248,10 +1279,10 @@ Printf.eprintf "[render %s:X @ %s] try expansion\n%!" (Source.string_of_region e
   | MemE (e1, e2) -> render_exp env e1 ^ " \\in " ^ render_exp env e2
   | LenE e1 -> "{|" ^ render_exp env e1 ^ "|}"
   | SizeE id -> "||" ^ render_gramid env id ^ "||"
-  | ParenE ({it = SeqE [{it = AtomE atom; _}; _]; _} as e1, _)
+  | ParenE ({it = SeqE [{it = AtomE atom; _}; _]; _} as e1)
     when render_atom env atom = "" ->
     render_exp env e1
-  | ParenE (e1, _) -> "(" ^ render_exp env e1 ^ ")"
+  | ParenE e1 -> "(" ^ render_exp env e1 ^ ")"
   | TupE es -> "(" ^ render_exps ", " env es ^ ")"
   | InfixE (e1, atom, e2) ->
     let id = typed_id atom in
@@ -1272,14 +1303,14 @@ Printf.eprintf "[render %s:X @ %s] try expansion\n%!" (Source.string_of_region e
         | true, _ -> "{" ^ render_exps "," env (as_tup_exp e2) ^ "} {}"
         | false, _ -> render_exp env e2
         )
-      )
+      ) |> fst
   | BrackE (l, e1, r) ->
     let id = typed_id l in
     let el = AtomE l $ l.at in
     let er = AtomE r $ r.at in
     let args = List.map arg_of_exp ([el] @ as_seq_exp e1 @ [er]) in
     render_expand render_exp env env.show_atom env.macro_atom id args
-      (fun () -> render_atom env l ^ space (render_exp env) e1 ^ render_atom env r)
+      (fun () -> render_atom env l ^ space (render_exp env) e1 ^ render_atom env r) |> fst
   | CallE (id, [arg]) when id.it = "" -> (* expansion result only *)
     render_arg env arg
   | CallE (id, args) when id.it = "" ->  (* expansion result only *)
@@ -1298,7 +1329,7 @@ Printf.eprintf "[render %s:X @ %s] try expansion\n%!" (Source.string_of_region e
     let es = e2' :: flatten_fuse_exp_rev e1 in
     String.concat "" (List.map (fun e -> "{" ^ render_exp env e ^ "}") (List.rev es))
   | UnparenE {it = ArithE e1; _} -> render_exp env (UnparenE e1 $ e.at)
-  | UnparenE ({it = ParenE (e1, _); _} | e1) -> render_exp env e1
+  | UnparenE ({it = ParenE e1; _} | e1) -> render_exp env e1
   | HoleE `None -> ""
   | HoleE _ -> error e.at "misplaced hole"
   | LatexE s -> s
@@ -1388,7 +1419,7 @@ and render_conditions env prems : row list =
   in
   prefix_row br (
     match prems''' with
-    | [] -> [Row [Col pre]]
+    | [] -> [Row [Col ("\\quad " ^ pre)]]
     | [Elem prem] -> [Row [Col ("\\quad " ^ pre ^ "~ " ^ render_prem env prem)]]
     | _ ->
       [Row [Col
@@ -1420,20 +1451,20 @@ and render_sym env g : string =
   | VarG (id, args) ->
     render_apply render_gramid render_exp_as_sym
       env env.show_gram env.macro_gram id args
-  | NatG (DecOp, n) -> Z.to_string n
-  | NatG (HexOp, n) ->
+  | NumG (`DecOp, n) -> Z.to_string n
+  | NumG (`HexOp, n) ->
     let fmt =
       if n < Z.of_int 0x100 then "%02X" else
       if n < Z.of_int 0x10000 then "%04X" else
       "%X"
     in "\\mathtt{0x" ^ Z.format fmt n ^ "}"
-  | NatG (CharOp, n) ->
+  | NumG (`CharOp, n) ->
     let fmt =
       if n < Z.of_int 0x100 then "%02X" else
       if n < Z.of_int 0x10000 then "%04X" else
       "%X"
     in "\\mathrm{U{+}" ^ Z.format fmt n ^ "}"
-  | NatG (AtomOp, n) -> "\\mathtt{" ^ Z.to_string n ^ "}"
+  | NumG (`AtomOp, n) -> "\\mathtt{" ^ Z.to_string n ^ "}"
   | TextG t -> "\\mbox{\\texttt{`" ^ t ^ "'}}"
   | EpsG -> "\\epsilon"
   | SeqG gs -> render_sym_seq env gs
@@ -1472,7 +1503,7 @@ and render_sym_seq env = function
 and render_prod env prod : row list =
   let (g, e, prems) = prod.it in
   match e.it, prems with
-  | (TupE [] | ParenE ({it = SeqE []; _}, _)), [] ->
+  | (TupE [] | ParenE {it = SeqE []; _}), [] ->
     [Row [Col (render_sym env g)]]
   | _ when not env.config.display ->
     prefix_rows_hd

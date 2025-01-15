@@ -54,7 +54,7 @@ let patch_tags tags = tags
 (* elem *)
 let patch_mode rt = function
   | CaseV ("ACTIVE", tid :: _args) as v ->
-    let tid' = unwrap_numv_to_int tid in
+    let tid' = unwrap_natv_to_int tid in
     let table = List.nth (unwrap_listv_to_list !tables) tid' in
     let rt' = List.nth (unwrap_tupv (casev_nth_arg 0 table)) 1 in
     if (rt = rt') then v else choose [ nullary "PASSIVE"; nullary "DECLARE" ]
@@ -68,7 +68,7 @@ let patch_elems elems = listv_map patch_elem elems
 let patch_data data =
   let datamode = match casev_nth_arg 1 data with
     | CaseV ("ACTIVE", [mid; _init]) when Random.int 50 > 0 ->
-      let int_to_const i = caseV ("CONST", [nullary "I32"; numV_of_int i]) in
+      let int_to_const i = caseV ("CONST", [nullary "I32"; natV_of_int i]) in
       CaseV ("ACTIVE", [mid; listV [| int_to_const (Random.int 3) |]])
     | v -> v
   in
@@ -77,17 +77,17 @@ let patch_datas datas = listv_map patch_data datas
 
 (* start *)
 let patch_start start =
-  let fid = start |> casev_nth_arg 0 |> unwrap_numv_to_int in
+  let fid = start |> casev_nth_arg 0 |> unwrap_natv_to_int in
   let fs = !funcs |> unwrap_listv_to_list in
   let is_ok f =
-    let tid = casev_nth_arg 0 f |> unwrap_numv_to_int in
+    let tid = casev_nth_arg 0 f |> unwrap_natv_to_int in
     let t = (try List.nth (!types |> unwrap_listv_to_list) tid with _ -> failwith (string_of_int tid)) |> casev_nth_arg 0 in
     t = tupV [empty_list; empty_list] in
   let f = List.nth fs fid in
   if is_ok f then Some start else
   let candidates = find_index_all is_ok fs in
   if candidates = [] then None else
-    Some (caseV ("START", [numV_of_int (choose candidates)]))
+    Some (caseV ("START", [natV_of_int (choose candidates)]))
 let patch_starts starts = match starts with
 | OptV None -> starts
 | OptV Some start -> OptV (patch_start start)
