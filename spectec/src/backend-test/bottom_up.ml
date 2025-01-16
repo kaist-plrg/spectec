@@ -73,8 +73,12 @@ let il_tup es =
   TupE es |> to_phrase (TupT (List.map (fun e -> e, e.note) es) $ no_region)
 let some_opt = OptE (Some (il_tup [])) |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
 let none_opt = OptE None |> to_phrase (IterT (TupT [] $ no_region, Opt) $ no_region)
-let il_some x t = CaseE ([[Xl.Atom.Atom x |> to_phrase (Xl.Atom.info x)]; [Xl.Atom.Quest |> to_phrase (Xl.Atom.info "?")]], il_tup [some_opt]) |> to_phrase (mk_VarT t)
-let il_none x t = CaseE ([[Xl.Atom.Atom x |> to_phrase (Xl.Atom.info x)]; [Xl.Atom.Quest |> to_phrase (Xl.Atom.info "?")]], il_tup [none_opt]) |> to_phrase (mk_VarT t)
+let il_some x t =
+  let e = il_case x t [] in
+  OptE (Some e) |> to_phrase (IterT (TupT [e, e.note] $ no_region, Opt) $ no_region)
+let il_none x t =
+  let e = il_case x t [] in
+  OptE None |> to_phrase (IterT (TupT [e, e.note] $ no_region, Opt) $ no_region)
 let il_zero = NumE (Xl.Num.zero `NatT) |> to_phrase (mk_VarT "u32")
 
 let remove_sub e =

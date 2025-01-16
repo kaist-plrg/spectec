@@ -212,7 +212,7 @@ let () =
       else (
         log "Translating to AL...";
         let interp = match !target with
-        | Interpreter _ -> true
+        | Interpreter _ | Test -> true
         | _ -> false in
         Il2al.Translate.translate il interp @ Il2al.Manual.manual_algos
       )

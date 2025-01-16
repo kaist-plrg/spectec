@@ -662,19 +662,9 @@ let tag off i tag =
   )
 
 let table off i tab =
-<<<<<<< HEAD
-  let {ttype = TableT (lim, t); tinit} = tab.it in
-  Node ("table $" ^ nat (off + i) ^ " " ^ limits nat32 lim,
-    atom ref_type t :: (
-      match tinit.it with
-      | [ { it = RefNull _; _ } ] -> []
-      | _ -> list instr tinit.it
-    )
-=======
   let {ttype = TableT (at, lim, t); tinit} = tab.it in
   Node ("table $" ^ nat (off + i) ^ " " ^ addr_type at ^ " " ^ limits nat64 lim,
     atom ref_type t :: list instr tinit.it
->>>>>>> main
   )
 
 let memory off i mem =

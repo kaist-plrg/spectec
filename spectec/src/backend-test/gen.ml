@@ -187,7 +187,7 @@ let to_wast seed m result =
   let open Reference_interpreter.Script in
 
   let global ty value =
-    caseV ("GLOBAL", [ TupV ([ CaseV ("MUT", [ OptV None ]); nullary ty]);
+    caseV ("GLOBAL", [ TupV ([ OptV None; nullary ty]);
       listV_of_list [CaseV ("CONST", [ nullary ty; value])]])
   in
 
@@ -350,7 +350,9 @@ let gen_test el' il' al' =
 
     times := Sys.time () -. st :: !times;
 
-    ) with | e -> print_endline @@ "FAIL: " ^ (string_of_int seed) ^ ".wast - " ^ Printexc.to_string e;
+    ) with | e -> print_endline @@
+      " " ^ (Filename.concat !Flag.out ((string_of_int seed) ^ ".wast")) ^ ":0.0-0.0: " ^
+      "west error: " ^ Printexc.to_string e;
   );
 
   (* Print Coverage *)
