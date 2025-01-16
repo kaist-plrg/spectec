@@ -934,7 +934,7 @@ let fix_values vt: rule list =
           )
         )
       | _ ->
-        let vt' = vt |> replace_caseE_arg [0; 0] some_opt in
+        let vt' = vt |> replace_caseE_arg [0] (il_some "NULL" "nul")  in
         [f "REF.NULL" vt'; f "REF.AS_NON_NULL" vt]
       )
     )
