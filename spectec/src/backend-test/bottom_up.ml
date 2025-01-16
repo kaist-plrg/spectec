@@ -1570,8 +1570,8 @@ let wrap_as_module (func: exp) =
     | CaseE ([[]; []; []], {it = TupE [mut; t]; _}) ->
       let is_mut e =
         match e.it with
-        | CaseE ([[{it = Atom "MUT"; _}]; [{it = Quest; _}]], {it = TupE [{it = OptE (Some _); _}]; _}) -> true
-        | CaseE ([[{it = Atom "MUT"; _}]; [{it = Quest; _}]], {it = TupE [{it = OptE None; _}]; _}) -> false
+        | OptE None -> false
+        | OptE (Some _) -> true
         | _ -> Random.bool ()
       in
       Some (is_mut mut, t)
