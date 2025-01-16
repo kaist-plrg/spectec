@@ -120,7 +120,8 @@ let rec replace_caseE_arg is re e =
 
 let exp_to_int e =
   match (reduce_exp e).it with
-  | NumE (`Nat z) -> Z.to_int z
+  | NumE (`Nat z)
+  | NumE (`Int z) -> Z.to_int z
   | _ -> failwith (string_of_exp e ^ " is not an integer")
 let exp_of_int i =
   NumE (`Nat (Z.of_int i)) |> to_phrase (NumT `NatT $ no_region)
@@ -586,8 +587,13 @@ and gen_typ c typ =
   | VarT (id, args) -> gen {typ; args; prems = []; refer} id.it
   | NumT `NatT ->
     (match refer with
-    | Some ({it = NumE _; _} as r) -> r
+    | Some ({it = NumE (`Nat _); _} as r) -> r
     | _ -> NumE (`Nat (Random.int 3 |> Z.of_int)) |> to_phrase typ (* 0, 1, 2 *)
+    )
+  | NumT `IntT ->
+    (match refer with
+    | Some ({it = NumE (`Int _); _} as r) -> r
+    | _ -> NumE (`Int (Random.int 5 - 2 |> Z.of_int)) |> to_phrase typ (* -2 ~ 2 *)
     )
   | IterT (typ', List) ->
     (match refer with
@@ -878,7 +884,8 @@ let fix_values vt: rule list =
     apply_unify_result_rule result trule
   in
   let g case = find_trules case |> List.hd in
-  match (remove_sub vt).it with
+  let vt = vt |> remove_sub |> reduce_exp in
+  match vt.it with
   (* HARDCODE: Default instr name for each type *)
   | CaseE ([[{it = Atom nt; _}]], {it = TupE []; _}) ->
     (match nt with
@@ -889,14 +896,14 @@ let fix_values vt: rule list =
     | _ -> failwith "Unknown type"
     )
   | CaseE ([[{it = Atom "REF"; _}];[];[]], {it = TupE [
-      {it = CaseE ([[{it = Atom "NULL"; _}];[{it = Quest; _}]], {it = TupE [{it = OptE nul; _}]; _}); _};
+      {it = OptE nul; _};
       ht
     ]; _}) ->
     assert (!Flag.version = 3);
     (match nul with
-    | Some _ ->
+    | Some _ -> (* Nullable *)
       [f "REF.NULL" vt]
-    | None ->
+    | None -> (* Non-nullable *)
       let ht =
         match ht.it with
         | CaseE ([[{it = Atom ("ANY" | "EQ"); _}]], {it = TupE []; _}) ->
@@ -931,8 +938,7 @@ let fix_values vt: rule list =
         [f "REF.NULL" vt'; f "REF.AS_NON_NULL" vt]
       )
     )
-  | _ ->
-    [f "LOCAL.GET" vt]
+  | _ -> failwith @@ "fix_value: Unrecognized valtype - " ^ string_of_exp vt
 let accumulate_rtss rtss =
   List.fold_left (fun stack rts ->
     let last_rt = List.hd (List.rev stack) in
@@ -1594,8 +1600,8 @@ let wrap_as_module (func: exp) =
   (* 3. Generate tables *)
   let extract_table_sidecond = extract_context_sidecond "TABLES" (fun e ->
     match e.it with
-    | CaseE ([[]; []; []], {it = TupE [lim; rt]; _}) ->
-      Some (lim, rt)
+    | CaseE ([[]; []; []; []], {it = TupE [at; lim; rt]; _}) ->
+      Some (at, lim, rt)
     | _ -> None)
   in
 
@@ -1605,6 +1611,7 @@ let wrap_as_module (func: exp) =
       [Dot2 |> to_phrase (info "..")];
       [RBrack |> to_phrase (info "]")]
     ] in
+    il_case "I32" "addrtype" [], (* TODO: Maybe... this can be automated? *)
     CaseE (mixop, il_tup [il_zero; il_zero]) |> to_phrase (mk_VarT "limits"),
     il_case "REF" "reftype" [il_some "NULL" "nul"; il_case "FUNC" "heaptype" []]
   in
@@ -1615,8 +1622,8 @@ let wrap_as_module (func: exp) =
     default_table
     "TABLE"
     "table"
-    (fun (lim, rt) ->
-      [il_case "" "tabletype" [lim; rt]; ListE (gen_default_instr' rt) |> to_phrase (mk_VarT "expr")]
+    (fun (at, lim, rt) ->
+      [il_case "" "tabletype" [at; lim; rt]; ListE (gen_default_instr' rt) |> to_phrase (mk_VarT "expr")]
     )
   in
 
