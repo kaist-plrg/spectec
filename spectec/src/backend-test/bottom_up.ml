@@ -51,15 +51,18 @@ let rec count_freq eq = function
 
 let to_phrase ty x = x $$ no_region % ty
 
+(* Il.Eval Wrapper *)
 let reduce_exp e = Il.Eval.reduce_exp !il_env e
 let reduce_prem pr =
   match pr.it with
   | IfPr e -> {pr with it = IfPr (reduce_exp e)}
   | RulePr (id, mixop, e) -> {pr with it = RulePr (id, mixop, reduce_exp e)}
   | _ -> pr
+let match_exp e1 e2 = Il.Eval.match_exp !il_env Il.Subst.empty e1 e2
 
 (* Smart Constructors *)
 let mk_VarT x = VarT (x $ no_region, []) $ no_region
+let il_var x t = VarE (x $ no_region) |> to_phrase t
 let il_case name tname args =
   CaseE (
     (if name = "" then [] else [Xl.Atom.Atom name |> to_phrase (Xl.Atom.info name)]) :: (List.map (fun _ -> []) args),
@@ -222,6 +225,7 @@ let contains_false =
 exception UnifyFail of exp * exp
 let unify_fail _map e1 e2 =
   raise @@ UnifyFail (e1, e2)
+(* TODO: Eventually, replace this with Il.Eval.subst *)
 let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
   let rec resolve e =
     match e.it with
@@ -709,6 +713,9 @@ let print_unify_result =
   List.iter (fun (x, e) ->
     print_endline (x ^ ": " ^ (string_of_exp e))
   )
+let result_of_subst s = Il.Subst.Map.bindings s.Il.Subst.varid
+let print_subst s =
+  print_unify_result @@ result_of_subst s
 
 let apply_unify_result result e =
   List.fold_left (fun e (x, e_x) ->
@@ -771,6 +778,10 @@ let fix_lengths i max es =
 
 (* 1. fix_rts: pre-determine concrete types of each cases *)
 let fix_rts (cases: string list): restype list * rule list =
+  Debug_log.(log "bottom_up.fix_rts"
+    (fun () -> String.concat " " cases)
+    (fun (_rts, rules) -> rules |> List.map string_of_rule |> String.concat "\n" )
+  ) @@ fun _ ->
   let rts, trules = List.fold_left (fun (rts, trules) case ->
     let i = List.length trules in
     (* Helpers *)
@@ -977,16 +988,20 @@ let register_iterlen_cond i result p =
       l,
       ({it = LenE {it = IterE (e, _); _}; _})
     ); _}) ->
-    (match l.it with
-    | VarE l ->
-      let j = Random.int 3 in (* TODO: Check if l is already in unify result *)
-      let sidecond = IterLenC (i, e, j + 1 + Random.int 2) in
-      push sidecond sideconds;
-      (l.it, exp_of_int j) :: result
-    | _ ->
-      let sidecond = IterLenC (i, e, exp_to_int l + 1 + Random.int 2) in
-      push sidecond sideconds;
-      result)
+    (* TODO: Check if l is already in unify result *)
+    let idx = exp_of_int @@ Random.int 3 in
+    let subst =
+      match match_exp idx l with
+      | Some subst -> subst
+      | None -> Il.Subst.empty
+      | exception Il.Eval.Irred -> Il.Subst.empty
+    in
+
+    let l' = l |> Il.Subst.subst_exp subst |> reduce_exp in
+
+    let sidecond = IterLenC (i, e, exp_to_int l' + 1 + Random.int 2) in
+    push sidecond sideconds;
+    result_of_subst subst @ result
   | _ -> result
 let reset_iterlen_cond i =
   sideconds := List.filter (fun sc ->
@@ -1205,7 +1220,15 @@ let concretize_free_prem prem =
 
 (* 3. fix_immediate: determine and concretize the immediates of each instr *)
 let rec fix_immediate (trules: rule list): exp list =
+  Debug_log.(log "bottom_up.fix_immediate"
+    (fun () -> trules |> List.map string_of_rule |> String.concat "\n" )
+    (fun exps -> exps |> List.map string_of_exp |> String.concat "; " )
+  ) @@ fun _ ->
   List.mapi (fun i trule ->
+    Debug_log.(log "bottom_up.fix_immediate.loop"
+      (fun () -> string_of_rule trule)
+      (fun e -> string_of_exp e)
+    ) @@ fun _ ->
     let i = i - !values_cnt in
 
     let iter_to_list' e =
