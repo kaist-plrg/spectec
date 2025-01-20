@@ -583,18 +583,22 @@ and gen_typs c typs =
       | Some {it = TupE es; _} -> List.map Option.some es
       | _ -> List.init (List.length typs') (fun _ -> None)
     in
-    List.fold_left_map (fun replaces ((e, t), refer) ->
-      let e' =
-        let refer' = try_gen_from_prems {c with refer} e in
+    List.fold_left_map (fun (replaces, prems) ((e, t), refer) ->
+      let e', prems' =
+        let c = {c with prems; refer} in
+        let refer = try_gen_from_prems {c with refer} e in
+        let c = {c with refer} in
+
         let t' = List.fold_left (fun t (e, e') -> transform_typ (replace e e') t) t replaces in
-        try_n 10 "generating syntax" (fun () ->
-          let e' = gen_typ {c with refer = refer'} t' in
-          let prems' = List.map (transform_prem (replace e e')) c.prems in
-          e' |> unless (prems' |> contains_false)
+        try_n 100 "generating syntax" (fun () ->
+          let e' = gen_typ c t' in
+          let prems' = List.map (transform_prem (replace e e')) prems in
+          (e', prems') |> unless (prems' |> contains_false)
         )
       in
-      (e, e') :: replaces, e'
-    ) [] (List.combine typs' refs) |> snd
+      ((e, e') :: replaces, prems'),
+      e'
+    ) ([], c.prems) (List.combine typs' refs) |> snd
   | _ -> [ gen_typ c typs ]
 and gen_typ c typ =
   let refer = c.refer in
@@ -1402,22 +1406,6 @@ and gen_default_instrs rt1 rt2 =
 
 (* 3.5 patch: Make manual, syntactic patch to instrs. Eventually should be removed, or automated *)
 let rec patch instrs =
-  let patch_shape sh =
-    match sh.it with
-    | CaseE ([[]; [{it = Atom "X"; _}]; []], {it = TupE [t; _dim]; _}) ->
-      let dim =
-        match case_of_case t with
-        | Atom "I8" -> 16
-        | Atom "I16" -> 8
-        | Atom "I32" -> 4
-        | Atom "F32" -> 4
-        | Atom "I64" -> 2
-        | Atom "F64" -> 2
-        | _ -> failwith "invalid shape: did you add new `shape`?"
-      in
-      sh |> replace_caseE_arg [1; 0] (exp_of_int dim)
-    | _ -> sh
-  in
   let handle_rec i instr =
     let instrs = nth_arg_of_case i instr in
     let instrs' =
@@ -1466,7 +1454,6 @@ let rec patch instrs =
     | Atom "TRY_TABLE"  -> instr |> handle_rec 2
     | _ -> instr
     )
-    |> transform_exp patch_shape
   ) instrs
 
 (* 4. wrap_as_func: Wrap the generated instruction sequence with func, including params and blocks *)
