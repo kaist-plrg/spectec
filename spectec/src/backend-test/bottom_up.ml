@@ -237,6 +237,11 @@ let rec unify_exp ?(on_fail=unify_fail) map e1 e2 =
   if Il.Eq.eq_exp e1 e2 then map else
   let f = unify_exp ~on_fail map in
   match e1.it, e2.it with (*TODO: Generalize to more cases *)
+  | VarE x, VarE y ->
+    if not (Il.Eval.sub_typ !il_env e1.note e2.note) then
+      ((x.it, e2) :: map)
+    else
+      ((y.it, e1) :: map)
   | _, VarE x -> ((x.it, e1) :: map)
   | VarE x, _ -> ((x.it, e2) :: map)
   | SubE (e1, t1, _), SubE (e2, t2, _) when Il.Eval.sub_typ !il_env t1 t2 || Il.Eval.sub_typ !il_env t2 t1 ->
