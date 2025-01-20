@@ -143,12 +143,14 @@ and is_normal_exp e =
   | StrE efs -> List.for_all (fun (_, e) -> is_normal_exp e) efs
   | _ -> false
 
-and diff_exp e1 e2 =
+and diff_exp env e1 e2 =
   match e1.it, e2.it with
-  | ListE es1, ListE es2 -> List.length es1 <> List.length es2 || List.exists2 diff_exp es1 es2
-  | TupE es1, TupE es2 -> List.length es1 <> List.length es2 || List.exists2 diff_exp es1 es2
+  | ListE el1, ListE el2
+  | TupE el1, TupE el2 -> List.length el1 <> List.length el2 || List.exists2 (diff_exp env) el1 el2
   | OptE None, OptE (Some _) -> true
   | OptE (Some _), OptE None -> true
+  | CaseE (op1, e1), CaseE (op2, e2) -> not (Mixop.eq op1 op2) || diff_exp env e1 e2
+  | CaseE _, (SubE ({it = VarE _; _}, _, _)) when match_exp' env Subst.empty e1 e2 = None -> true
   | _ -> false
 
 and reduce_exp env e : exp =
@@ -192,12 +194,10 @@ and reduce_exp env e : exp =
     (match op, e1'.it, e2'.it with
     | `EqOp, _, _ when Eq.eq_exp e1' e2' -> BoolE true
     | `NeOp, _, _ when Eq.eq_exp e1' e2' -> BoolE false
-    | `EqOp, _, _ when diff_exp e1' e2' -> BoolE false
-    | `NeOp, _, _ when diff_exp e1' e2' -> BoolE true
+    | `EqOp, _, _ when diff_exp env e1' e2' -> BoolE false
+    | `NeOp, _, _ when diff_exp env e1' e2' -> BoolE true
     | `EqOp, _, _ when is_normal_exp e1' && is_normal_exp e2' -> BoolE false
     | `NeOp, _, _ when is_normal_exp e1' && is_normal_exp e2' -> BoolE true
-    | `EqOp, CaseE _, _ when match_exp' env Subst.empty e1' e2' = None -> BoolE false
-    | `NeOp, CaseE _, _ when match_exp' env Subst.empty e1' e2' = None -> BoolE true
     | #Num.cmpop as op', NumE n1, NumE n2 ->
       (match Num.cmp op' n1 n2 with
       | Some b -> BoolE b

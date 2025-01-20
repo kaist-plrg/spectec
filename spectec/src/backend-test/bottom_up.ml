@@ -526,6 +526,7 @@ let try_gen_from_prems c e =
   | _ -> c.refer
 
 let rec gen c x =
+  Debug_log.(log "bottom_up.gen" (fun _ -> x) string_of_exp) @@ fun _ ->
   let a2e a =
     match a.it with
     | ExpA e -> reduce_exp e
@@ -770,10 +771,14 @@ let fix_free_var_of_rt trules ess =
   )
 
 let get_cached_length i e =
-  List.find_map (function
-    | IterLenC (i', e', l) when i = i' && Il.Eq.eq_exp e e' -> Some l
-    | _ -> None
-  ) !sideconds
+  match e.note.it with
+  | IterT ({it = VarT ({it = "laneidx"; _}, _); _}, _) -> (* HARDCODE: For VSHUFFLE *)
+    Some 16
+  | _ ->
+    List.find_map (function
+      | IterLenC (i', e', l) when i = i' && Il.Eq.eq_exp e e' -> Some l
+      | _ -> None
+    ) !sideconds
 
 exception RejectedSample of string
 
@@ -806,6 +811,9 @@ let fix_rts (cases: string list): restype list * rule list =
     let i = List.length trules in
     (* Helpers *)
     let len_cache = ref [] in
+    let init_len_cache () =
+      len_cache := []
+    in
     let iter_to_list ?(enforce=false) e =
       match e.it with
       | IterE (e', (List, xes)) ->
@@ -862,7 +870,7 @@ let fix_rts (cases: string list): restype list * rule list =
       let trule = case_to_rule case in
       let (rt1, rt2) = rule_to_arrow trule in
 
-      len_cache := [];
+      init_len_cache ();
       let vts1 = mk_vts rt1 |> List.map append_idx_exp in
       let vts2 = mk_vts rt2 |> List.map append_idx_exp in
       let trule = trule |> transform_rule iter_to_list |> append_idx_rule in
@@ -1034,13 +1042,7 @@ let concretize_instr trule instr =
   (* 1. Generate from syntax *)
   let trule, instr = try_n 100 "concretizing instr" (fun () -> try (
     let instr' = gen {typ = mk_VarT "instr"; args = []; prems = []; refer = Some instr} "instr" in
-    (* HARDCODE: for VSHUFFLE *)
-    let on_fail map e1 e2 =
-      match e1.it, e2.it with
-      | ListE _, ListE _ -> map
-      | _ -> raise @@ UnifyFail (e1, e2)
-    in
-    let unify_result = unify_exp ~on_fail [] instr instr' in
+    let unify_result = unify_exp [] instr instr' in
 
     let trule = apply_unify_result_rule unify_result trule in
 
@@ -1416,15 +1418,6 @@ let rec patch instrs =
       sh |> replace_caseE_arg [1; 0] (exp_of_int dim)
     | _ -> sh
   in
-  let patch_sz sz =
-    match sz.note.it with
-    | VarT ({it = "sz"; _}, []) ->
-      let i = nth_arg_of_case 0 sz |> exp_to_int in
-      if List.mem i [8; 16; 32; 64] then sz else
-      gen_typ sz.note
-    | _ -> sz
-  in
-  let ixx n = il_case ("I" ^ string_of_int n) "Jnn" [] in
   let handle_rec i instr =
     let instrs = nth_arg_of_case i instr in
     let instrs' =
@@ -1436,31 +1429,6 @@ let rec patch instrs =
   in
   List.map (fun instr ->
     (match case_of_case instr with
-    | Atom "VSWIZZLE" ->
-      instr
-      |> replace_caseE_arg [0; 0] (il_case "I8" "lanetype" [])
-      |> replace_caseE_arg [0; 1; 0] (exp_of_int 16)
-    | Atom "VSHUFFLE" ->
-      let li = mk_VarT "laneidx" in
-      instr
-      |> replace_caseE_arg [0; 0] (il_case "I8" "lanetype" [])
-      |> replace_caseE_arg [0; 1; 0] (exp_of_int 16)
-      |> replace_caseE_arg [1] (il_list (List.init 16 (fun _ -> gen_typ li)) li)
-    | Atom "VEXTUNOP" ->
-      let (t1, t2) = (16, 8) // (32, 16) in
-      instr
-      |> replace_caseE_arg [0; 0] (ixx t1)
-      |> replace_caseE_arg [1; 0] (ixx t2)
-    | Atom "VEXTBINOP" ->
-      let (t1, t2) =
-        match case_of_case @@ nth_arg_of_case 2 instr with
-        | Atom "EXTMUL" -> (16, 8) // (32, 16)
-        | Atom "DOT" -> (32, 16)
-        | _ -> failwith "Unknown vextbinop"
-      in
-      instr
-      |> replace_caseE_arg [0; 0] (ixx t1)
-      |> replace_caseE_arg [1; 0] (ixx t2)
     | Atom "VEXTRACT_LANE" ->
       let sx_opt =
         match instr |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> case_of_case with
@@ -1499,7 +1467,6 @@ let rec patch instrs =
     | _ -> instr
     )
     |> transform_exp patch_shape
-    |> transform_exp patch_sz
   ) instrs
 
 (* 4. wrap_as_func: Wrap the generated instruction sequence with func, including params and blocks *)
@@ -1843,7 +1810,7 @@ let gen_module (cases: string list): Al.Ast.value =
 
   (* 3. Fix immediates *)
   Log.debug ("===3===");
-  let instrs = fix_immediate trules in (* May throw, if it is impossible to fill in immeidates *)
+  let instrs = fix_immediate trules in (* May throw, if it is impossible to fill in immediates *)
 
   (* 3.5 Manual patch *)
   Log.debug ("===3.5===");
