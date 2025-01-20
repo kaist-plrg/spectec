@@ -313,6 +313,26 @@ let extract_context_sidecond field f_elem sidecond =
     else
       let* x = f_elem elem in
       Some (exp_to_int index, x)
+  | IfPrC {it = CmpE (
+      `EqOp, `BoolT,
+      {it = ProjE ({it = UncaseE (
+        {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _},
+      _); _}, _); _},
+      elem
+    ); _}
+  | IfPrC {it = CmpE (
+      `EqOp, `BoolT,
+      elem,
+      {it = ProjE ({it = UncaseE (
+        {it = IdxE ({it = DotE (_C, {it = Atom field'; _}); _}, index); _},
+      _); _}, _); _}
+    ); _}
+  ->
+    if field' <> field then
+      None
+    else
+      let* x = f_elem elem in
+      Some (exp_to_int index, x)
   | RulePrC (id, [[]; [{it = Turnstile; _}]; [{it = Sub; _}]; []], {it = TupE [
       _C;
       {it = IdxE ({it = DotE (_C', {it = Atom field'; _}); _}, index); _};
