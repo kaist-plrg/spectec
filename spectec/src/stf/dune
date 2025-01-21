@@ -1,0 +1,9 @@
+
+(library
+  (name stf)
+  (libraries xl el il al util backend_interpreter)
+  (modules
+    template
+    gen
+  )
+)

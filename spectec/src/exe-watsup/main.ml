@@ -12,6 +12,7 @@ type target =
  | Prose of bool
  | Splice of Backend_splice.Config.t
  | Interpreter of string list
+ | STF
 
 type pass =
   | Sub
@@ -146,6 +147,7 @@ let argspec = Arg.align (
   "--all-passes", Arg.Unit (fun () -> List.iter enable_pass all_passes)," Run all passes";
 
   "--test-version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " Wasm version to assume for tests (default: 3)";
+  "--stf", Arg.Unit (fun () -> target := STF), "Subtype Test Generation";
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";
@@ -198,7 +200,7 @@ let () =
     if !print_final_il && not !print_all_il then print_il il;
 
     let al =
-      if not (!print_al || !print_al_o <> "") && (!target = Check || !target = Latex) then []
+      if not (!print_al || !print_al_o <> "") && (!target = Check || !target = Latex || !target = STF) then []
       else (
         log "Translating to AL...";
         let interp = match !target with
@@ -299,6 +301,8 @@ let () =
       Backend_interpreter.Ds.init al;
       log "Interpreting...";
       Backend_interpreter.Runner.run args
+    | STF ->
+      Stf.Template.tmp il
     );
     log "Complete."
   with
