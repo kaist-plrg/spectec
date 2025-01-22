@@ -302,7 +302,7 @@ let () =
       log "Interpreting...";
       Backend_interpreter.Runner.run args
     | STF ->
-      Stf.Template.tmp il
+      Stf.Run.stf il
     );
     log "Complete."
   with

@@ -1,9 +1,10 @@
 
 (library
   (name stf)
-  (libraries xl el il al util backend_interpreter)
+  (libraries xl el il al util backend_interpreter il2al)
   (modules
     template
     gen
+    run
   )
 )

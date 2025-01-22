@@ -47,7 +47,7 @@ let empty_module' =
 
 let idx i = Int32.of_int i @@ no_region
 
-(* Subtype test template *)
+(* Subtype test template with `subtype0` and `subtype1` *)
 (*
   (module
     (type $t0 `subtype0`)
@@ -80,22 +80,25 @@ let subtype (subtype0: sub_type) (subtype1: sub_type) : module_ =
   } @@ no_region
 
 
-(* Tagtype test template *)
+(* Tagtype test template with `subtype0` and `subtype1` *)
 (*
   (module
-    (type $0 `unroll_def_type tagtype0`)
+    (type $0 `subtype0`)
     (tag $0 (type 0))
     (export "tag" (tag 0))
   )
   (register "export")
   (module
-    (type $0 `unroll_def_type tagtype1`)
+    (type $0 `subtype1`)
     (import "export" "tag" (tag $0 (type 0)))
   )
 *)
 
 
-let tagtype (tagtype0: def_type) (tagtype1: def_type): module_ * module_ =
+let tagtype (subtype_pair: sub_type * sub_type) : module_ list =
+  let subtype0, subtype1 = subtype_pair in
+  let rectype0, rectype1 = RecT [ subtype0 ], RecT [ subtype1 ] in
+
   let module_name = Utf8.decode "export" in
   let item_name = Utf8.decode "tag" in
 
@@ -106,7 +109,7 @@ let tagtype (tagtype0: def_type) (tagtype1: def_type): module_ * module_ =
 
   let export_module =
     { empty_module' with
-      types=[ RecT [ unroll_def_type tagtype0 ] @@ no_region ];
+      types=[ rectype0 @@ no_region ];
       tags=[ { tgtype=idx 0 } @@ no_region ];
       exports=[ tag_export ]
     } @@ no_region in
@@ -119,15 +122,15 @@ let tagtype (tagtype0: def_type) (tagtype1: def_type): module_ * module_ =
 
   let import_module =
     { empty_module' with
-      types=[ RecT [ unroll_def_type tagtype1 ] @@ no_region ];
+      types=[ rectype1 @@ no_region ];
       imports=[ tag_import ]
     } @@ no_region in
 
-  export_module, import_module
+  [ export_module; import_module ]
 
+(*
 let tmp il =
 
-  Gen.init il;
   Gen.types' "nat";
 
   let subtype0 = SubT (NoFinal, [], DefFuncT (FuncT ([ NumT I32T ], []))) in
@@ -156,6 +159,7 @@ let tmp il =
 
   Print.module_ oc 0 import_module;
   Run.run_file "import.wat" |> ignore
+*)
 
 
 
