@@ -45,114 +45,115 @@
 %  - Wasm 3.0 테스트 자동 생성기를 만들어내고, 그 과정속의 챌린지들을 identify 하고 해결
 %  - 현존하는 Wasm 구현체에서, 42개의 새로운 버그를 발견
 
-WebAssembly (Wasm) is a portable, low-level binary instruction format designed
-to deliver fast, secure, and platform-independent execution of applications.
-Initially conceived as a compilation target for web applications, Wasm has
-rapidly expanded its applicability to domains such as edge computing,
-blockchain, and server-side execution. Wasm’s core design goals include
-enabling near-native performance, supporting a wide variety of programming
-languages, and ensuring robust security through sandboxed execution
-environments. These characteristics have made Wasm a critical component of
+WebAssembly (\wasm) is a portable, low-level binary instruction format
+designed to deliver fast, secure, and platform-independent execution of applications.
+Initially conceived as a compilation target for web applications,
+\wasm has rapidly expanded its applicability to domains such as edge computing, blockchain, and server-side execution.
+\wasm's core design goals include enabling near-native performance,
+supporting a wide variety of programming languages,
+and ensuring robust security through sandboxed execution environments.
+These characteristics have made \wasm a critical component of
 modern software systems, where efficient and safe execution is paramount.
 
-As with any programming language or runtime, rigorous testing is essential to
-ensure the correctness, robustness, and security of Wasm implementations.
-Testing serves to validate that Wasm engines adhere to the formal specification
-and that the behavior of programs is consistent across different platforms and
-implementations. For this reason, the Wasm community has developed an official
-test suite to aid in verifying conformance with the specification. Beyond this,
-researchers have actively explored automated testing techniques, including
-fuzzing and random program generation, to discover edge cases and identify
-potential bugs. Tools such as wasm-smith have been instrumental in generating
-random yet valid Wasm modules for stress-testing implementations. However,
-generating valid Wasm test cases is not a trivial task: it requires adherence
-to the specification’s rigorous validation rules, including type safety,
-control flow constraints, and memory usage guarantees. For instance, a valid
-sequence of instructions like (i32.const 0) (i32.const 1) (i32.add) must
+As with any programming language, rigorous testing is essential to ensure the
+correctness, robustness, and security of \wasm implementations.
+%Testing serves to validate that \wasm engines adhere to the formal specification
+%and that the behavior of programs is consistent across different platforms and implementations.
+For this reason, the \wasm community has developed an official test suite
+to aid in verifying conformance with the specification.
+Beyond this, researchers have actively explored automated testing techniques,
+including random program generation via fuzzing and symbolic execution,
+to discover edge cases and identify potential bugs.
+Tools such as wasm-smith have been instrumental in generating
+random yet valid \wasm modules for stress-testing implementations.
+However, generating valid \wasm test cases is not a trivial task: it requires adherence
+to the specification's rigorous validation rules, including type safety,
+control flow constraints, and memory usage guarantees.
+For instance, a valid sequence of instructions like (i32.const 0) (i32.const 1) (i32.add) must
 respect type constraints, while an invalid sequence such as (i32.const 0)
-(i32.const 1) (i64.add) would violate Wasm’s typing rules. Ensuring such
-correctness is a fundamental challenge in automated test generation for Wasm.
+(i32.const 1) (i64.add) would violate \wasm's typing rules.
+Ensuring such correctness is a fundamental challenge in automated test generation for \wasm.
 
-In its early stages, Wasm featured a relatively small and simple instruction
-set that was limited to numeric operations, basic memory manipulation, and
-control flow constructs such as loops and branches. With these simple
-constructs, manually creating test cases was a scalable task, and implementing
-automated test generators was relatively straightforward. However, the Wasm
-specification has grown significantly over time. Through an open proposal
-process, new features have been continuously added to the language to enhance
-its capabilities and address emerging use cases, including SIMD, garbage
-collection, multi-memory, tail calls, and exceptions handling.  These
-advancements have made Wasm a more powerful and flexible platform, but they
-have also introduced significant complexity into its instruction set and
-validation rules. With each new proposal, the language grows more intricate,
+In its early stages, \wasm featured a relatively small and simple instruction set
+that was limited to numeric operations, basic memory manipulation,
+and control flow constructs such as loops and branches.
+With these simple constructs, manually creating test cases was a scalable task, and implementing
+automated test generators was relatively straightforward.
+However, the \wasm specification has grown significantly over time.
+Through an open proposal process, new features have been continuously added to the language to enhance
+its capabilities and address emerging use cases,
+including SIMD, garbage collection, multi-memory, tail calls, and exceptions handling.
+These advancements have made \wasm a more powerful and flexible platform, but they
+have also introduced significant complexity into its instruction set and validation rules.
+With each new proposal, the language grows more intricate,
 requiring test cases to cover not only individual features but also the
-interactions between them. For instance, testing the interplay between garbage
-collection and exception handling can uncover subtle implementation issues that
-might otherwise go unnoticed. This rapid evolution of Wasm has made manual test
+interactions between them.
+For instance, testing the interplay between garbage collection and exception handling
+can uncover subtle implementation issues that might otherwise go unnoticed.
+This rapid evolution of \wasm has made manual test
 creation impractical and has highlighted the pressing need for automated tools
 to generate semantically rich and comprehensive test cases.
 
 The challenge of automated test generation is further compounded by the need to
-ensure that tests remain compliant with the Wasm specification as it evolves.
-Validation rules, which ensure that Wasm modules are well-formed and type-safe,
-grow increasingly complex with each new feature. Writing tests that satisfy
-these rules requires a deep understanding of the specification and significant
-effort to implement validation logic correctly. Additionally, as the number of
-features grows, the potential combinations of features and interactions
-increase exponentially, making exhaustive manual testing infeasible. Automated
-test generation systems must therefore strike a balance between efficiency,
-completeness, and correctness while adapting to the ever-changing Wasm
-landscape.
+ensure that tests remain compliant with the \wasm specification as it evolves.
+Validation rules, which ensure that \wasm modules are well-formed and type-safe,
+grow increasingly complex with each new feature.
+Writing tests that satisfy these rules requires a deep understanding of the specification and significant
+effort to implement validation logic correctly.
+Additionally, as the number of features grows, the potential combinations of features and interactions
+increase exponentially, making exhaustive manual testing infeasible.
+Automated test generation systems must therefore strike a balance between efficiency,
+completeness, and correctness while adapting to the ever-changing \wasm landscape.
 
-The recent emergence of SpecTec, a mechanized framework for formalizing the
-Wasm specification, has introduced new possibilities for addressing these
-challenges.  SpecTec provides a domain-specific language (DSL) for expressing
-the syntax, validation rules, and runtime semantics of Wasm in a
-machine-readable and writable format. This mechanized approach simplifies the
-maintenance of the specification and allows developers to automatically
-generate artifacts such as formal specifications, porse specifications, and
-interpreters.  SpecTec has been adopted by the Wasm community as the official
-tooling for authoring and maintaining the Wasm specification. By enabling
-precise and automated reasoning about the specification, SpecTec provides a
-foundation for
-further innovation in areas such as test generation. 
+The recent emergence of \spectec, a mechanized framework for formalizing the
+\wasm specification, has introduced new possibilities for addressing these challenges.
+\spectec provides a domain-specific language (DSL) for expressing
+the syntax, validation rules, and runtime semantics of \wasm in a machine-readable and writable format.
+This mechanized approach simplifies the maintenance of the specification and allows developers to automatically
+generate artifacts such as formal specifications, porse specifications, and interpreters.
+\spectec has been adopted by the \wasm community as the official tooling for authoring and maintaining the \wasm specification.
+By enabling precise and automated reasoning about the specification, \spectec provides a
+foundation for further innovation in areas such as test generation.
 
-In this work, we present WEST (Wasm Test), a novel framework that leverages
-SpecTec to enable the automated and systematic generation of test cases for
-Wasm. By directly utilizing the mechanized specification provided by SpecTec,
-WEST simplifies the process of generating valid Wasm programs while ensuring
-compliance with the language’s validation rules. Furthermore, WEST is designed
-to accommodate the rapid evolution of the Wasm specification by supporting test
-generation for new features and their interactions. This systematic approach
-ensures that all validation rules are thoroughly exercised, generating test
-cases that are both diverse and semantically rich. An additional benefit of
-WEST is its ability to detect inconsistencies in the specification itself. If
-the mechanized specification contains errors or ambiguities, these are revealed
-during the test generation process, making WEST a valuable tool for improving
-the quality of the Wasm specification.
 
-Using WEST, we developed an automated test generator for Wasm 3.0, addressing
-key challenges in adapting to the growing complexity of the specification. Our
-system uncovered 42 previously unknown bugs in existing Wasm implementations,
-demonstrating the effectiveness of our approach in identifying real-world
-issues. By enabling systematic, automated, and scalable test generation, WEST
-advances the state of the art in Wasm testing and provides a foundation for
+In this work, we present \west (\wasm Test), a novel framework that leverages
+\spectec to enable the automated and systematic generation of test cases for \wasm.
+By directly utilizing the mechanized specification provided by \spectec,
+\west simplifies the process of generating valid \wasm programs while ensuring
+compliance with the language's validation rules.
+Furthermore, \west is designed to accommodate the rapid evolution of the \wasm specification by supporting test
+generation for new features and their interactions.
+This systematic approach ensures that all validation rules are thoroughly exercised, generating test
+cases that are both diverse and semantically rich.
+An additional benefit of \west is its ability to detect inconsistencies in the specification itself.
+If the mechanized specification contains errors or ambiguities, these are revealed
+during the test generation process, making \west a valuable tool for improving
+the quality of the \wasm specification.
+
+Using \west, we developed an automated test generator for \wasm 3.0, addressing
+key challenges in adapting to the growing complexity of the specification.
+Our system uncovered 42 previously unknown bugs in existing \wasm implementations,
+demonstrating the effectiveness of our approach in identifying real-world issues.
+By enabling systematic, automated, and scalable test generation, \west
+advances the state of the art in \wasm testing and provides a foundation for
 future research in this area.
 
 Our contributions can be summarized as follows: 
-\begin{itemize}\item
-We propose a novel methodology for leveraging SpecTec to facilitate
-the implementation of automated test generators for Wasm.
-\begin{itemize}\item
-We develop an automated test generator for Wasm 3.0 and
+\begin{itemize}
+\item
+We propose \west, a methodology for leveraging \spectec to facilitate
+the implementation of automated test generators for \wasm.
+\item
+We develop an automated test generator for \wasm 3.0 and
 identify key challenges in this process, proposing solutions to address them.
-\begin{itemize}\item
-Using WEST, we uncover 42 previously unknown bugs in existing Wasm implementations,
+\item
+We uncover 42 previously unknown bugs in existing \wasm implementations,
 demonstrating the practical utility of our approach.
+\end{itemize}
 
 The remainder of this paper is organized as follows.
-Section 2 provides an overview of the SpecTec framework and its design principles.
-Section 3 details our methodology for automated test generation.
-Section 4 presents our results, including bug discoveries and performance evaluations.
-Section 5 discusses related work on Wasm testing and specification frameworks.
+Section 2 provides a brief overview of \wasm and its mechanized specification framework, \spectec.
+Section 3 details the \west's methodology for automated test generation.
+Section 4 presents our results, including bug discoveries.
+Section 5 discusses related work on \wasm testing and specification frameworks.
 Finally, Section 6 concludes with a discussion of future work.
