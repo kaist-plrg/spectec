@@ -12,7 +12,7 @@ let init (il: script) : unit = env := Env.env_of_script il
 
 let admin_syntax = [ "REC"; "DEF"; "BOT" ]
 
-let is_admin_syntax (tc: typcase) : bool =
+let is_surface_syntax (tc: typcase) : bool =
   let mixop, _, _ = tc in
   match mixop with
   | ({ it = Atom name; _} :: _) :: _ when List.mem name admin_syntax -> false
@@ -101,7 +101,7 @@ and types (depth: int) (name: string) : exp list =
     |> (function
         | VariantT tcs ->
           tcs
-          |> List.filter is_admin_syntax
+          |> List.filter is_surface_syntax
           |> List.concat_map (caseE depth name)
         | AliasT typ -> tmp depth typ
         | dt -> failwith (string_of_deftyp `H (dt $ no_region)))
