@@ -72,7 +72,7 @@ let rec tmp (depth) (typ: typ) : exp list =
     let null_typ = VarT ("NULL" $ no_region, []) $ no_region in
     let empty = TupE [] % (TupT [] $ no_region) in
     [ OptE None % typ ; OptE (Some (CaseE ([[null_atom]], empty) % null_typ)) % typ ]
-  | VarT (id, _) -> types depth id.it in
+  | VarT (id, _) -> types depth id.it
   | TupT ps ->
     ps
     |> List.map snd
