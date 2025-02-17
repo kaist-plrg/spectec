@@ -7,7 +7,7 @@ let list2pair (l: 'a list) : 'a * 'a =
 
 let write (filename: string) (module_:module_) : unit =
   let oc = Out_channel.open_text filename in
-  Print.module_ oc 0 module_;
+  Print.module_ oc 80 module_;
   Out_channel.close oc
 
 let stf il =
