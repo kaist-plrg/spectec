@@ -83,14 +83,14 @@ let subtype (subtype0: sub_type) (subtype1: sub_type) : module_ =
 (* Tagtype test template with `subtype0` and `subtype1` *)
 (*
   (module
-    (type $0 `subtype1`)
-    (type $1 `subtype0`)
+    (type $0 `subtype0`)
+    (type $1 `subtype1`)
     (tag $0 (type 1))
     (export "tag" (tag 0))
   )
   (register "export")
   (module
-    (type $0 `subtype1`)
+    (type $0 `subtype0`)
     (import "export" "tag" (tag $0 (type 0)))
   )
 *)
@@ -110,7 +110,7 @@ let tagtype (subtype_pair: sub_type * sub_type) : module_ list =
 
   let export_module =
     { empty_module' with
-      types=[ rectype1 @@ no_region; rectype0 @@ no_region ];
+      types=[ rectype0 @@ no_region; rectype1 @@ no_region ];
       tags=[ { tgtype=idx 1 } @@ no_region ];
       exports=[ tag_export ]
     } @@ no_region in
@@ -123,7 +123,7 @@ let tagtype (subtype_pair: sub_type * sub_type) : module_ list =
 
   let import_module =
     { empty_module' with
-      types=[ rectype1 @@ no_region ];
+      types=[ rectype0 @@ no_region ];
       imports=[ tag_import ]
     } @@ no_region in
 
