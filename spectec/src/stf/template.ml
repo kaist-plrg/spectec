@@ -98,7 +98,7 @@ let subtype (subtype0: sub_type) (subtype1: sub_type) : module_ =
 
 let tagtype (subtype_pair: sub_type * sub_type) : module_ list =
   let subtype0, subtype1 = subtype_pair in
-  let rectype_export, rectype_import = RecT [ subtype1; subtype0 ], RecT [ subtype1 ] in
+  let rectype0, rectype1 = RecT [ subtype0 ], RecT [ subtype1 ] in
 
   let module_name = Utf8.decode "export" in
   let item_name = Utf8.decode "tag" in
@@ -110,7 +110,7 @@ let tagtype (subtype_pair: sub_type * sub_type) : module_ list =
 
   let export_module =
     { empty_module' with
-      types=[ rectype_export @@ no_region ];
+      types=[ rectype1 @@ no_region; rectype0 @@ no_region ];
       tags=[ { tgtype=idx 1 } @@ no_region ];
       exports=[ tag_export ]
     } @@ no_region in
@@ -123,7 +123,7 @@ let tagtype (subtype_pair: sub_type * sub_type) : module_ list =
 
   let import_module =
     { empty_module' with
-      types=[ rectype_import @@ no_region ];
+      types=[ rectype1 @@ no_region ];
       imports=[ tag_import ]
     } @@ no_region in
 
