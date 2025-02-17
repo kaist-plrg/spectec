@@ -9,14 +9,22 @@ module Env = Il.Env
 let env: Env.t ref = ref Env.empty
 let init (il: script) : unit = env := Env.env_of_script il
 
+let non_target_typcases =
+  [ "STRUCT{structtype : structtype}(structtype : structtype)";
+    "ARRAY{arraytype : arraytype}(arraytype : arraytype)";
+  ]
 
-let admin_syntax = [ "REC"; "DEF"; "BOT" ]
+let is_target (tc: typcase) : bool =
+  not (List.mem (string_of_typcase tc) non_target_typcases)
+
+let admin_typcases =
+  [ "BOT";
+    "DEF{rectype : rectype, n : n}(rectype : rectype, n : n)";
+    "REC{n : n}(n : n)";
+  ]
 
 let is_surface_syntax (tc: typcase) : bool =
-  let mixop, _, _ = tc in
-  match mixop with
-  | ({ it = Atom name; _} :: _) :: _ when List.mem name admin_syntax -> false
-  | _ -> true
+  not (List.mem (string_of_typcase tc) admin_typcases)
 
 
 (* Ast constructors *)
@@ -58,7 +66,13 @@ let rec tmp (depth) (typ: typ) : exp list =
   (* TODO *)
   | VarT (id, [ { it=TypA typ; _ } ]) when id.it = "list" ->
     tmp depth (IterT (typ, List) $ no_region)
-  | VarT (id, _) -> types depth id.it
+  (* TODO *)
+  | VarT (id, _) when id.it = "nul" ->
+    let null_atom = Xl.Atom.(Atom "NULL" % {def=""; case=""}) in
+    let null_typ = VarT ("NULL" $ no_region, []) $ no_region in
+    let empty = TupE [] % (TupT [] $ no_region) in
+    [ OptE None % typ ; OptE (Some (CaseE ([[null_atom]], empty) % null_typ)) % typ ]
+  | VarT (id, _) -> types depth id.it in
   | TupT ps ->
     ps
     |> List.map snd
@@ -67,14 +81,14 @@ let rec tmp (depth) (typ: typ) : exp list =
     |> List.map (function exps -> TupE exps % typ)
   (* TODO *)
   | NumT `NatT -> [ NumE (`Nat Z.zero) % typ ]
-  | IterT (typ, iter) ->
+  | IterT (typ', iter) ->
     (match iter with
     | Opt ->
       OptE None % typ :: 
-        List.map (function ttt -> OptE (Some ttt) % typ) (tmp depth typ)
+        List.map (function ttt -> OptE (Some ttt) % typ) (tmp depth typ')
     | _ ->
       ListE [] % typ :: 
-        List.map (function ttt -> ListE [ ttt ] % typ) (tmp depth typ)
+        List.map (function ttt -> ListE [ ttt ] % typ) (tmp depth typ')
     (* TODO: any length *)
     )
   | _ -> failwith (string_of_typ typ)
@@ -102,6 +116,7 @@ and types (depth: int) (name: string) : exp list =
         | VariantT tcs ->
           tcs
           |> List.filter is_surface_syntax
+          |> List.filter is_target
           |> List.concat_map (caseE depth name)
         | AliasT typ -> tmp depth typ
         | dt -> failwith (string_of_deftyp `H (dt $ no_region)))
