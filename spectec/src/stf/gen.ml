@@ -37,10 +37,6 @@ let varT (typname: string) : typ = VarT (typname $ no_region, []) $ no_region
 let noinfo : info = { def=""; case="" }
 let iterT (typ: typ) (iter: iter) : typ = IterT (typ, iter) $ no_region
 
-let tupE (exps: exp list) : exp =
-  let tup_typ = TupT (List.map (fun e -> e, e.note) exps) $ no_region in
-
-  TupE exps % tup_typ
 
 let caseE (typname: string) (mixop: mixop) (args: exp list) : exp =
 
@@ -49,6 +45,17 @@ let caseE (typname: string) (mixop: mixop) (args: exp list) : exp =
 let listE (typname: string) (exps: exp list) : exp =
   ListE exps % iterT (varT typname) List
   *)
+
+let tupE (exps: exp list) : exp =
+  let tup_typ = TupT (List.map (fun e -> e, e.note) exps) $ no_region in
+
+  TupE exps % tup_typ
+
+let empty = TupE [] % (TupT [] $ no_region)
+let empty_list typ = ListE [] % (IterT (typ, List) $ no_region)
+let valtypeT = VarT ("valtype" $ no_region, []) $ no_region
+
+let atom (atom': Xl.Atom.atom') = atom' % Xl.Atom.{ def = ""; case = "" }
 
 
 let rec cartesian_product : 'a list list -> 'a list list = function
@@ -68,11 +75,20 @@ let rec tmp (depth) (typ: typ) : exp list =
     tmp depth (IterT (typ, List) $ no_region)
   (* TODO *)
   | VarT (id, _) when id.it = "nul" ->
-    let null_atom = Xl.Atom.(Atom "NULL" % {def=""; case=""}) in
+    let null_atom = atom (Xl.Atom.Atom "NULL") in
     let null_typ = VarT ("NULL" $ no_region, []) $ no_region in
-    let empty = TupE [] % (TupT [] $ no_region) in
     [ OptE None % typ ; OptE (Some (CaseE ([[null_atom]], empty) % null_typ)) % typ ]
-  | VarT (id, _) -> types depth id.it
+  | VarT (id, _) when id.it = "functype" ->
+    let arrow_atom = atom Xl.Atom.Arrow in
+    "resulttype"
+    |> types (depth+1)
+    |> List.map (fun rt -> CaseE ([[]; [ arrow_atom ]; []], tupE [ rt; empty_list valtypeT ]) % typ)
+  | VarT (id, _) ->
+      let res = types depth id.it in
+      if id.it = "functype" then
+      List.map string_of_exp res
+  |> List.iter print_endline;
+  res
   | TupT ps ->
     ps
     |> List.map snd
