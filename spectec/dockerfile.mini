@@ -1,0 +1,136 @@
+FROM ubuntu:20.04
+
+RUN apt-get update --fix-missing
+RUN apt-get upgrade --yes
+RUN apt install cmake --yes
+RUN apt install curl --yes
+RUN apt install wget
+RUN apt-get install git make --yes
+RUN apt-get install python3 python3-pip --yes
+
+# Installing OCaml
+#   - opam v2.0.5
+#   - OCaml v5.0.0
+#   - dune v3.10.0
+#   - menhir v20230608
+
+RUN apt-get install opam libgmp-dev pkg-config --yes
+RUN opam init --disable-sandboxing
+RUN opam switch create 5.0.0
+RUN opam install dune menhir zarith --yes
+RUN eval $(opam config env)
+
+
+WORKDIR /root
+
+
+# Install wabt
+
+RUN git clone --recursive https://github.com/WebAssembly/wabt && \
+    cd wabt && \
+    git submodule update --init
+
+
+# Build wabt
+
+RUN mkdir wabt/build && cd wabt/build && cmake .. && cmake --build .
+ENV PATH="${PATH}:/root/wabt/bin"
+
+
+# Install spectec
+
+RUN git clone https://github.com/kaist-plrg/spectec.git
+
+
+# Checkout to west
+
+WORKDIR /root/spectec/spectec
+RUN git checkout west
+
+
+# Install wasmtime
+
+RUN curl https://wasmtime.dev/install.sh -sSf | bash
+
+
+# Install wasmer
+
+#RUN curl https://get.wasmer.io -sSfL | sh
+#ENV WASMER_DIR="/root/.wasmer"
+#ENV WASMER_CACHE_DIR="$WASMER_DIR/cache"
+#ENV PATH="${PATH}:$WASMER_DIR/bin"
+
+
+# Install wasm3
+
+#WORKDIR /root
+#RUN git clone https://github.com/wasm3/wasm3.git
+#RUN mkdir -p /root/wasm3/build
+#WORKDIR /root/wasm3/build
+#RUN cmake ..
+#RUN make -j8
+#RUN cp /root/wasm3/build/wasm3 /root/spectec/spectec/runtimes/wasm3
+#WORKDIR /root/spectec/spectec/runtimes/wasm3
+## RUN wget https://github.com/wasm3/wasm3/releases/download/v0.5.0/wasm3-linux-x64.elf
+## RUN mv wasm3-linux-x64.elf wasm3
+#RUN chmod +x wasm3
+## TODO
+
+
+# Install wasmedge
+
+#WORKDIR /root/spectec/spectec/runtimes/wasmedge
+#RUN curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | bash -s -- -p .
+#RUN /bin/bash -c "source ./env && make"
+## TODO
+
+
+# Install V8
+
+WORKDIR /root
+RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+ENV PATH=/root/depot_tools:$PATH
+RUN gclient
+RUN mkdir /root/v8
+WORKDIR /root/v8
+ENV TAR_OPTIONS=--no-same-owner
+RUN fetch v8
+WORKDIR /root/v8/v8
+RUN gclient sync
+RUN apt-get install lsb-release sudo pkg-config -y
+RUN tools/dev/gm.py x64.release
+
+
+# Install JavaScriptCore
+
+#WORKDIR /root
+#RUN git config --global http.postBuffer 1000000000
+#RUN git clone https://github.com/WebKit/WebKit.git WebKit --progress
+## cloning takes too long (about 1hr)
+#RUN apt-get install libicu-dev python ruby bison flex cmake build-essential ninja-build git gperf -y
+#RUN apt-get install software-properties-common -y
+#RUN add-apt-repository ppa:ubuntu-toolchain-r/test
+#RUN apt-get update
+#RUN apt-get install gcc-11 g++-11 -y
+#RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+#RUN update-alternatives --config gcc
+#RUN /root/WebKit/Tools/Scripts/build-webkit --jsc-only
+## ENV PATH=/root/depot_tools:$PATH
+
+
+# Install reference interpreters
+
+#RUN opam install ocamlbuild --yes
+#WORKDIR /root/spectec/spectec/runtimes
+#RUN git pull
+#WORKDIR /root/spectec/spectec/runtimes/util/interpreter
+#RUN ./install_wasm.sh
+
+
+WORKDIR /root/spectec/spectec
+
+
+# Automate `eval $(opam env)`
+
+ENTRYPOINT ["opam", "exec", "--"]
+CMD ["/bin/bash", "--login"]
