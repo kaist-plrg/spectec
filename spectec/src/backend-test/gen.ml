@@ -234,9 +234,10 @@ let to_wast seed m result =
         [ Assertion (AssertUninstantiable (None, "") |> to_phrase) |> to_phrase ]
       | Error Exception.Exhaustion ->
         [ (* TODO: Exhaustion *) ]
-      | Error e ->
-        Printf.sprintf "Unexpected error in instantiating module: %s" (Printexc.to_string e) |> prerr_endline;
-        []
+      | Error _e ->
+        failwith "invalid module"
+        (* Printf.sprintf "Unexpected error in instantiating module: %s" (Printexc.to_string e) |> prerr_endline; *)
+        (* [] *)
   in
 
   let is_exhaustion = function
@@ -350,7 +351,7 @@ let gen_test el' il' al' =
 
     times := Sys.time () -. st :: !times;
 
-    ) with | e -> print_endline @@
+    ) with | e -> Log.debug @@
       " " ^ (Filename.concat !Flag.out ((string_of_int seed) ^ ".wast")) ^ ":0.0-0.0: " ^
       "west error: " ^ Printexc.to_string e;
   );
