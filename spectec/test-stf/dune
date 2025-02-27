@@ -1,0 +1,9 @@
+(mdx
+  (libraries spectec)
+  (deps
+    (source_tree template)
+    (source_tree wasm)
+    (glob_files_rec ../spec/*)
+  )
+  (files TEST.md)
+)
