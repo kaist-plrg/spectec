@@ -940,8 +940,10 @@ let assertion mode ass =
 
 let command mode cmd =
   match cmd.it with
-  | Module (x_opt, def) -> [definition mode true x_opt def]
-  | Instance (x1_opt, x2_opt) -> [instance (x1_opt, x2_opt)]
+  (* | Module (x_opt, def) -> [definition mode true x_opt def] *)
+  (* | Instance (x1_opt, x2_opt) -> [instance (x1_opt, x2_opt)] *)
+  | Module (x_opt, def) -> [definition mode false x_opt def]
+  | Instance (_x1_opt, _x2_opt) -> []
   | Register (n, x_opt) -> [Node ("register " ^ name n ^ var_opt x_opt, [])]
   | Action act -> [action mode act]
   | Assertion ass -> assertion mode ass
