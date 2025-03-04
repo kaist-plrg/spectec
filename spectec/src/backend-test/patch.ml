@@ -110,7 +110,7 @@ let dedup_names exports =
   dedup_names' [] (unwrap_listv_to_list exports) |> listV_of_list
 let patch_export export = export
 let patch_exports exports = listv_map patch_export exports
-  |> dedup_names
+  (* |> dedup_names *)
 
 (* module *)
 let patch_module module_ =

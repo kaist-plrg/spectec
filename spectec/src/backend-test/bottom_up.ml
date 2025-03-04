@@ -83,6 +83,12 @@ let il_none x t =
   let e = il_case x t [] in
   OptE None |> to_phrase (IterT (TupT [e, e.note] $ no_region, Opt) $ no_region)
 let il_zero = NumE (Xl.Num.zero `NatT) |> to_phrase (mk_VarT "u32")
+let il_nat i =
+  if i >= 0 then
+    NumE (`Nat (Z.of_int i)) |> to_phrase (NumT `NatT $ no_region)
+  else
+    failwith (string_of_int i ^ " is not a nattural number")
+let il_int i = NumE (`Int (Z.of_int i)) |> to_phrase (NumT `IntT $ no_region)
 
 let remove_sub e =
   match e.it with
@@ -1740,8 +1746,21 @@ let wrap_as_module (func: exp) =
     ])
   in
 
+  (* 10. Generate exports *)
+  let mk_char c = il_case "" "char" [il_nat (Char.code c)] in
+  let mk_name s =
+    let l = s |> String.to_seq |> List.of_seq in
+    il_case "" "name" [il_list (List.map mk_char l) (mk_VarT "char")] in
+  let func_to_export = (fun i _ ->
+    il_case "EXPORT" "export" [
+      (* name: fi *)
+      mk_name ("f" ^ string_of_int i);
+      il_case "FUNC" "externidx" [il_case "" "funcidx" [il_nat i]]
+    ]
+  ) in
+  let exports = List.mapi func_to_export funcs in
+
   let imports = [] in
-  let exports = [] in
 
   il_case "MODULE" "module" [
     il_list types (mk_VarT "type");

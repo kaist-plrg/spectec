@@ -86,7 +86,7 @@ let al_to_byte (v: value): Char.t = al_to_nat v |> Char.chr
 let al_to_bytes (v: value): string = al_to_seq al_to_byte v |> String.of_seq
 let al_to_string = function
   | TextV str -> str
-  | v -> error_value "text" v
+  | v -> al_to_bytes v
 let al_to_name name = name |> al_to_string |> Utf8.decode
 let al_to_bool = unwrap_boolv
 

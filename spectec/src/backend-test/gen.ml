@@ -22,6 +22,17 @@ let string_of_module m = match m with
   "(MODULE\n  " ^ (List.map Al.Print.string_of_value args |> String.concat "\n  ") ^ "\n)"
 | _ -> failwith "Unreachable"
 
+let name_to_string v =
+  match v with
+  | Al.Ast.TextV s -> s
+  | Al.Ast.ListV _ ->
+    unwrap_listv_to_list v
+    |> List.map unwrap_numv_to_int
+    |> List.map Char.chr
+    |> List.to_seq
+    |> String.of_seq
+  | _ -> failwith @@ "name_to_string: " ^ Al.Print.string_of_value v
+
 (** Mutation **)
 let patch m =
   try
@@ -36,16 +47,32 @@ type invoke_result = (Al.Ast.value list, exn) result
 type assertion = invoke * invoke_result
 type instant_result = (assertion list, exn) result
 
+let unwrap_rectype t =
+  if !Flag.version = 3 then
+    let idx =
+      t
+      |> casev_nth_arg 1
+      |> unwrap_numv_to_int
+    in
+    t
+    |> casev_nth_arg 0
+    |> casev_nth_arg 0
+    |> Fun.flip listv_nth idx
+    |> casev_nth_arg 2
+    |> casev_nth_arg 0
+  else
+    t
+
 let mk_assertion funcinst =
-  let name = strv_access "NAME" funcinst |> unwrap_textv in
+  let name = strv_access "NAME" funcinst |> name_to_string in
   let addr = strv_access "ADDR" funcinst |> casev_nth_arg 0 in
   let arg_types =
     Ds.Store.access "FUNCS"
     |> unwrap_listv_to_list
     |> (fun l -> List.nth l (unwrap_numv_to_int addr))
     |> strv_access "TYPE"
-    |> casev_get_args
-    |> (fun l -> List.nth l 0)
+    |> unwrap_rectype
+    |> casev_nth_arg 0
     |> unwrap_listv_to_list
   in
   let args =
@@ -55,7 +82,7 @@ let mk_assertion funcinst =
       | Al.Ast.CaseV ("I64", []) as t -> caseV ("CONST", [t; natV (gen_bytes 8)])
       | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout64) (gen_bytes 8)])
       | Al.Ast.CaseV ("V128", []) as t -> caseV ("VCONST", [t; natV (gen_bytes 16)])
-      | t -> (* Assumpnion: is ref *) caseV ("REF.NULL", [t])
+      | t -> (* Assumption: is ref *) caseV ("REF.NULL", [t]) (* TODO: handle case for non-null ref type *)
     ) arg_types
   in
   let invoke = name, args in
@@ -234,8 +261,8 @@ let to_wast seed m result =
         [ Assertion (AssertUninstantiable (None, "") |> to_phrase) |> to_phrase ]
       | Error Exception.Exhaustion ->
         [ (* TODO: Exhaustion *) ]
-      | Error _e ->
-        failwith "invalid module"
+      | Error e ->
+        raise e
         (* Printf.sprintf "Unexpected error in instantiating module: %s" (Printexc.to_string e) |> prerr_endline; *)
         (* [] *)
   in
@@ -351,7 +378,7 @@ let gen_test el' il' al' =
 
     times := Sys.time () -. st :: !times;
 
-    ) with | e -> Log.debug @@
+    ) with | e -> Log.info @@
       " " ^ (Filename.concat !Flag.out ((string_of_int seed) ^ ".wast")) ^ ":0.0-0.0: " ^
       "west error: " ^ Printexc.to_string e;
   );
