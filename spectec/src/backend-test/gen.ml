@@ -76,13 +76,33 @@ let mk_assertion funcinst =
     |> unwrap_listv_to_list
   in
   let args =
-    List.map (function
+    List.map (function (* TODO: Automate this *)
       | Al.Ast.CaseV ("I32", []) as t -> caseV ("CONST", [t; natV (gen_bytes 4)])
       | Al.Ast.CaseV ("F32", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout32) (gen_bytes 4)])
       | Al.Ast.CaseV ("I64", []) as t -> caseV ("CONST", [t; natV (gen_bytes 8)])
       | Al.Ast.CaseV ("F64", []) as t -> caseV ("CONST", [t; Construct.(al_of_floatN layout64) (gen_bytes 8)])
       | Al.Ast.CaseV ("V128", []) as t -> caseV ("VCONST", [t; natV (gen_bytes 16)])
-      | t -> (* Assumption: is ref *) caseV ("REF.NULL", [t]) (* TODO: handle case for non-null ref type *)
+      | Al.Ast.CaseV ("REF", [OptV (Some _); ht]) when !Flag.version = 3 ->
+        caseV ("REF.NULL", [ht])
+      | Al.Ast.CaseV ("REF", [_; ht]) as t when !Flag.version = 3 ->
+        (match ht with
+        (* Problem: Wast does not support direct ref value. Need proxy. *)
+        (*
+        | Al.Ast.CaseV ("ANY", [])
+        | Al.Ast.CaseV ("EQ", [])
+        | Al.Ast.CaseV ("I31", []) -> caseV ("REF.I31_NUM", [natV_of_int 0])
+        | Al.Ast.CaseV ("STRUCT", []) -> caseV ("REF.STRUCT_ADDR", [natV_of_int 0])
+        | Al.Ast.CaseV ("ARRAY", []) -> caseV ("REF.ARRAY_ADDR", [natV_of_int 0])
+        | Al.Ast.CaseV ("FUNC", []) -> caseV ("REF.FUNC_ADDR", [natV_of_int 0])
+        | Al.Ast.CaseV ("EXN", []) -> caseV ("REF.EXN_ADDR", [natV_of_int 0])
+        | Al.Ast.CaseV ("EXTERN", []) -> caseV ("REF.EXTERN", [caseV ("REF.I31_NUM", [natV_of_int 0])])
+        *)
+        | _ -> failwith @@ "Cannot generate the argument for the parameter type: " ^ Al.Print.string_of_value t
+        )
+      | t ->
+        (* Assumption: is ref *)
+        assert (!Flag.version < 3);
+        caseV ("REF.NULL", [t])
     ) arg_types
   in
   let invoke = name, args in
@@ -287,7 +307,7 @@ let to_wast seed m result =
     let assertions = List.filter_map invoke_to_wast assertions in
 
     if List.exists is_exhaustion assertions then
-      let assertions_returns = List.filter (is_exhaustion %> not) assertions in
+      let assertions_returns = List.filter (Fun.negate is_exhaustion) assertions in
 
       to_file (string_of_int seed) (script @ List.map (fun a -> Assertion (to_phrase a) |> to_phrase) assertions_returns);
 
