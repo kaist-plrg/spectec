@@ -298,8 +298,13 @@ let to_wast seed m result =
       Sys.mkdir dir 0o755;
     let file = Filename.concat dir (name ^ ".wast") in
     let oc = open_out file in
-    Reference_interpreter.Print.script oc 80 `Textual script;
-    close_out oc
+    try
+      Reference_interpreter.Print.script oc 80 `Textual script;
+      close_out oc
+    with exn ->
+      close_out oc;
+      Sys.remove file;
+      raise exn
   in
 
   match result with
@@ -334,6 +339,15 @@ let to_wast seed m result =
   with
     | e -> prerr_endline ("Invalid: " ^ Printexc.to_string e)
   *)
+
+let rm_file name =
+  let dir = !Flag.out in
+  let file = Filename.concat dir (name ^ ".wast") in
+  if Sys.file_exists file then Sys.remove file
+
+let rm_wast seed =
+  rm_file (string_of_int seed);
+  rm_file (string_of_int seed ^ "-e")
 
 (* Generate tests *)
 
@@ -396,7 +410,11 @@ let gen_test el' il' al' =
     (* Conform test *)
     Conform_test.conform_test seed;
 
+    (* Record time *)
     times := Sys.time () -. st :: !times;
+
+    (* Cleanup *)
+    if !Flag.clean then rm_wast seed;
 
     ) with | e -> Log.info @@
       " " ^ (Filename.concat !Flag.out ((string_of_int seed) ^ ".wast")) ^ ":0.0-0.0: " ^

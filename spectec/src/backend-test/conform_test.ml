@@ -21,5 +21,6 @@ let test_engine engine wast =
 let conform_test seed =
   let wast = Printf.sprintf "out/%d.wast" seed in
 
+  (* TODO: parallelize *)
   test_engine "../interpreter/wasm" wast;
   (* test_engine "wasmtime wast" wast; *)

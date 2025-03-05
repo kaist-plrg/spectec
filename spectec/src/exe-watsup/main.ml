@@ -156,6 +156,7 @@ let argspec = Arg.align (
   "--test:seed", Arg.Int (fun i -> Backend_test.Flag.(seed := i; n := 1)), "  Generate specific test case";
   "--test:log", Arg.Int (fun i -> Backend_test.Flag.log := i), "  Set the logging level, default to 3 (warn)";
   "--test:swarm", Arg.Unit (fun () -> Backend_test.Flag.swarm := true), "  Enable swarm testing";
+  "--test:clean", Arg.Unit (fun () -> Backend_test.Flag.clean := true), "  Remove generated wast file";
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";
