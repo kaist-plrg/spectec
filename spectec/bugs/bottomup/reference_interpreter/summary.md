@@ -38,7 +38,7 @@ If west were *perfect*, then this bug would not have been caught.
 
 When the wasm instruction `array.new_data`is performed on a short data,
 the instruction should result in a trap,
-but it results in a 
+but it results in an uncaught exception.
 
 * fuzzer info
     - approach: bottom-up
