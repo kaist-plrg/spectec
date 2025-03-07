@@ -40,6 +40,8 @@ When the wasm instruction `array.new_data`is performed on a short data,
 the instruction should result in a trap,
 but it results in an uncaught exception.
 
+p.s. This also happnes for `array.init_data`.
+
 * fuzzer info
     - approach: bottom-up
     - commit: 6a5095741cf0708a934714983c292768b1393bea
