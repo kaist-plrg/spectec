@@ -27,7 +27,7 @@ let classify err =
   else if has_substring err "expected trap, got Core(" then
     "wasmtime: out_of_bound_table_none_reference"
   (* Unsupported *)
-  else if has_substring err "exception handling featrue" then
+  else if has_substring err "exception handling feature" then
     "wasmtime: unsupported exc"
   else if has_substring err "exceptions" then
     "wasmtime: unsupported exc"
