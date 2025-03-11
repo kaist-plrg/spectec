@@ -9,6 +9,9 @@ syntax tableaddr hint(desc "table address") = addr
 syntax memaddr hint(desc "memory address") = addr
 syntax elemaddr hint(desc "elem address") = addr
 syntax dataaddr hint(desc "data address") = addr
+syntax structaddr hint(desc "structure address") = addr
+syntax arrayaddr hint(desc "array address") = addr
+syntax hostaddr hint(desc "host address") = addr
 
 var a : addr
 var fa : funcaddr
@@ -37,8 +40,16 @@ syntax num hint(desc "number") =
   | CONST numtype num_(numtype)          hint(show %.CONST %)
 syntax vec hint(desc "vector") =
   | VCONST vectype vec_(vectype)         hint(show %.CONST %)
-syntax ref hint(desc "reference") hint(macro "reff") =
-  | REF.NULL reftype | REF.FUNC_ADDR funcaddr | REF.EXTERN addr
+syntax addrref hint(desc "address value") =
+  | REF.I31_NUM u31                      hint(show REF.I31 %%)    hint(macro "%NUM")
+  | REF.STRUCT_ADDR structaddr           hint(show REF.STRUCT %%) hint(macro "%ADDR")
+  | REF.ARRAY_ADDR arrayaddr             hint(show REF.ARRAY %%)  hint(macro "%ADDR")
+  | REF.FUNC_ADDR funcaddr               hint(show REF.FUNC %%)   hint(macro "%ADDR")
+  | REF.HOST_ADDR hostaddr               hint(show REF.HOST %%)   hint(macro "%ADDR")
+  | REF.EXTERN addrref
+syntax ref hint(desc "reference value")  hint(macro "reff") =
+  | addrref
+  | REF.NULL heaptype
 syntax val hint(desc "value") =
   | num | vec | ref
 
@@ -57,7 +68,7 @@ var res : result
 ;; Instances
 
 syntax funcinst hint(desc "function instance") =
-  { TYPE functype,
+  { TYPE deftype,
     MODULE moduleinst,
     CODE func }
 syntax globalinst hint(desc "global instance") =
@@ -78,8 +89,22 @@ syntax exportinst hint(desc "export instance") =
   { NAME name,
     ADDR externaddr }
 
+
+syntax packval hint(desc "packed value") =
+  | PACK packtype iN($psizenn(packtype))    hint(show %.PACK %)
+
+syntax fieldval hint(desc "field value") =
+  | val | packval
+
+syntax structinst hint(desc "structure instance") hint(macro "%" "SI%") =
+  { TYPE deftype, FIELDS fieldval* }
+
+syntax arrayinst hint(desc "array instance") hint(macro "%" "AI%") =
+  { TYPE deftype, FIELDS fieldval* }
+
+
 syntax moduleinst hint(desc "module instance") =
-  { TYPES functype*,
+  { TYPES deftype*,
     FUNCS funcaddr*,
     GLOBALS globaladdr*,
     TABLES tableaddr*,
@@ -97,6 +122,11 @@ var ei : eleminst
 var di : datainst
 var xi : exportinst
 
+var si : structinst
+var ai : arrayinst
+var fv : fieldval
+var pv : packval
+
 
 ;; Configurations proper
 
@@ -106,10 +136,12 @@ syntax store hint(desc "store") =
     TABLES tableinst*,
     MEMS meminst*,
     ELEMS eleminst*,
-    DATAS datainst* }
+    DATAS datainst*,
+    STRUCTS structinst*,
+    ARRAYS arrayinst* }
 
 syntax frame hint(desc "frame") =
-  { LOCALS val*,
+  { LOCALS (val?)*,
     MODULE moduleinst }
 
 syntax state hint(desc "state") = store; frame
@@ -126,9 +158,9 @@ var z : state
 
 syntax admininstr hint(show instr) hint(desc "administrative instruction") =
   | instr
-  | REF.FUNC_ADDR funcaddr         hint(show REF.FUNC %)
-  | REF.EXTERN addr         hint(show REF.EXTERN %)
+  | addrref
   | CALL_ADDR funcaddr             hint(show CALL %)
+  | RETURN_CALL_ADDR funcaddr      hint(show CALL %)
   | LABEL_ n `{instr*} admininstr* hint(show LABEL_%#% %%)
   | FRAME_ n `{frame} admininstr*  hint(show FRAME_%#% %%)
   | TRAP
