@@ -226,6 +226,7 @@ let invoke_to_wast ((f, args), result) =
   | Ok returns -> Some (AssertReturn (action, List.map value_to_wast returns))
   | Error Exception.Exhaustion -> Some (AssertExhaustion (action, ""))
   | Error Exception.Trap -> Some (AssertTrap (action, ""))
+  | Error Exception.Throw -> Some (AssertException action)
   | Error e ->
     Printf.sprintf "Unexpected error in invoking %s: %s" f (Printexc.to_string e) |> prerr_endline;
     None
