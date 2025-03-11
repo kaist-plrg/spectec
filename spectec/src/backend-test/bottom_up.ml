@@ -929,7 +929,7 @@ let fix_rts (cases: string list): restype list * rule list =
   fix_free_var_of_rt trules rts
 
 (* 2. fix_values: generate necessary values in front of main instrs *)
-let fix_values vt: rule list =
+let rec fix_values vt: rule list =
   let f case vt =
     let trule = find_trules case |> List.hd in
     let _, rt = rule_to_arrow trule in
@@ -949,14 +949,19 @@ let fix_values vt: rule list =
       [f "VCONST" vt]
     | _ -> failwith "Unknown type"
     )
-  | CaseE ([[{it = Atom "REF"; _}];[];[]], {it = TupE [
-      {it = OptE nul; _};
+  | CaseE ([[{it = Atom "REF"; _}];[];[]] as mixop, ({it = TupE [
+      {it = OptE nul; _} as nul_opt_exp;
       ht
-    ]; _}) ->
+    ]; _} as arg)) ->
     assert (!Flag.version = 3);
     (match nul with
     | Some _ -> (* Nullable *)
-      [f "REF.NULL" vt]
+      let must_nul = Random.bool () in
+      if must_nul then
+        [f "REF.NULL" vt]
+      else
+        (* fix value with non-nullable *)
+        fix_values { vt with it = CaseE (mixop, { arg with it = TupE [{ nul_opt_exp with it = OptE None }; ht] }) }
     | None -> (* Non-nullable *)
       let ht =
         match ht.it with
