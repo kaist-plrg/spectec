@@ -975,11 +975,9 @@ let rec fix_values vt: rule list =
       | CaseE ([[{it = Atom "I31"; _}]], {it = TupE []; _}) ->
         [f "CONST" i32; g "REF.I31"]
       | CaseE ([[{it = Atom "STRUCT"; _}]], {it = TupE []; _}) ->
-        [f "STRUCT.NEW_DEFAULT" vt]
+        [g "STRUCT.NEW_DEFAULT"]
       | CaseE ([[{it = Atom "ARRAY"; _}]], {it = TupE []; _}) ->
-        [f "CONST" i32; f "ARRAY.NEW_DEFAULT" vt]
-      | CaseE ([[{ it = Atom "FUNC"; _ }]], {it = TupE []; _}) ->
-        [f "REF.FUNC" vt]
+        [f "CONST" i32; g "ARRAY.NEW_DEFAULT"]
       | CaseE ([[{it = Atom "_IDX"; _}]; []], _) ->
         let idx = ht |> nth_arg_of_case 0 |> nth_arg_of_case 0 |> exp_to_int in
         let conds = List.filter_map extract_type_sidecond !sideconds in
