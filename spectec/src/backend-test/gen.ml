@@ -8,8 +8,6 @@ open Backend_interpreter
 open Al.Al_util
 
 (** Helpers **)
-let (%>) f g v = f v |> g
-
 let flatten_rec =
   List.concat_map (fun def ->
     match def.it with
@@ -34,12 +32,7 @@ let name_to_string v =
   | _ -> failwith @@ "name_to_string: " ^ Al.Print.string_of_value v
 
 (** Mutation **)
-let patch m =
-  try
-    Patch.patch_module m
-  with e ->
-    prerr_endline (Printexc.to_string e); m
-  (* TODO *)
+let patch m = Patch.patch_module m
 
 (** Injection **)
 type invoke = string * Al.Ast.value list

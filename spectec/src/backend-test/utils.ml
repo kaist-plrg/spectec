@@ -1,3 +1,5 @@
+let (%>) f g v = f v |> g
+
 let choosei l =
   let n = List.length l in
   if n = 0 then failwith "Cannot choose from an empty list";
