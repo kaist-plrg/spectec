@@ -1,6 +1,6 @@
 (library
   (name backend_interpreter)
-  (libraries reference_interpreter util il2al il al)
+  (libraries reference_interpreter util il2al il al yojson)
   (modules
     interpreter
     numerics
@@ -11,5 +11,6 @@
     ds
     host
     debugger
+    embedding
     )
 )

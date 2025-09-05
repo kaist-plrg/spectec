@@ -13,6 +13,7 @@ type target =
  | Prose of bool
  | Splice of Backend_splice.Config.t
  | Interpreter of string list
+ | Embedding of string
 
 type pass =
   | Sub
@@ -157,6 +158,7 @@ let argspec = Arg.align (
   "--all-passes", Arg.Unit (fun () -> List.iter enable_pass all_passes)," Run all passes";
 
   "--test-version", Arg.Int (fun i -> Backend_interpreter.Construct.version := i), " Wasm version to assume for tests (default: 3)";
+  "--embedding", Arg.String (fun s -> target := Embedding s), " Run Wasm in an embedding mode";
 
   "-help", Arg.Unit ignore, "";
   "--help", Arg.Unit ignore, "";
@@ -183,7 +185,7 @@ let () =
     Il.Valid.valid il;
 
     (match !target with
-    | Prose _ | Splice _ | Interpreter _ ->
+    | Prose _ | Splice _ | Interpreter _ | Embedding _ ->
       enable_pass Sideconditions;
     | _ when !print_al || !print_al_o <> "" ->
       enable_pass Sideconditions;
@@ -213,7 +215,7 @@ let () =
       else (
         log "Translating to AL...";
         let interp = match !target with
-        | Interpreter _ -> true
+        | Interpreter _ | Embedding _ -> true
         | _ -> false in
         Il2al.Translate.translate il interp @ Il2al.Manual.manual_algos
       )
@@ -319,6 +321,11 @@ let () =
       Backend_interpreter.Ds.init al;
       log "Interpreting...";
       Backend_interpreter.Runner.run args
+    | Embedding s ->
+      log "Initializing interpreter...";
+      Backend_interpreter.Ds.init al;
+      log "Embedding...";
+      Backend_interpreter.Embedding.run s
     );
     log "Complete."
   with

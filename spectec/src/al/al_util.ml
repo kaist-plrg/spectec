@@ -104,6 +104,7 @@ let tupV vl = TupV vl
 let nullary s = CaseV (String.uppercase_ascii s, [])
 let listV a = ListV (ref a)
 let listV_of_list l = Array.of_list l |> listV
+let textV s = TextV s
 let zero = natV Z.zero
 let one = natV Z.one
 let empty_list = listV [||]
@@ -159,6 +160,12 @@ let listv_singleton l =
   match l with
   | ListV arr_ref when Array.length !arr_ref = 1 -> Array.get !arr_ref 0
   | v -> fail_value "listv_singleton" v
+
+let listv_to_optv l =
+  let len = listv_len l in
+  if len = 0 then OptV None
+  else if len = 1 then OptV (Some (listv_nth l 0))
+  else fail_value "cannot convert list into option" l
 
 let strv_access field = function
   | StrV r -> Record.find field r

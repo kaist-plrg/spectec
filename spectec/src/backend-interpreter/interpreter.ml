@@ -781,7 +781,7 @@ and create_context (name: string) (args: value list) : AlContext.mode =
   AlContext.al (name, params, body, env, 0)
 
 and call_func (name: string) (args: value list) : value option =
-   let builtin_name, is_builtin =
+  let builtin_name, is_builtin =
      match find_hint name "builtin" with
      | None -> name, false
      | Some hint ->
