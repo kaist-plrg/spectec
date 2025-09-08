@@ -2,20 +2,41 @@ open Reference_interpreter
 open Al
 open Al_util
 
-let rec al2field: Ast.value -> string * Yojson.Safe.t = function
-  | CaseV (name, [json]) -> name, al2json json
-  | v -> failwith ("todo: " ^ (Print.structured_string_of_value v))
 
-and al2json: Ast.value -> Yojson.Safe.t = function
-  | CaseV ("_RESULT", [json]) -> al2json json
-  | CaseV ("MODULE", args) ->
-    (* Assume Wasm 3.0 *)
-    let module_fields =
-      [ "types"; "imports"; "tags"; "globals"; "mems"; "tables";
-        "funcs"; "datas"; "elems"; "start"; "exports" ] in
-    let fields = List.combine module_fields (List.map al2json args) in
-    `Assoc fields
-  | CaseV ("", []) -> `List []
+(* Helper for handling json *)
+
+type json = Yojson.Safe.t
+
+let json2int: json -> int = function
+  | `Int i -> i
+  | `Float f -> int_of_float f
+  | json ->
+    json
+    |> Yojson.Safe.show
+    |> Printf.sprintf "json2int: Not a integer: %s"
+    |> failwith
+
+let json2string: json -> string = function
+  | `String s -> s
+  | json ->
+    json
+    |> Yojson.Safe.show
+    |> Printf.sprintf "json2string: Not a string: %s"
+    |> failwith
+
+let json2list (f: json -> 'a) (json: json): 'a list =
+  match json with
+  | `List l -> List.map f l
+  | json ->
+    json
+    |> Yojson.Safe.show
+    |> Printf.sprintf "json2list: Not a list: %s"
+    |> failwith
+
+let rec al2json: Ast.value -> json = function
+  | CaseV (name, args) ->
+    let fields = List.mapi (fun i e -> "_" ^ string_of_int i, al2json e) args in
+    `Assoc (("__variant_name__", `String name) :: fields)
   | OptV opt ->
     let jsons = opt |> Option.to_list |> List.map al2json in
     `List jsons
@@ -24,27 +45,21 @@ and al2json: Ast.value -> Yojson.Safe.t = function
     `List jsons
   | v -> failwith ("todo: " ^ (Print.structured_string_of_value v))
 
-let rec json2al: Yojson.Safe.t -> Ast.value = function
+let rec json2al: json -> Ast.value = function
   | `List l -> l |> List.map json2al |> listV_of_list
   | `Int i -> intV (Z.of_int i)
   | `Float f -> intV (Z.of_float f)
-  | `Assoc [] ->
-    (* TODO: hard coding for error object *)
-    caseV ("ERROR", [])
-  | `Assoc fields ->
-    (* TODO: hard coding for module object *)
-    let types_ = List.find (fun (s, _) -> s = "types") fields |> snd |> json2al in
-    let funcs = List.find (fun (s, _) -> s = "funcs") fields |> snd |> json2al in
-    let tables = List.find (fun (s, _) -> s = "tables") fields |> snd |> json2al in
-    let mems = List.find (fun (s, _) -> s = "mems") fields |> snd |> json2al in
-    let globals = List.find (fun (s, _) -> s = "globals") fields |> snd |> json2al in
-    let tags = List.find (fun (s, _) -> s = "tags") fields |> snd |> json2al in
-    let elems = List.find (fun (s, _) -> s = "elems") fields |> snd |> json2al in
-    let datas = List.find (fun (s, _) -> s = "datas") fields |> snd |> json2al in
-    let start = List.find (fun (s, _) -> s = "start") fields |> snd |> json2al |> listv_to_optv in
-    let imports = List.find (fun (s, _) -> s = "imports") fields |> snd |> json2al in
-    let exports = List.find (fun (s, _) -> s = "exports") fields |> snd |> json2al in
-    caseV ("MODULE", [ types_; imports; tags; globals; mems; tables; funcs; datas; elems; start; exports ])
+  | `Assoc fields when List.mem_assoc "__variant_name__" fields ->
+    let variant_name = List.assoc "__variant_name__" fields in
+    let args =
+      List.init
+        (List.length fields - 1)
+        (fun i ->
+          fields
+          |> List.assoc ("_" ^ string_of_int i)
+          |> json2al
+        ) in
+    caseV (json2string variant_name, args)
   | _ -> textV "yet"
 
 let parse_input input =
@@ -57,25 +72,10 @@ let parse_input input =
     )
   | _ -> "", []
 
-let json2int: Yojson.Safe.t -> int = function
-  | `Int i -> i
-  | `Float f -> int_of_float f
-  | json ->
-    json
-    |> Yojson.Safe.show
-    |> Printf.sprintf "json2int: Not a integer: %s"
-    |> failwith
 
-let json2list (f: Yojson.Safe.t -> 'a) (json: Yojson.Safe.t): 'a list =
-  match json with
-  | `List l -> List.map f l
-  | json ->
-    json
-    |> Yojson.Safe.show
-    |> Printf.sprintf "json2list: Not a list: %s"
-    |> failwith
+(* Embedding functions *)
 
-type embedding_function = Yojson.Safe.t list -> Yojson.Safe.t
+type embedding_function = json list -> json
 
 let module_decode: embedding_function = function
   | [ json ] ->
