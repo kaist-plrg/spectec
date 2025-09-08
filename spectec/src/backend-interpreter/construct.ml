@@ -34,7 +34,14 @@ let version = ref 3
 
 (* Destruct data structure *)
 
-let al_to_opt (f: value -> 'a) (v: value): 'a option = unwrap_optv v |> Option.map f
+let al_to_opt (f: value -> 'a) (v: value): 'a option =
+  match v with
+  | OptV opt -> Option.map f opt
+  | ListV l when Array.length !l = 0 ->
+    None
+  | ListV l when Array.length !l = 1 ->
+    Some (f (Array.get !l 0))
+  | v -> error_value "opt" v
 let al_to_list (f: value -> 'a) (v: value): 'a list =
   unwrap_listv v |> (!) |> Array.to_list |> List.map f
 let al_to_seq f s = al_to_list f s |> List.to_seq
