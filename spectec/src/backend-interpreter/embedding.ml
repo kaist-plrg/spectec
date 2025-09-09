@@ -77,6 +77,9 @@ let parse_input input =
 
 type embedding_function = json list -> json
 
+let nullary constructor = caseV (constructor, [])
+let embedding_error = nullary "error"
+
 let module_decode: embedding_function = function
   | [ json ] ->
     let int_list = json2list json2int json in
@@ -96,7 +99,7 @@ let module_decode: embedding_function = function
     let result =
       try
         bytes |> Decode.decode "" |> Construct.al_of_module
-      with Decode.Code _ -> nullary "ERROR" in
+      with Decode.Code _ -> embedding_error in
     al2json result
   | args ->
     args
@@ -113,7 +116,7 @@ let module_validate: embedding_function = function
         let module_ = Construct.al_to_module al in
         Reference_interpreter.Valid.check_module module_ |> ignore;
         nullary ""
-      with Reference_interpreter.Valid.Invalid _ -> nullary "ERROR"
+      with Reference_interpreter.Valid.Invalid _ -> embedding_error
       in
     al2json result
   | args ->
