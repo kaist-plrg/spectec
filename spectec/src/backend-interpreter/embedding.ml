@@ -36,7 +36,7 @@ let json2list (f: json -> 'a) (json: json): 'a list =
 let rec al2json: Ast.value -> json = function
   | CaseV (name, args) ->
     let fields = List.mapi (fun i e -> "_" ^ string_of_int i, al2json e) args in
-    `Assoc (("__variant_name__", `String name) :: fields)
+    `Assoc (("constructor", `String name) :: fields)
   | OptV opt ->
     let jsons = opt |> Option.to_list |> List.map al2json in
     `List jsons
@@ -49,8 +49,8 @@ let rec json2al: json -> Ast.value = function
   | `List l -> l |> List.map json2al |> listV_of_list
   | `Int i -> intV (Z.of_int i)
   | `Float f -> intV (Z.of_float f)
-  | `Assoc fields when List.mem_assoc "__variant_name__" fields ->
-    let variant_name = List.assoc "__variant_name__" fields in
+  | `Assoc fields when List.mem_assoc "constructor" fields ->
+    let variant_name = List.assoc "constructor" fields in
     let args =
       List.init
         (List.length fields - 1)
