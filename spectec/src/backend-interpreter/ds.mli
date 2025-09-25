@@ -12,6 +12,7 @@ val lookup_env_opt : string -> env -> value option
 
 module Store : sig
   val get : unit -> value
+  val set : value -> unit
   val access : string -> value
 end
 

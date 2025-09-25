@@ -2005,6 +2005,11 @@ let al_of_externtype = function
   | ExternMemoryT (memtype) -> CaseV ("MEM", [al_of_memorytype memtype])
   | ExternTagT (tagtype) -> CaseV ("TAG", [al_of_tagtype tagtype])
 
+let al_of_importtype = function
+  | ImportT (name1, name2, xt) ->
+    (* TODO: Utf8 *)
+    CaseV ("IMPORTT", [ al_of_name name1; al_of_name name2; al_of_externtype xt ])
+
 let al_of_import import =
   let Import (module_name, item_name, xt) = import.it in
   CaseV ("IMPORT",

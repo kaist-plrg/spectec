@@ -48,6 +48,16 @@ let lookup_algo name =
 module Store = struct
   let store = ref Record.empty
 
+  let get () = strV !store
+
+  let set = function
+    | StrV record -> store := record
+    | v ->
+      v
+      |> string_of_value
+      |> Printf.sprintf "Store.set: %s is not a record"
+      |> failwith
+
   let init () =
     store :=
       Record.empty
@@ -61,8 +71,6 @@ module Store = struct
       |> Record.add "STRUCTS" (listV [||])
       |> Record.add "ARRAYS" (listV [||])
       |> Record.add "EXNS" (listV [||])
-
-  let get () = strV !store
 
   let access field = Record.find field !store
 end

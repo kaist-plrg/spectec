@@ -43,6 +43,12 @@ let rec al2json: Ast.value -> json = function
   | ListV vs ->
     let jsons = !vs |> Array.to_list |> List.map al2json in
     `List jsons
+  | StrV fields ->
+    let jsons =
+      fields
+      |> Util.Record.to_list
+      |> List.map (fun (k, v) -> k, al2json v) in
+    `Assoc jsons
   | v -> failwith ("todo: " ^ (Print.structured_string_of_value v))
 
 let rec json2al: json -> Ast.value = function
@@ -60,6 +66,11 @@ let rec json2al: json -> Ast.value = function
           |> json2al
         ) in
     caseV (json2string variant_name, args)
+  | `Assoc fields ->
+    fields
+    |> List.map (fun (k, v) -> k, json2al v)
+    |> Util.Record.of_list
+    |> strV
   | _ -> textV "yet"
 
 let parse_input input =
@@ -112,8 +123,8 @@ let module_validate: embedding_function = function
   | [ json ] ->
     let al = json2al json in
     let result =
+      let module_ = Construct.al_to_module al in
       try
-        let module_ = Construct.al_to_module al in
         Reference_interpreter.Valid.check_module module_ |> ignore;
         nullary ""
       with Reference_interpreter.Valid.Invalid _ -> embedding_error
@@ -126,11 +137,51 @@ let module_validate: embedding_function = function
     |> Printf.sprintf "module_validate: wrong arity %s"
     |> failwith
 
+let module_imports: embedding_function = function
+  | [ json ] ->
+    let al = json2al json in
+    (* Module must be valid *)
+    let module_ = Construct.al_to_module al in
+    let ModuleT (importtypes, _) = Reference_interpreter.Valid.check_module module_ in
+    importtypes
+    |> List.map Construct.al_of_importtype
+    |> List.map args_of_casev
+    |> List.map (fun args -> caseV ("", args))
+    |> listV_of_list
+    |> al2json
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "module_imports: wrong arity %s"
+    |> failwith
+
+let module_instantiate: embedding_function = function
+  | [ store_json; module_json; externaddrs_json ] ->
+    let store = json2al store_json in
+    let module_ = json2al module_json in
+    let externaddrs = json2al externaddrs_json in
+
+    Ds.Store.set store;
+    let result =
+      try
+        Interpreter.instantiate [ module_; externaddrs ]
+      with _ -> embedding_error in
+    al2json result
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "module_instantiate: wrong arity %s"
+    |> failwith
+
 module EmbeddingFuncMap = Map.Make (String)
 let embedding_func_map =
   EmbeddingFuncMap.empty
   |> EmbeddingFuncMap.add "module_decode" module_decode
   |> EmbeddingFuncMap.add "module_validate" module_validate
+  |> EmbeddingFuncMap.add "module_imports" module_imports
+  |> EmbeddingFuncMap.add "module_instantiate" module_instantiate
 
 let mem name = EmbeddingFuncMap.mem name embedding_func_map
 
