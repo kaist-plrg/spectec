@@ -2010,6 +2010,11 @@ let al_of_importtype = function
     (* TODO: Utf8 *)
     CaseV ("IMPORTT", [ al_of_name name1; al_of_name name2; al_of_externtype xt ])
 
+let al_of_exporttype = function
+  | ExportT (name, xt) ->
+    (* TODO: Utf8 *)
+    CaseV ("IMPORTT", [ al_of_name name; al_of_externtype xt ])
+
 let al_of_import import =
   let Import (module_name, item_name, xt) = import.it in
   CaseV ("IMPORT",

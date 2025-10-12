@@ -156,6 +156,25 @@ let module_imports: embedding_function = function
     |> Printf.sprintf "module_imports: wrong arity %s"
     |> failwith
 
+let module_exports: embedding_function = function
+  | [ json ] ->
+    let al = json2al json in
+    (* Module must be valid *)
+    let module_ = Construct.al_to_module al in
+    let ModuleT (_, exporttypes) = Reference_interpreter.Valid.check_module module_ in
+    exporttypes
+    |> List.map Construct.al_of_exporttype
+    |> List.map args_of_casev
+    |> List.map (fun args -> caseV ("", args))
+    |> listV_of_list
+    |> al2json
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "module_exports: wrong arity %s"
+    |> failwith
+
 let module_instantiate: embedding_function = function
   | [ store_json; module_json; externaddrs_json ] ->
     let store = json2al store_json in
@@ -167,7 +186,7 @@ let module_instantiate: embedding_function = function
       try
         Interpreter.instantiate [ module_; externaddrs ]
       with _ -> embedding_error in
-    al2json result
+    al2json (caseV ("", [ Ds.Store.get (); result ]))
   | args ->
     args
     |> List.map Yojson.Safe.show
@@ -181,6 +200,7 @@ let embedding_func_map =
   |> EmbeddingFuncMap.add "module_decode" module_decode
   |> EmbeddingFuncMap.add "module_validate" module_validate
   |> EmbeddingFuncMap.add "module_imports" module_imports
+  |> EmbeddingFuncMap.add "module_exports" module_exports
   |> EmbeddingFuncMap.add "module_instantiate" module_instantiate
 
 let mem name = EmbeddingFuncMap.mem name embedding_func_map
