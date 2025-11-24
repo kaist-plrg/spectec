@@ -49,11 +49,13 @@ let rec al2json: Ast.value -> json = function
       |> Util.Record.to_list
       |> List.map (fun (k, v) -> k, al2json v) in
     `Assoc jsons
+  | TextV s -> `String s
+  | NumV ((`Int z | `Nat z)) -> `Int (Z.to_int z)
   | v -> failwith ("todo: " ^ (Print.structured_string_of_value v))
 
 let rec json2al: json -> Ast.value = function
   | `List l -> l |> List.map json2al |> listV_of_list
-  | `Int i -> intV (Z.of_int i)
+  | `Int i -> natV (Z.of_int i)
   | `Float f -> intV (Z.of_float f)
   | `Assoc fields when List.mem_assoc "constructor" fields ->
     let variant_name = List.assoc "constructor" fields in
@@ -71,7 +73,11 @@ let rec json2al: json -> Ast.value = function
     |> List.map (fun (k, v) -> k, json2al v)
     |> Util.Record.of_list
     |> strV
-  | _ -> textV "yet"
+  | `String s -> textV s
+  | json ->
+    json
+    |> Yojson.Safe.show
+    |> failwith
 
 let parse_input input =
   let json = Yojson.Safe.from_string input in
@@ -79,9 +85,9 @@ let parse_input input =
   | `Assoc fields ->
     (match List.assoc "name" fields, List.assoc "args" fields with
     | `String name, `List args -> name, args
-    | _ -> "", []
+    | _ -> failwith "todo"
     )
-  | _ -> "", []
+  | _ -> failwith "todo"
 
 
 (* Embedding functions *)
@@ -211,7 +217,7 @@ let call_func name args =
 
 let run input =
   let funcname, args = parse_input input in
-  (* print_endline (funcname ^ "(" ^ String.concat ", " (List.map Print.string_of_value args) ^ ")"); *)
+  (* print_endline (funcname ^ "(" ^ String.concat ", " (List.map Yojson.Safe.show args) ^ ")"); *)
 
   if EmbeddingFuncMap.mem funcname embedding_func_map then
     Ds.WasmContext.init_context ();

@@ -116,6 +116,8 @@ let al_to_final: value -> final = function
 let al_to_mut: value -> mut = function
   | OptV None -> Cons
   | OptV _ -> Var
+  | ListV l when Array.length !l = 0 -> Cons
+  | ListV l when Array.length !l = 1 -> Var
   | v -> error_value "mut" v
 
 let rec al_to_storagetype: value -> storagetype = function
