@@ -80,6 +80,7 @@ let externaddr_ok = function
         |> fun type_ -> CaseV (name, [type_])
         |> Construct.al_to_externtype
       in
+
       let externtype = Construct.al_to_externtype t in
       boolV (Match.match_externtype [] externaddr_type externtype)
     with exn -> raise (Exception.Invalid (exn, Printexc.get_raw_backtrace ())))

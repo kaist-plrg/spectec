@@ -36,7 +36,8 @@ let json2list (f: json -> 'a) (json: json): 'a list =
 let rec al2json: Ast.value -> json = function
   | CaseV (name, args) ->
     let fields = List.mapi (fun i e -> "_" ^ string_of_int i, al2json e) args in
-    `Assoc (("constructor", `String name) :: fields)
+    let constructor = String.lowercase_ascii name in
+    `Assoc (("constructor", `String constructor) :: fields)
   | OptV opt ->
     let jsons = opt |> Option.to_list |> List.map al2json in
     `List jsons
@@ -58,7 +59,11 @@ let rec json2al: json -> Ast.value = function
   | `Int i -> natV (Z.of_int i)
   | `Float f -> intV (Z.of_float f)
   | `Assoc fields when List.mem_assoc "constructor" fields ->
-    let variant_name = List.assoc "constructor" fields in
+    let variant_name =
+      fields
+      |> List.assoc "constructor"
+      |> json2string
+      |> String.uppercase_ascii in
     let args =
       List.init
         (List.length fields - 1)
@@ -67,7 +72,7 @@ let rec json2al: json -> Ast.value = function
           |> List.assoc ("_" ^ string_of_int i)
           |> json2al
         ) in
-    caseV (json2string variant_name, args)
+    caseV (variant_name, args)
   | `Assoc fields ->
     fields
     |> List.map (fun (k, v) -> k, json2al v)
@@ -200,6 +205,28 @@ let module_instantiate: embedding_function = function
     |> Printf.sprintf "module_instantiate: wrong arity %s"
     |> failwith
 
+let global_alloc: embedding_function = function
+  | [ store_json; globaltype_json; val_json ] ->
+    let store = json2al store_json in
+    let globaltype = json2al globaltype_json in
+    let val_ = json2al val_json in
+
+    Ds.Store.set store;
+    let globaladdr =
+      match
+        Interpreter.call_func "allocglobal" [ globaltype; val_ ]
+      with
+      | Some globaladdr -> globaladdr
+      | None -> failwith "allocglobal return None" in
+
+    al2json (caseV ("", [ Ds.Store.get (); globaladdr ]))
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "global_alloc: wrong arity %s"
+    |> failwith
+
 module EmbeddingFuncMap = Map.Make (String)
 let embedding_func_map =
   EmbeddingFuncMap.empty
@@ -208,6 +235,7 @@ let embedding_func_map =
   |> EmbeddingFuncMap.add "module_imports" module_imports
   |> EmbeddingFuncMap.add "module_exports" module_exports
   |> EmbeddingFuncMap.add "module_instantiate" module_instantiate
+  |> EmbeddingFuncMap.add "global_alloc" global_alloc
 
 let mem name = EmbeddingFuncMap.mem name embedding_func_map
 
