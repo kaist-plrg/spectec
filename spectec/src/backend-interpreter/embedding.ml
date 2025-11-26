@@ -240,7 +240,7 @@ let global_type: embedding_function = function
       |> Fun.flip List.nth (Z.to_int (unwrap_natv globaladdr))
       |> strv_access "TYPE" in
 
-    al2json (caseV ("", [ Ds.Store.get (); globaltype ]))
+    al2json globaltype
   | args ->
     args
     |> List.map Yojson.Safe.show
