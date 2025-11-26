@@ -51,7 +51,7 @@ let rec al2json: Ast.value -> json = function
       |> List.map (fun (k, v) -> k, al2json v) in
     `Assoc jsons
   | TextV s -> `String s
-  | NumV ((`Int z | `Nat z)) -> `Int (Z.to_int z)
+  | NumV ((`Int z | `Nat z)) -> `Intlit (Z.to_string z)
   | v -> failwith ("todo: " ^ (Print.structured_string_of_value v))
 
 let rec json2al: json -> Ast.value = function
@@ -79,6 +79,7 @@ let rec json2al: json -> Ast.value = function
     |> Util.Record.of_list
     |> strV
   | `String s -> textV s
+  | `Intlit s -> natV (Z.of_string s)
   | json ->
     json
     |> Yojson.Safe.show
@@ -227,6 +228,26 @@ let global_alloc: embedding_function = function
     |> Printf.sprintf "global_alloc: wrong arity %s"
     |> failwith
 
+let global_type: embedding_function = function
+  | [ store_json; globaladdr_json ] ->
+    let store = json2al store_json in
+    let globaladdr = json2al globaladdr_json in
+
+    let globaltype =
+      store
+      |> strv_access "GLOBALS"
+      |> unwrap_listv_to_list
+      |> Fun.flip List.nth (Z.to_int (unwrap_natv globaladdr))
+      |> strv_access "TYPE" in
+
+    al2json (caseV ("", [ Ds.Store.get (); globaltype ]))
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "global_type: wrong arity %s"
+    |> failwith
+
 module EmbeddingFuncMap = Map.Make (String)
 let embedding_func_map =
   EmbeddingFuncMap.empty
@@ -236,6 +257,7 @@ let embedding_func_map =
   |> EmbeddingFuncMap.add "module_exports" module_exports
   |> EmbeddingFuncMap.add "module_instantiate" module_instantiate
   |> EmbeddingFuncMap.add "global_alloc" global_alloc
+  |> EmbeddingFuncMap.add "global_type" global_type
 
 let mem name = EmbeddingFuncMap.mem name embedding_func_map
 
