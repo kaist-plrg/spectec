@@ -159,6 +159,7 @@ and t_exp' n e : eqns * exp' =
     let eqns2, iterexp'' = t_iterexp n iterexp' in
     let iterexp''' = update_iterexp_vars (Il.Free.free_exp e') iterexp'' in
     eqns1' @ eqns2, IterE (e', iterexp''')
+  | IfE (e1, e2, e3) -> t_eee n (e1, e2, e3) (fun (e1', e2', e3') -> IfE (e1', e2', e3'))
 
 and t_field n ((a, e) : expfield) =
   unary t_exp n e (fun e' -> (a, e'))
@@ -207,6 +208,9 @@ and t_prem' n prem : eqns * prem' =
     let eqns2, iterexp'' = t_iterexp n iterexp' in
     let iterexp''' = update_iterexp_vars (Il.Free.free_prem prem') iterexp'' in
     eqns1' @ eqns2, IterPr (prem', iterexp''')
+  | NegPr prem ->
+    let eqns1, prem' = t_prem n prem in
+    eqns1, NegPr (prem')
 
 let t_prems n k  = t_list t_prem n k (fun x -> x)
 

@@ -35,10 +35,10 @@ syntax deftype hint(desc "defined type") =
 syntax typeuse/syn hint(desc "type use") =
   | _IDX typeidx | ...
 syntax typeuse/sem =
-  | ... | deftype | REC nat hint(show REC.%)
+  | ... | deftype | REC n hint(show REC.%)
 
 syntax typevar hint(desc "type variable") =
-  | _IDX typeidx | REC nat hint(show REC.%)
+  | _IDX typeidx | REC n hint(show REC.%)
 
 syntax heaptype hint(desc "heap type") =
   | absheaptype | typeuse
@@ -52,9 +52,9 @@ syntax valtype/sem =
   | ... | BOT
 
 
-syntax Inn hint(show I#N) hint(macro "nt%") = I32 | I64
+syntax Inn hint(show I#N) hint(macro "nt%") = addrtype
 syntax Fnn hint(show F#N) hint(macro "nt%") = F32 | F64
-syntax Vnn hint(show V#N) hint(macro "nt%") = V128
+syntax Vnn hint(show V#N) hint(macro "nt%") = vectype
 syntax Cnn hint(show t) = Inn | Fnn | Vnn
 
 
@@ -94,7 +94,7 @@ syntax storagetype hint(desc "storage type") = valtype | packtype
 
 syntax Pnn hint(show I#N) hint(macro "nt%") = packtype
 syntax Jnn hint(show I#N) hint(macro "nt%") = Inn | Pnn
-syntax Lnn hint(show I#N) hint(macro "nt%") = Inn | Fnn | Pnn
+syntax Lnn hint(show I#N) hint(macro "nt%") = lanetype
 
 
 ;; Result types
@@ -125,7 +125,7 @@ syntax rectype hint(desc "recursive type") hint(macro "%" "T%") =
 
 ;; External types
 
-syntax limits hint(desc "limits range") = `[u64 .. u64] hint(macro "L%")
+syntax limits hint(desc "limits range") = `[u64 .. u64?] hint(macro "L%")
 
 syntax tagtype hint(desc "tag type") = typeuse
 syntax globaltype hint(desc "global type") = mut? valtype

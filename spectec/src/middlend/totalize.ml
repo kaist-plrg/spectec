@@ -105,6 +105,7 @@ and t_exp' env = function
   | CaseE (mixop, e) -> CaseE (mixop, t_exp env e)
   | CvtE (exp, t1, t2) -> CvtE (t_exp env exp, t1, t2)
   | SubE (exp, t1, t2) -> SubE (t_exp env exp, t_typ env t1, t_typ env t2)
+  | IfE (e1, e2, e3) -> IfE (t_exp env e1, t_exp env e2, t_exp env e3)
 
 and t_iter env = function
   | ListN (e, id_opt) -> ListN (t_exp env e, id_opt)
@@ -166,6 +167,7 @@ and t_prem' env = function
   | LetPr (e1, e2, ids) -> LetPr (t_exp env e1, t_exp env e2, ids)
   | ElsePr -> ElsePr
   | IterPr (prem, iterexp) -> IterPr (t_prem env prem, t_iterexp env iterexp)
+  | NegPr prem -> NegPr (t_prem env prem)
 
 and t_prem env x = { x with it = t_prem' env x.it }
 
@@ -214,7 +216,7 @@ let rec t_def' env = function
         | ExpP (_, typI) ->
           let x = ("x" ^ string_of_int i) $ no_region in
           [ExpB (x, typI) $ x.at], ExpA (VarE x $$ no_region % typI) $ no_region
-        | TypP id -> [], TypA (VarT (id, []) $ no_region) $ no_region
+        | TypP id -> [TypB id $ no_region], TypA (VarT (id, []) $ no_region) $ no_region
         | DefP (id, _, _) -> [], DefA id $ no_region
         | GramP (id, _) -> [], GramA (VarG (id, []) $ no_region) $ no_region
         ) params' |> List.split in

@@ -303,7 +303,7 @@ and reduce_exp env e : exp =
         let ns = List.map List.length ess' in
         let n = Z.to_int n' in
         if List.for_all ((=) n) ns then
-          (TupE (List.init n (fun i ->
+          (ListE (List.init n (fun i ->
             let esI' = List.map (fun es -> List.nth es i) ess' in
             let s = List.fold_left2 Subst.add_varid Subst.empty ids esI' in
             let s' =
@@ -398,6 +398,13 @@ and reduce_exp env e : exp =
     | _ when is_head_normal_exp e1' ->
       {e1' with note = e.note}
     | _ -> SubE (e1', t1', t2') $> e
+    )
+  | IfE (e1, e2, e3) ->
+    let e1' = reduce_exp env e1 in
+    (match e1'.it with
+    | BoolE true -> reduce_exp env e2
+    | BoolE false -> reduce_exp env e3
+    | _ -> IfE (e1', e2, e3) $> e (* do not reduce arms *)
     )
 
 and reduce_iter env = function
@@ -503,6 +510,9 @@ and reduce_prem env prem : bool option =
     | exception Irred -> None
     )
   | IterPr (_prem, _iter) -> None  (* TODO(3, rossberg): reduce? *)
+  | NegPr prem -> 
+    let* b = reduce_prem env prem in
+    Some (not b)
 
 
 (* Matching *)

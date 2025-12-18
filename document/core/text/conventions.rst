@@ -70,13 +70,10 @@ In order to distinguish symbols of the textual syntax from symbols of the abstra
 
    The :ref:`textual grammar <text-limits>` for :ref:`limits <syntax-limits>` is defined as follows:   
 
-   $${grammar: Tlimits_}
+   $${grammar: Tlimits}
 
    The variables ${:n} and ${:m} name the attributes of the respective ${grammar-case: Tu64} nonterminals, which in this case are the actual :ref:`unsigned integers <syntax-uint>` those parse into.
    The attribute of the complete production then is the abstract syntax for the limit, expressed in terms of the former values.
-
-   The variable ${:N} is a *parameter* to the grammer symbol that can be instantiated differently at each use site.
-   In this example, it controls the value range of the limits.
 
 
 .. index:: ! abbreviations, rewrite rule
@@ -114,6 +111,10 @@ For each index space, such a context contains the list of :ref:`names <syntax-na
 which were denoted by the corresponding :ref:`identifiers <text-id>`.
 Unnamed indices are associated with empty (${:eps}) entries in these lists.
 Fields have *dependent* name spaces, and hence a separate list of field identifiers per type.
+
+In addition, the field ${:TYPEDEFS} records the :ref:`defined type <syntax-deftype>` associated with each :ref:`type index <syntax-typeidx>`.
+They are needed to look up the number of parameters of :ref:`function types <syntax-functype>` when used in a :ref:`function definition <text-func>`,
+in order to produce the correct indices for :ref:`locals <syntax-local>`.
 
 An identifier context is *well-formed* if no index space contains duplicate identifiers.
 For fields, names need only be unique within a single type.

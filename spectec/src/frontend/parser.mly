@@ -159,7 +159,7 @@ and short_alt_prod' = function
 %token NOT AND OR
 %token QUEST PLUS MINUS STAR SLASH BACKSLASH UP CAT PLUSMINUS MINUSPLUS
 %token ARROW ARROW2 ARROWSUB ARROW2SUB DARROW2 SQARROW SQARROWSUB SQARROWSTAR SQARROWSTARSUB
-%token MEM PREC SUCC TURNSTILE TILESTURN TURNSTILESUB TILESTURNSUB
+%token MEM NOTMEM PREC SUCC TURNSTILE TILESTURN TURNSTILESUB TILESTURNSUB
 %token DOLLAR TICK
 %token BOT TOP
 %token HOLE MULTIHOLE NOTHING FUSE FUSEFUSE LATEX
@@ -182,10 +182,10 @@ and short_alt_prod' = function
 %right SQARROW SQARROWSUB SQARROWSTAR SQARROWSTARSUB PREC SUCC BIGAND BIGOR BIGADD BIGMUL BIGCAT
 %left COLON SUB SUP ASSIGN EQUIV APPROX COLONSUB EQUIVSUB APPROXSUB
 %left COMMA COMMA_NL
-%right EQ NE LT GT LE GE MEM EQSUB
+%right EQ NE LT GT LE GE MEM NOTMEM EQSUB
 %right ARROW ARROWSUB
 %left SEMICOLON
-%left DOT DOTDOT DOTDOTDOT
+%left DOTDOTDOT
 %left PLUS MINUS CAT
 %left STAR SLASH BACKSLASH
 
@@ -296,6 +296,7 @@ atom_escape :
   | TICK LE { Atom.LessEqual }
   | TICK GE { Atom.GreaterEqual }
   | TICK MEM { Atom.Mem }
+  | TICK NOTMEM { Atom.NotMem }
   | TICK QUEST { Atom.Quest }
   | TICK PLUS { Atom.Plus }
   | TICK STAR { Atom.Star }
@@ -308,6 +309,10 @@ atom_escape :
   | BOT { Atom.Bot }
   | TOP { Atom.Top }
   | INFINITY { Atom.Infinity }
+  | DOT { Atom.Dot }
+  | DOTDOT { Atom.Dot2 }
+  | TICK DOT { Atom.Dot }
+  | TICK DOTDOT { Atom.Dot2 }
 
 varid_bind_with_suffix :
   | varid { $1 }
@@ -360,8 +365,6 @@ check_atom :
 %inline infixop :
   | infixop_ { $1 $$ $sloc }
 %inline infixop_ :
-  | DOT { Atom.Dot }
-  | DOTDOT { Atom.Dot2 }
   | DOTDOTDOT { Atom.Dot3 }
   | SEMICOLON { Atom.Semicolon }
   | BACKSLASH { Atom.Backslash }
@@ -652,6 +655,7 @@ exp_bin_ :
   | exp_bin boolop exp_bin { BinE ($1, $2, $3) }
   | exp_bin CAT exp_bin { CatE ($1, $3) }
   | exp_bin MEM exp_bin { MemE ($1, $3) }
+  | exp_bin NOTMEM exp_bin { UnE (`NotOp, MemE ($1, $3) $ $sloc) }
 
 exp_rel : exp_rel_ { $1 $ $sloc }
 exp_rel_ :
@@ -720,6 +724,7 @@ arith_bin_ :
   | arith_bin boolop arith_bin { BinE ($1, $2, $3) }
   | arith_bin CAT arith_bin { CatE ($1, $3) }
   | arith_bin MEM arith_bin { MemE ($1, $3) }
+  | arith_bin NOTMEM arith_bin { UnE (`NotOp, MemE ($1, $3) $ $sloc) }
 
 arith : arith_bin { $1 }
 

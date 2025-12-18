@@ -81,6 +81,7 @@ and exp' =
   | IterE of exp * iterexp       (* exp iter *)
   | CvtE of exp * numtyp * numtyp (* exp : typ1 <:> typ2 *)
   | SubE of exp * typ * typ      (* exp : typ1 <: typ2 *)
+  | IfE of exp * exp * exp       (* if exp then exp else exp *)
 
 and expfield = atom * exp        (* atom exp *)
 
@@ -164,6 +165,7 @@ and prem' =
   | LetPr of exp * exp * string list                  (* binding *)
   | ElsePr                                            (* otherwise *)
   | IterPr of prem * iterexp                          (* iteration *)
+  | NegPr of prem                                     (* negated premise *)
 
 and hintdef = hintdef' phrase
 and hintdef' =

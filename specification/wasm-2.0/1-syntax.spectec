@@ -138,7 +138,7 @@ syntax valtype hint(desc "value type") =
 
 syntax Inn hint(show I#n) = I32 | I64
 syntax Fnn hint(show F#n) = F32 | F64
-syntax Vnn hint(show V#n) = V128
+syntax Vnn hint(show V#n) = vectype
 
 
 syntax resulttype hint(desc "result type") =
@@ -150,9 +150,9 @@ syntax resulttype hint(desc "result type") =
 syntax packtype hint(desc "packed type") = I8 | I16
 syntax lanetype hint(desc "lane type") = numtype | packtype
 
-syntax Pnn hint(show I#n) = I8 | I16
+syntax Pnn hint(show I#n) = packtype
 syntax Jnn hint(show I#n) = Inn | Pnn
-syntax Lnn hint(show I#n) = Inn | Fnn | Pnn
+syntax Lnn hint(show I#n) = lanetype
 
 
 ;; External types
@@ -160,7 +160,7 @@ syntax Lnn hint(show I#n) = Inn | Fnn | Pnn
 syntax mut = MUT?
 
 syntax limits hint(desc "limits") =
-  `[u32 .. u32]
+  `[u32 .. u32?]
 
 syntax globaltype hint(desc "global type") =
   mut valtype

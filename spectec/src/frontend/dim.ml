@@ -108,7 +108,7 @@ let rec check_iter env ctx iter =
      * Declaratively, it should be fine to always assume full dimensionality,
      * i.e., check id under context (strip_index iter :: ctx) below.
      * However, the interpreter backend cannot handle that.
-     * We chicken out by assuming n is scalar, i.e., ignore outer ctx below. *)
+     * We chicken out by assuming e is scalar, i.e., ignore outer ctx below. *)
     Option.iter (fun id -> check_varid env [strip_index iter] `Expl id) id_opt
 
 and check_typ env ctx t =
@@ -487,6 +487,11 @@ and annot_exp env e : Il.Ast.exp * occur =
     | SubE (e1, t1, t2) ->
       let e1', occur1 = annot_exp env e1 in
       SubE (e1', t1, t2), occur1
+    | IfE (e1, e2, e3) ->
+      let e1', occur1 = annot_exp env e1 in
+      let e2', occur2 = annot_exp env e2 in
+      let e3', occur3 = annot_exp env e3 in
+      IfE (e1', e2', e3'), union occur1 (union occur2 occur3)
   in {e with it}, occur
 
 and annot_expfield env (atom, e) : Il.Ast.expfield * occur =
@@ -600,6 +605,9 @@ and annot_prem env prem : Il.Ast.prem * occur =
       let prem1', occur1 = annot_prem env prem1 in
       let iter', occur' = annot_iterexp env occur1 iter prem.at in
       IterPr (prem1', iter'), occur'
+    | NegPr prem1 ->
+      let prem1', occur1 = annot_prem env prem1 in
+      NegPr prem1', occur1
   in {prem with it}, occur
 
 
