@@ -268,6 +268,44 @@ let global_read: embedding_function = function
     |> Printf.sprintf "global_read: wrong arity %s"
     |> failwith
 
+let global_write: embedding_function = function
+  | [ store_json; globaladdr_json; val_json ] ->
+    let store = json2al store_json in
+    let globaladdr = json2al globaladdr_json in
+    let val_ = json2al val_json in
+
+    Ds.Store.set store;
+
+    let globalinst =
+      store
+      |> strv_access "GLOBALS"
+      |> unwrap_listv_to_list
+      |> Fun.flip List.nth (Z.to_int (unwrap_natv globaladdr)) in
+
+    let mut =
+      match strv_access "TYPE" globalinst with
+      | CaseV ("", [ mut; _ ]) -> mut
+      | v ->
+        v
+        |> Print.string_of_value
+        |> Printf.sprintf "global_write: invalid global type %s"
+        |> failwith in
+
+    let result = 
+      if is_some "MUT" mut then (
+        strv_update "VALUE" val_ globalinst;
+        Ds.Store.get ()
+      ) else
+        embedding_error in
+
+    al2json result
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "global_write: wrong arity %s"
+    |> failwith
+
 module EmbeddingFuncMap = Map.Make (String)
 let embedding_func_map =
   EmbeddingFuncMap.empty
@@ -279,6 +317,7 @@ let embedding_func_map =
   |> EmbeddingFuncMap.add "global_alloc" global_alloc
   |> EmbeddingFuncMap.add "global_type" global_type
   |> EmbeddingFuncMap.add "global_read" global_read
+  |> EmbeddingFuncMap.add "global_write" global_write
 
 let mem name = EmbeddingFuncMap.mem name embedding_func_map
 

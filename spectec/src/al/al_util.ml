@@ -139,6 +139,13 @@ let print_yet at category msg =
 
 (* Helper functions *)
 
+let is_some constructor = function
+  | ListV arr ->
+    (match !arr with
+    | [| CaseV (x, []) |] when constructor = x -> true
+    | _ -> false)
+  | _ -> false
+
 let listv_len = function
   | ListV arr_ref -> Array.length !arr_ref
   | v -> fail_value "listv_len" v
@@ -170,6 +177,10 @@ let listv_to_optv l =
 let strv_access field = function
   | StrV r -> Record.find field r
   | v -> fail_value "strv_access" v
+
+let strv_update field v = function
+  | StrV r -> Record.replace field v r
+  | v -> fail_value "strv_update" v
 
 let map
   (destruct: value -> 'a)
