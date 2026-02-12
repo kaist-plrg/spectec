@@ -306,6 +306,27 @@ let global_write: embedding_function = function
     |> Printf.sprintf "global_write: wrong arity %s"
     |> failwith
 
+let val_default: embedding_function = function
+  | [ valtype_json ] ->
+    let valtype = json2al valtype_json in
+
+    let result =
+      match
+        Interpreter.call_func "allocglobal" [ valtype ]
+      with
+      | Some (OptV None) -> embedding_error
+      | Some (OptV (Some v)) -> v
+      | Some _ -> failwith "val_default: invalid return value"
+      | None -> failwith "val_default: no return value" in
+
+    al2json result
+  | args ->
+    args
+    |> List.map Yojson.Safe.show
+    |> String.concat ", "
+    |> Printf.sprintf "val_default: wrong arity %s"
+    |> failwith
+
 module EmbeddingFuncMap = Map.Make (String)
 let embedding_func_map =
   EmbeddingFuncMap.empty
@@ -318,6 +339,7 @@ let embedding_func_map =
   |> EmbeddingFuncMap.add "global_type" global_type
   |> EmbeddingFuncMap.add "global_read" global_read
   |> EmbeddingFuncMap.add "global_write" global_write
+  |> EmbeddingFuncMap.add "val_default" val_default
 
 let mem name = EmbeddingFuncMap.mem name embedding_func_map
 
