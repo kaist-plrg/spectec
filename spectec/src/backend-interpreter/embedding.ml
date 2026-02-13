@@ -79,7 +79,7 @@ let rec json2al: json -> Ast.value = function
     |> Util.Record.of_list
     |> strV
   | `String s -> textV s
-  | `Intlit s -> natV (Z.of_string s)
+  | `Intlit s -> s |> Z.of_string |> Z.abs |> natV
   | json ->
     json
     |> Yojson.Safe.show
@@ -312,7 +312,7 @@ let val_default: embedding_function = function
 
     let result =
       match
-        Interpreter.call_func "allocglobal" [ valtype ]
+        Interpreter.call_func "default_" [ valtype ]
       with
       | Some (OptV None) -> embedding_error
       | Some (OptV (Some v)) -> v
