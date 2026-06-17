@@ -54,7 +54,9 @@ var res : result
 
 ;; Instances
 
-syntax hostfunc hint(desc "host function") hint(macro "%" "FI%") = `...
+syntax hostfunc hint(desc "host function") hint(macro "%" "FI%") =
+  | HOSTFUNC text
+
 syntax funccode hint(show code) hint(macro "funccode") = func | hostfunc
 
 syntax taginst hint(desc "tag instance") hint(macro "%" "HI%") =

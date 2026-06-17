@@ -166,6 +166,8 @@ rule Step_read/br_on_cast_fail-fail:
 
 ;; Function instructions
 
+def $callhostfunc(hostfunc, state, val*): val*
+
 rule Step_read/call:
   z; (CALL x)  ~>  (REF.FUNC_ADDR a) (CALL_REF $funcinst(z)[a].TYPE)
   -- if $moduleinst(z).FUNCS[x] = a
@@ -180,6 +182,14 @@ rule Step_read/call_ref-func:
   -- Expand: fi.TYPE ~~ FUNC t_1^n -> t_2^m
   -- if fi.CODE = FUNC x (LOCAL t)* (instr*)
   -- if f = {LOCALS val^n ($default_(t))*, MODULE fi.MODULE}
+
+rule Step_read/call_ref-host:
+  z; val^n (REF.FUNC_ADDR a) (CALL_REF yy)  ~>  val'*
+  ----
+  -- if $funcinst(z)[a] = fi
+  -- Expand: fi.TYPE ~~ FUNC t_1^n -> t_2^m
+  -- if fi.CODE = HOSTFUNC text
+  -- if val'* = $callhostfunc(HOSTFUNC text, z, val^n)
 
 
 rule Step_read/return_call:
