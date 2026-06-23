@@ -209,3 +209,30 @@ let call name =
     let f64' = local 1 |> as_const "F64" |> al_to_float64 |> F64.to_string in
     Printf.printf "- print_f64_f64: %s %s\n" f64 f64'
   | name -> raise (Exception.UnknownFunc ("No spectest function: " ^ name))
+
+
+let mem fname = fname = "callhostfunc"
+
+(* Effect performed to reenter the embedder (wjmeta) while executing a host
+   function: given the host-function id and its argument [val*], it yields the
+   resulting [val*]. The interpreter merely *performs* this effect; the party
+   that owns the JSON-RPC stdio ([backend_server]) installs the handler around
+   the [func_invoke] it is servicing. Using an effect (rather than a mutable
+   [ref] or threading an invoker through the whole interpreter) keeps this
+   module dependency-free, the binding dynamically scoped, and the library
+   graph a DAG. *)
+type _ Effect.t += Host_invoke : string * value list -> value list Effect.t
+
+(* Implements the spec's [$callhostfunc(hostfunc, state, val* ) : val*], invoked
+   from the [call_ref-host] rule. [hostfunc] is the opaque
+   [CaseV ("HOSTFUNC", [TextV id])] token stored as the funcinst CODE; we read
+   the id back out and perform the [Host_invoke] effect. *)
+let call_func name args =
+  match name, args with
+  (* In interp mode the implicit [state] parameter is dropped, so the spec's
+     [$callhostfunc(hostfunc, state, val* )] arrives here as [hostfunc; val*]. *)
+  | "callhostfunc", [ CaseV ("HOSTFUNC", [ TextV id ]); vals ] ->
+    let results = Effect.perform (Host_invoke (id, Al_util.unwrap_listv_to_list vals)) in
+    listV_of_list results
+  | "callhostfunc", _ -> failwith "callhostfunc: unexpected arguments"
+  | _ -> raise (Exception.UnknownFunc ("No host function: " ^ name))

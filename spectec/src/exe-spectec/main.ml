@@ -217,7 +217,7 @@ let () =
       else (
         log "Translating to AL...";
         let interp = match !target with
-        | Interpreter _ -> true
+        | Interpreter _ | Server -> true
         | _ -> false in
         Il2al.Translate.translate il interp @ Il2al.Manual.manual_algos
       )
@@ -325,6 +325,8 @@ let () =
       Backend_interpreter.Runner.run args
 
     | Server ->
+      log "Initializing interpreter...";
+      Backend_interpreter.Ds.init al;
       log "Running server...";
       Backend_server.Server.run ()
     );

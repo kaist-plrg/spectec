@@ -64,6 +64,11 @@ module Store = struct
 
   let get () = strV !store
 
+  let set v =
+    match v with
+    | StrV r -> store := r
+    | _ -> failwith "Store.set: expected a record value"
+
   let access field = Record.find field !store
 end
 

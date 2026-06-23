@@ -831,6 +831,9 @@ and call_func (name: string) (args: value list) : value option =
     else
       Some (Relation.call_func name args)
   )
+  (* Host functions *)
+  else if Host.mem name then
+    Some (Host.call_func name args)
   else
     raise (Exception.UnknownFunc ("There is no function named: " ^ name))
 

@@ -53,7 +53,19 @@ let rec value_of_json (j : Yojson.Safe.t) : value =
 
 (* JSON-RPC dispatcher *)
 
-let handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Safe.t) : Yojson.Safe.t =
+(* Ids for outbound requests we initiate (e.g. host_func_invoke). Independent
+   from wjmeta's own id space: each side counts separately, see the
+   JsonRpcConnection comment on the wjmeta side. *)
+let next_request_id = ref 0
+let fresh_id () = let i = !next_request_id in incr next_request_id; i
+
+(* These four are mutually recursive: servicing a [func_invoke] runs the AL
+   interpreter, which may perform [Host.Host_invoke] (a host function in the
+   invoked code); the effect handler calls [host_func_invoke] -> [send_request];
+   [send_request] pumps the channel and, on a nested inbound request, calls
+   [serve_request] -> [handle_request] again. This is what makes
+   host -> wasm -> host nesting work to arbitrary depth on a single channel. *)
+let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Safe.t) : Yojson.Safe.t =
   let open Yojson.Safe.Util in
   let ok result =
     `Assoc [("jsonrpc", `String "2.0"); ("id", id); ("result", json_of_value result)]
@@ -67,20 +79,79 @@ let handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Safe.t)
     | "module_decode" ->
       let bytes = params |> member "bytes" |> value_of_json in
       ok (Backend_interpreter.Embedding.module_decode bytes)
+    | "store_init" ->
+      ok (Backend_interpreter.Embedding.store_init ())
+    | "func_alloc" ->
+      let store = params |> member "store" |> value_of_json in
+      let deftype = params |> member "deftype" |> value_of_json in
+      let hostfunc = params |> member "hostfunc" |> value_of_json in
+      ok (Backend_interpreter.Embedding.func_alloc store deftype hostfunc)
+    | "func_invoke" ->
+      let store = params |> member "store" |> value_of_json in
+      let funcaddr = params |> member "funcaddr" |> value_of_json in
+      let args = params |> member "args" |> value_of_json in
+      (* Wasm execution may reenter wjmeta via the [Host_invoke] effect when the
+         invoked code calls a host function. Handle it by issuing a matching
+         [host_func_invoke] outbound request and resuming with its results. *)
+      let result =
+        Effect.Deep.try_with
+          (fun () -> Backend_interpreter.Embedding.func_invoke store funcaddr args)
+          ()
+          { effc = (fun (type a) (eff : a Effect.t) ->
+              match eff with
+              | Backend_interpreter.Host.Host_invoke (hid, vals) ->
+                Some (fun (k : (a, value) Effect.Deep.continuation) ->
+                  Effect.Deep.continue k (host_func_invoke hid vals))
+              | _ -> None) }
+      in
+      ok result
     | _ ->
       err (-32601) ("method not implemented: " ^ meth)
   with Failure msg | Invalid_argument msg ->
     err (-32603) msg)
 
+(* Reenter wjmeta to run host function [hid] with [vals], returning its [val*]. *)
+and host_func_invoke (hid : string) (vals : value list) : value list =
+  let params =
+    `Assoc [("id", `String hid);
+            ("args", `List (List.map json_of_value vals))] in
+  match send_request "host_func_invoke" params with
+  | ListV vs -> Array.to_list !vs
+  | _ -> failwith "host_func_invoke: expected list result"
+
+(* Read+handle+answer a single inbound request. *)
+and serve_request (json : Yojson.Safe.t) : unit =
+  let open Yojson.Safe.Util in
+  let id     = json |> member "id" in
+  let meth   = json |> member "method" |> to_string in
+  let params = json |> member "params" in
+  print_endline (Yojson.Safe.to_string (handle_request id meth params));
+  flush stdout
+
+(* Send an outbound request, then pump the channel until its response arrives,
+   serving any inbound requests met in the meantime (reentrancy). *)
+and send_request (meth : string) (params : Yojson.Safe.t) : value =
+  let id = fresh_id () in
+  let request =
+    `Assoc [("jsonrpc", `String "2.0"); ("id", `Int id);
+            ("method", `String meth); ("params", params)] in
+  print_endline (Yojson.Safe.to_string request);
+  flush stdout;
+  let rec pump () =
+    let json = Yojson.Safe.from_string (input_line stdin) in
+    let open Yojson.Safe.Util in
+    if (json |> member "method") <> `Null then
+      (serve_request json; pump ())                 (* nested inbound request *)
+    else if (json |> member "id") = `Int id then
+      (match json |> member "result" with
+       | `Null -> failwith (json |> member "error" |> member "message" |> to_string)
+       | result -> value_of_json result)
+    else
+      failwith "send_request: response id mismatch"
+  in
+  pump ()
+
 let run () =
   try while true do
-    let line = input_line stdin in
-    let json = Yojson.Safe.from_string line in
-    let open Yojson.Safe.Util in
-    let id     = json |> member "id" in
-    let meth   = json |> member "method" |> to_string in
-    let params = json |> member "params" in
-    let response = handle_request id meth params in
-    print_endline (Yojson.Safe.to_string response);
-    flush stdout
+    serve_request (Yojson.Safe.from_string (input_line stdin))
   done with End_of_file -> ()
