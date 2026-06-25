@@ -73,6 +73,10 @@ end
 
 module WasmContext : sig
   type t = value * value list * value list
+
+  val get_context_stack : unit -> t list
+  val set_context_stack : t list -> unit
+
   val get_context : unit -> t
   val init_context : unit -> unit
   val push_context : t -> unit

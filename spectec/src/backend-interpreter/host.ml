@@ -232,7 +232,9 @@ let call_func name args =
   (* In interp mode the implicit [state] parameter is dropped, so the spec's
      [$callhostfunc(hostfunc, state, val* )] arrives here as [hostfunc; val*]. *)
   | "callhostfunc", [ CaseV ("HOSTFUNC", [ TextV id ]); vals ] ->
+    let stack = WasmContext.get_context_stack () in
     let results = Effect.perform (Host_invoke (id, Al_util.unwrap_listv_to_list vals)) in
+    WasmContext.set_context_stack stack;
     listV_of_list results
   | "callhostfunc", _ -> failwith "callhostfunc: unexpected arguments"
   | _ -> raise (Exception.UnknownFunc ("No host function: " ^ name))

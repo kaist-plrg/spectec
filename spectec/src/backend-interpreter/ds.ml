@@ -287,6 +287,9 @@ module WasmContext = struct
   let top_level_context = TextV "TopLevelContext", [], []
   let context_stack: t list ref = ref [top_level_context]
 
+  let get_context_stack () = !context_stack
+  let set_context_stack stack = context_stack := stack
+
   let get_context () =
     match !context_stack with
     | h :: _ -> h
