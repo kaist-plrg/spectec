@@ -79,6 +79,9 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "module_decode" ->
       let bytes = params |> member "bytes" |> value_of_json in
       ok (Backend_interpreter.Embedding.module_decode bytes)
+    | "module_imports" ->
+      let module_ = params |> member "module" |> value_of_json in
+      ok (Backend_interpreter.Embedding.module_imports module_)
     | "store_init" ->
       ok (Backend_interpreter.Embedding.store_init ())
     | "func_alloc" ->

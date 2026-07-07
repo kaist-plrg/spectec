@@ -16,6 +16,35 @@ let module_decode (bytes_val : value) : value =
      with Decode.Code _ -> embedding_error)
   | _ -> failwith "module_decode: expected list value for bytes"
 
+(* module_imports(module) : (name, name, externtype)*
+
+   Per the Wasm core spec's embedding API (embedding.rst, module_imports),
+   this repackages a decoded module's import declarations as
+   [(module_name, item_name, externtype)] triples. [module_val] is the AL
+   value produced by [module_decode], a [MODULE] case whose second field is
+   already the list of [IMPORT] entries built by [Construct.al_of_import]
+   ([module_name; item_name; externtype]); we just pull that field out and
+   reshape each entry into a bare tuple, since [module_decode] stores the
+   externtype declared by the import directly (no separate validation pass
+   is needed to resolve it).
+
+   TODO: the spec's pre-condition (module is valid, step 1) and
+   post-condition (each returned externtype is valid under the empty
+   context, step 6) are not checked here — [module_val] is trusted as-is. *)
+let module_imports (module_val : value) : value =
+  match module_val with
+  | CaseV ("MODULE", _types :: imports :: _) ->
+    (match imports with
+     | ListV vs ->
+       Array.to_list !vs
+       |> List.map (function
+            | CaseV ("IMPORT", [ module_name; item_name; xt ]) ->
+              TupV [ module_name; item_name; xt ]
+            | _ -> failwith "module_imports: expected IMPORT case")
+       |> listV_of_list
+     | _ -> failwith "module_imports: expected list value for imports")
+  | _ -> failwith "module_imports: expected module value"
+
 (* store_init() : store
 
    The global [Ds.Store] is authoritative for the server, so this simply
