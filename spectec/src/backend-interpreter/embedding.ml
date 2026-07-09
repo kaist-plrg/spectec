@@ -45,6 +45,50 @@ let module_imports (module_val : value) : value =
      | _ -> failwith "module_imports: expected list value for imports")
   | _ -> failwith "module_imports: expected module value"
 
+(* module_exports(module) : (name, externtype)*
+
+   Per the Wasm core spec's embedding API (embedding.rst, module_exports),
+   this repackages a decoded module's export declarations as [(name,
+   externtype)] pairs. Unlike [module_imports] — where each [IMPORT] node
+   already carries its own externtype — an [EXPORT] node only carries an
+   [externidx] (a reference into the module's own funcs/tables/mems/globals),
+   so its externtype has to be *resolved*. That resolution is exactly what
+   module validation computes as a byproduct (the embedding.rst algorithm's
+   own precondition: "module is valid ... with external export types
+   externtype'*"), so this runs [Relation.module_ok] (registered as
+   "Module_ok", which drives the reference interpreter's real
+   [Valid.check_module]) to get [(importtype*, exporttype* )], keeps the export
+   half, and zips it positionally against the module's own [EXPORT] list —
+   both are built from the same [module.exports] in the same order, so no
+   further matching by name/index is needed. *)
+let module_exports (module_val : value) : value =
+  match module_val with
+  | CaseV
+      ( "MODULE",
+        _types :: _imports :: _tags :: _globals :: _mems :: _tables
+        :: _funcs :: _datas :: _elems :: _start :: exports :: _ ) ->
+    let export_vals =
+      match exports with
+      | ListV vs -> Array.to_list !vs
+      | _ -> failwith "module_exports: expected list value for exports"
+    in
+    let exporttypes =
+      match Interpreter.call_func "Module_ok" [ module_val ] with
+      | Some (CaseV ("->", [ _importtypes; ListV ets ])) -> Array.to_list !ets
+      | _ -> failwith "module_exports: Module_ok did not return export types"
+    in
+    (try
+       List.map2
+         (fun export_v externtype ->
+           match export_v with
+           | CaseV ("EXPORT", [ name; _externidx ]) -> TupV [ name; externtype ]
+           | _ -> failwith "module_exports: expected EXPORT case")
+         export_vals exporttypes
+       |> listV_of_list
+     with Invalid_argument _ ->
+       failwith "module_exports: exports/exporttypes length mismatch")
+  | _ -> failwith "module_exports: expected module value"
+
 (* store_init() : store
 
    The global [Ds.Store] is authoritative for the server, so this simply
