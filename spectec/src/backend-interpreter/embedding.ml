@@ -92,3 +92,25 @@ let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
   Ds.Store.set store; (* install the caller's store as the global store *)
   let results = Interpreter.invoke [ funcaddr; vals ] in
   TupV [ Ds.Store.get (); results ]
+
+(* module_instantiate(store, module, externval* ) : (store, moduleinst | error)
+
+   Defers to the spec's own [$instantiate(module, externval* ) : moduleinst],
+   driven through [Interpreter.instantiate] — which, like [Interpreter.invoke],
+   initializes a fresh Wasm context internally. The caller's [store] is
+   installed as the global store first, and [externvals] is already a list
+   value (as with [func_invoke]'s [vals]).
+
+   Instantiation can fail either by trapping (e.g. an out-of-bounds active
+   segment) or by the module's start function throwing (Wasm
+   exception-handling proposal). Both collapse to [embedding_error] here:
+   [Exception.Throw] carries no payload on the OCaml side ([interpreter.ml]'s
+   [ThrowI _ -> raise Exception.Throw] discards the thrown value), so there is
+   no distinct "exception" result to return yet, only trap-shaped "error". *)
+let module_instantiate
+  (store : value) (module_ : value) (externvals : value) : value =
+  Ds.Store.set store;
+  match Interpreter.instantiate [ module_; externvals ] with
+  | moduleinst -> TupV [ Ds.Store.get (); moduleinst ]
+  | exception (Exception.Trap | Exception.Throw) ->
+    TupV [ Ds.Store.get (); embedding_error ]

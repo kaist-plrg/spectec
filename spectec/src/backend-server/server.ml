@@ -108,6 +108,24 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
               | _ -> None) }
       in
       ok result
+    | "module_instantiate" ->
+      let store = params |> member "store" |> value_of_json in
+      let module_ = params |> member "module" |> value_of_json in
+      let externvals = params |> member "externvals" |> value_of_json in
+      (* Instantiation can run a start function, which may itself call a host
+         function — same reentrancy concern (and handling) as [func_invoke]. *)
+      let result =
+        Effect.Deep.try_with
+          (fun () -> Backend_interpreter.Embedding.module_instantiate store module_ externvals)
+          ()
+          { effc = (fun (type a) (eff : a Effect.t) ->
+              match eff with
+              | Backend_interpreter.Host.Host_invoke (hid, vals) ->
+                Some (fun (k : (a, value) Effect.Deep.continuation) ->
+                  Effect.Deep.continue k (host_func_invoke hid vals))
+              | _ -> None) }
+      in
+      ok result
     | _ ->
       err (-32601) ("method not implemented: " ^ meth)
   with Failure msg | Invalid_argument msg ->
