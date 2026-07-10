@@ -30,7 +30,9 @@ let rec value_of_json (j : Yojson.Safe.t) : value =
       | "nat"  -> `Nat (Z.of_string (j |> member "value" |> to_string))
       | "int"  -> `Int (Z.of_string (j |> member "value" |> to_string))
       | "rat"  -> `Rat (Q.make (Z.of_string (j |> member "num" |> to_string)) (Z.of_string (j |> member "den" |> to_string)))
-      | "real" -> `Real (j |> member "value" |> to_float)
+      | "real" ->
+        (* XXX: it is hardcoding for byte, it might not work well for other floats *)
+        `Nat (j |> member "value" |> to_float |> Z.of_float)
       | k -> failwith ("unknown num kind: " ^ k)
     in
     NumV num
