@@ -89,6 +89,24 @@ let module_exports (module_val : value) : value =
        failwith "module_exports: exports/exporttypes length mismatch")
   | _ -> failwith "module_exports: expected module value"
 
+(* module_validate(module) : error?
+
+   Per the Wasm core spec's embedding API (embedding.rst, module_validate),
+   returns nothing if [module_val] is valid, else [embedding_error].
+   Defers to the [$Module_ok] relation (2.4-validation.modules.spectec),
+   already implemented as [Relation.module_ok]: it converts [module_val] back
+   to the reference interpreter's AST and runs
+   [Reference_interpreter.Valid.check_module] on it, raising
+   [Exception.Invalid] when the module is not valid. The moduletype computed
+   by [$Module_ok] (external import/export types) is part of that relation's
+   conclusion, not of [module_validate]'s interface, so it is discarded here;
+   [OptV None] stands in for the spec's "return nothing". *)
+let module_validate (module_val : value) : value =
+  match Interpreter.call_func "Module_ok" [ module_val ] with
+  | Some _ -> OptV None
+  | None -> failwith "module_validate: Module_ok returned no value"
+  | exception Exception.Invalid _ -> embedding_error
+
 (* store_init() : store
 
    The global [Ds.Store] is authoritative for the server, so this simply
