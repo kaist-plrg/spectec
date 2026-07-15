@@ -31,6 +31,7 @@ let try_with_error fname at stringifier f step =
   | Exception.UnknownFunc _
   | Exception.FreeVar _) as e -> error at (prefix ^ Printexc.to_string e) (stringifier step)
   | Failure msg -> error at (prefix ^ msg) (stringifier step)
+  | Exception.Fail -> error at (prefix ^ "fail") (stringifier step)
 
 let warn msg = print_endline ("warning: " ^ msg)
 

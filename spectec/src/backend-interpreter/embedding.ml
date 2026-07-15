@@ -20,29 +20,48 @@ let module_decode (bytes_val : value) : value =
 
    Per the Wasm core spec's embedding API (embedding.rst, module_imports),
    this repackages a decoded module's import declarations as
-   [(module_name, item_name, externtype)] triples. [module_val] is the AL
-   value produced by [module_decode], a [MODULE] case whose second field is
-   already the list of [IMPORT] entries built by [Construct.al_of_import]
-   ([module_name; item_name; externtype]); we just pull that field out and
-   reshape each entry into a bare tuple, since [module_decode] stores the
-   externtype declared by the import directly (no separate validation pass
-   is needed to resolve it).
-
-   TODO: the spec's pre-condition (module is valid, step 1) and
-   post-condition (each returned externtype is valid under the empty
-   context, step 6) are not checked here — [module_val] is trusted as-is. *)
+   [(module_name, item_name, externtype)] triples, with each externtype
+   "valid under the empty context" (step 6) — i.e. fully resolved, not a bare
+   index into the module's own type section. [module_val]'s raw [IMPORT]
+   nodes (built by [Construct.al_of_import] straight off the decoded module)
+   carry exactly that kind of unresolved externtype (e.g. a func import's
+   type is [_IDX i], an index — compare [module_exports]'s [EXPORT] nodes,
+   whose externtype must be resolved from an [externidx] for the same
+   reason). Left unresolved, an [_IDX] handed to [func_alloc] for a host
+   function ends up as that host funcinst's [TYPE] verbatim (a host function
+   has no module of its own for the index to resolve against — see
+   [func_alloc]'s dummy moduleinst) — a raw [_IDX] tag can never equal the
+   [_DEF ...] tag [$instantiate] computes for the module's *required* import
+   type via [$Module_ok], so [Externaddr_ok] can never hold and instantiation
+   always fails for a host-function import. Resolved here the same way
+   [module_exports] resolves its half: run [$Module_ok] (driving
+   [Valid.check_module]) and take the import half of its
+   [importtype* -> exporttype*] result, zipped positionally against the raw
+   [IMPORT] list (both walk [module.imports] in the same order). *)
 let module_imports (module_val : value) : value =
   match module_val with
   | CaseV ("MODULE", _types :: imports :: _) ->
-    (match imports with
-     | ListV vs ->
-       Array.to_list !vs
-       |> List.map (function
-            | CaseV ("IMPORT", [ module_name; item_name; xt ]) ->
-              TupV [ module_name; item_name; xt ]
-            | _ -> failwith "module_imports: expected IMPORT case")
+    let import_vals =
+      match imports with
+      | ListV vs -> Array.to_list !vs
+      | _ -> failwith "module_imports: expected list value for imports"
+    in
+    let importtypes =
+      match Interpreter.call_func "Module_ok" [ module_val ] with
+      | Some (CaseV ("->", [ ListV its; _exporttypes ])) -> Array.to_list !its
+      | _ -> failwith "module_imports: Module_ok did not return import types"
+    in
+    (try
+       List.map2
+         (fun import_v externtype ->
+           match import_v with
+           | CaseV ("IMPORT", [ module_name; item_name; _xt ]) ->
+             TupV [ module_name; item_name; externtype ]
+           | _ -> failwith "module_imports: expected IMPORT case")
+         import_vals importtypes
        |> listV_of_list
-     | _ -> failwith "module_imports: expected list value for imports")
+     with Invalid_argument _ ->
+       failwith "module_imports: imports/importtypes length mismatch")
   | _ -> failwith "module_imports: expected module value"
 
 (* module_exports(module) : (name, externtype)*

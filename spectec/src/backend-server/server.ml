@@ -136,8 +136,15 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       ok result
     | _ ->
       err (-32601) ("method not implemented: " ^ meth)
-  with Failure msg | Invalid_argument msg ->
-    err (-32603) msg)
+  with
+  | Failure msg | Invalid_argument msg ->
+    err (-32603) msg
+  | Backend_interpreter.Exception.Error (at, msg, step) ->
+    err (-32603) (msg ^ " (interpreting " ^ step ^ " at " ^ Util.Source.string_of_region at ^ ")")
+  | Backend_interpreter.Exception.Invalid (e, backtrace) ->
+    err (-32603) ("Invalid: " ^ Printexc.to_string e ^ "\n" ^ Printexc.raw_backtrace_to_string backtrace)
+  | e ->
+    err (-32603) (Printexc.to_string e ^ "\n" ^ Printexc.get_backtrace ()))
 
 (* Reenter wjmeta to run host function [hid] with [vals], returning its [val*]. *)
 and host_func_invoke (hid : string) (vals : value list) : value list =
