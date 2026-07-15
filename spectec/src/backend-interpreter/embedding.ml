@@ -126,6 +126,25 @@ let module_validate (module_val : value) : value =
   | None -> failwith "module_validate: Module_ok returned no value"
   | exception Exception.Invalid _ -> embedding_error
 
+(* expand(deftype) : comptype
+
+   Not part of the Wasm Core Spec's own Embedding API (embedding.rst) — a
+   wjmeta/js-api-bridge-specific convenience wrapping the [$Expand] relation
+   (2.1-validation.types.spectec: [Expand: deftype ~~ comptype]), already
+   implemented as [Relation.expand] (drives [Types.expand_deftype]). Exists
+   because js-api/index.bs's own prose destructures a [deftype] (e.g. the
+   result of [func_type], or an imported function's externtype) directly as
+   if it already were its underlying [params -> results] comptype, without
+   ever calling out to a [$expand] step the way the Wasm Core Spec's own
+   [Expand] relation requires — the same gap as [module_imports] before it was
+   fixed to resolve its externtypes via [$Module_ok] above; see
+   [docs/spec_errors.md] in the wjmeta side of this bridge. *)
+let expand (deftype : value) : value =
+  match Interpreter.call_func "Expand" [ deftype ] with
+  | Some comptype -> comptype
+  | None -> failwith "expand: Expand returned no value"
+  | exception Exception.Invalid _ -> embedding_error
+
 (* store_init() : store
 
    The global [Ds.Store] is authoritative for the server, so this simply
