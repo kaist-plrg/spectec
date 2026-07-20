@@ -104,6 +104,10 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let deftype = params |> member "deftype" |> value_of_json in
       let hostfunc = params |> member "hostfunc" |> value_of_json in
       ok (Backend_interpreter.Embedding.func_alloc store deftype hostfunc)
+    | "func_type" ->
+      let store = params |> member "store" |> value_of_json in
+      let funcaddr = params |> member "funcaddr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.func_type store funcaddr)
     | "func_invoke" ->
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in

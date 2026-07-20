@@ -200,6 +200,21 @@ let func_alloc (store : value) (deftype : value) (hostfunc : value) : value =
   | Some funcaddr -> TupV [ Ds.Store.get (); funcaddr ]
   | None -> failwith "func_alloc: allocfunc returned no value"
 
+(* func_type(store, funcaddr) : deftype
+
+   Per the Wasm core spec's embedding API (embedding.rst, func_type),
+   [func_type(S, a) = S.FUNCS[a].TYPE] — a pure structural lookup into the
+   given [store]'s FUNCS array, same idiom as [instance_export] above (and
+   [relation.ml]'s [ref_ok], which reads a funcinst's TYPE the same way off
+   the global store). No AL-interpreter call and no [Ds.Store] mutation
+   needed: unlike [func_alloc]/[func_invoke], this can't observe or change
+   store state, so it just reads straight out of the caller-supplied [store]
+   value. [funcaddr] is a bare nat, as elsewhere in this module. *)
+let func_type (store : value) (funcaddr : value) : value =
+  match funcaddr with
+  | NumV (`Nat i) -> strv_access "TYPE" (listv_nth (strv_access "FUNCS" store) (Z.to_int i))
+  | _ -> failwith "func_type: expected nat funcaddr"
+
 (* func_invoke(store, funcaddr, val* ) : (store, val* )
 
    The caller's [store] is installed as the global store first; [vals] is
