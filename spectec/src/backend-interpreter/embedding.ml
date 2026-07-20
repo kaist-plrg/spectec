@@ -108,6 +108,25 @@ let module_exports (module_val : value) : value =
        failwith "module_exports: exports/exporttypes length mismatch")
   | _ -> failwith "module_exports: expected module value"
 
+(* instance_export(moduleinst, name) : externaddr | error
+
+   Per the Wasm core spec's embedding API (embedding.rst, instance_export),
+   looks up `name` in `moduleinst`'s own EXPORTS list (each entry an
+   exportinst = {NAME name, ADDR externaddr}) and returns the matching ADDR,
+   or `error` if none match. A pure structural lookup — no need to drive it
+   through the AL interpreter the way module_validate/module_exports do,
+   since `moduleinst` (module_instantiate's own result) already carries
+   fully-resolved exportinst records directly. *)
+let instance_export (moduleinst : value) (name : value) : value =
+  match strv_access "EXPORTS" moduleinst with
+  | ListV exports ->
+    (match
+       Array.find_opt (fun xi -> strv_access "NAME" xi = name) !exports
+     with
+     | Some xi -> strv_access "ADDR" xi
+     | None -> embedding_error)
+  | _ -> failwith "instance_export: expected list value for EXPORTS"
+
 (* module_validate(module) : error?
 
    Per the Wasm core spec's embedding API (embedding.rst, module_validate),

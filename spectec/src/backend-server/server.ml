@@ -90,6 +90,10 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "module_exports" ->
       let module_ = params |> member "module" |> value_of_json in
       ok (Backend_interpreter.Embedding.module_exports module_)
+    | "instance_export" ->
+      let moduleinst = params |> member "moduleinst" |> value_of_json in
+      let name = params |> member "name" |> value_of_json in
+      ok (Backend_interpreter.Embedding.instance_export moduleinst name)
     | "expand" ->
       let deftype = params |> member "deftype" |> value_of_json in
       ok (Backend_interpreter.Embedding.expand deftype)
