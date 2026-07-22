@@ -164,6 +164,44 @@ let expand (deftype : value) : value =
   | None -> failwith "expand: Expand returned no value"
   | exception Exception.Invalid _ -> embedding_error
 
+(* match_valtype(valtype1, valtype2) : bool
+
+   Per the Wasm core spec's embedding API (embedding.rst, "Matching"): true
+   iff [valtype1] matches [valtype2] under the empty context, deferring to
+   [Match.match_valtype] — the same one [relation.ml]'s [val_ok]/
+   [match_globaltype]/... already call with the same empty context `[]`. *)
+let match_valtype (valtype1 : value) (valtype2 : value) : value =
+  let t1 = Construct.al_to_valtype valtype1 in
+  let t2 = Construct.al_to_valtype valtype2 in
+  boolV (Match.match_valtype [] t1 t2)
+
+(* match_externtype(externtype1, externtype2) : bool
+
+   The [externtype]-level sibling of [match_valtype] just above (embedding.rst,
+   "Matching") — [Match.match_externtype], same empty context. *)
+let match_externtype (externtype1 : value) (externtype2 : value) : value =
+  let xt1 = Construct.al_to_externtype externtype1 in
+  let xt2 = Construct.al_to_externtype externtype2 in
+  boolV (Match.match_externtype [] xt1 xt2)
+
+(* val_default(valtype) : val
+
+   Per the Wasm core spec's embedding API (embedding.rst, "Values"): returns
+   the default value for [valtype], or [embedding_error] if none is defined
+   (a non-nullable reftype) — the spec's own stated result for that case, not
+   a failure. Drives the mechanized [$default_(valtype) : val?] definition
+   (4.1-execution.values.spectec) through [Interpreter.call_func], like
+   [expand]/[module_validate] above, rather than the reference interpreter's
+   own hand-written [Value.default_value]. The mechanized `val?` result
+   compiles to `OptV`, the same convention every other SpecTec `?`-type uses
+   (e.g. `mut?`/`max?` throughout construct.ml). *)
+let val_default (valtype_val : value) : value =
+  match Interpreter.call_func "default_" [ valtype_val ] with
+  | Some (OptV (Some v)) -> v
+  | Some (OptV None) -> embedding_error
+  | Some _ -> failwith "val_default: default_ returned an unexpected shape"
+  | None -> failwith "val_default: default_ returned no value"
+
 (* store_init() : store
 
    The global [Ds.Store] is authoritative for the server, so this simply

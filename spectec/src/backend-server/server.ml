@@ -97,6 +97,17 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "expand" ->
       let deftype = params |> member "deftype" |> value_of_json in
       ok (Backend_interpreter.Embedding.expand deftype)
+    | "match_valtype" ->
+      let valtype1 = params |> member "valtype1" |> value_of_json in
+      let valtype2 = params |> member "valtype2" |> value_of_json in
+      ok (Backend_interpreter.Embedding.match_valtype valtype1 valtype2)
+    | "match_externtype" ->
+      let externtype1 = params |> member "externtype1" |> value_of_json in
+      let externtype2 = params |> member "externtype2" |> value_of_json in
+      ok (Backend_interpreter.Embedding.match_externtype externtype1 externtype2)
+    | "val_default" ->
+      let valtype = params |> member "valtype" |> value_of_json in
+      ok (Backend_interpreter.Embedding.val_default valtype)
     | "store_init" ->
       ok (Backend_interpreter.Embedding.store_init ())
     | "func_alloc" ->
