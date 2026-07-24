@@ -61,6 +61,18 @@ let rec value_of_json (j : Yojson.Safe.t) : value =
 let next_request_id = ref 0
 let fresh_id () = let i = !next_request_id in incr next_request_id; i
 
+(* signed_31/signed_32/signed_64 are js-api's rendered names for Wasm Core
+   spec's parametric `signed_(N)` numeric op; SpecTec itself only exposes a
+   single numerics function "signed" taking the bit width as an explicit
+   first argument (see backend-interpreter/numerics.ml's `signed`). This
+   translation lives here rather than on the wjmeta/Scala side, since
+   SpecTec is the one that knows its own rendering convention -- wjmeta just
+   calls "signed_32" as if it were any other embedding function. *)
+let call_signed (bits : int) (i : value) : value =
+  match Backend_interpreter.Interpreter.call_func "signed" [ NumV (`Nat (Z.of_int bits)); i ] with
+  | Some result -> result
+  | None -> failwith (Printf.sprintf "signed_%d: no result" bits)
+
 (* These four are mutually recursive: servicing a [func_invoke] runs the AL
    interpreter, which may perform [Host.Host_invoke] (a host function in the
    invoked code); the effect handler calls [host_func_invoke] -> [send_request];
@@ -156,6 +168,18 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
               | _ -> None) }
       in
       ok result
+    (* Wasm Core spec numerics referenced directly by js-api prose -- not
+       part of the formal embedding.rst boundary, but simple enough (pure,
+       no store) to expose here. See `call_signed` above. *)
+    | "signed_31" ->
+      let i = params |> member "i" |> value_of_json in
+      ok (call_signed 31 i)
+    | "signed_32" ->
+      let i = params |> member "i" |> value_of_json in
+      ok (call_signed 32 i)
+    | "signed_64" ->
+      let i = params |> member "i" |> value_of_json in
+      ok (call_signed 64 i)
     | _ ->
       err (-32601) ("method not implemented: " ^ meth)
   with

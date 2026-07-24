@@ -1075,6 +1075,8 @@ let inv_concatn : numerics =
   }
 
 let numerics_list : numerics list = [
+  signed;
+  inv_signed;
   profile_nd;
   r_fmadd;
   r_fmin;

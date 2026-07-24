@@ -33,7 +33,10 @@ let try_with_error fname at stringifier f step =
   | Failure msg -> error at (prefix ^ msg) (stringifier step)
   | Exception.Fail -> error at (prefix ^ "fail") (stringifier step)
 
-let warn msg = print_endline ("warning: " ^ msg)
+(* stderr, not stdout: in `--server` mode stdout is a JSON-RPC frame stream
+   (one JSON value per line), and any stray text on it desyncs the client's
+   parser. *)
+let warn msg = prerr_endline ("warning: " ^ msg)
 
 
 (* Hints *)
