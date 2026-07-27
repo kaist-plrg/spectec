@@ -253,6 +253,45 @@ let func_type (store : value) (funcaddr : value) : value =
   | NumV (`Nat i) -> strv_access "TYPE" (listv_nth (strv_access "FUNCS" store) (Z.to_int i))
   | _ -> failwith "func_type: expected nat funcaddr"
 
+(* global_type(store, globaladdr) : globaltype
+
+   [global_type(S, a) = S.GLOBALS[a].TYPE] — same structural-lookup idiom as
+   [func_type] above (embedding.rst, global_type). *)
+let global_type (store : value) (globaladdr : value) : value =
+  match globaladdr with
+  | NumV (`Nat i) -> strv_access "TYPE" (listv_nth (strv_access "GLOBALS" store) (Z.to_int i))
+  | _ -> failwith "global_type: expected nat globaladdr"
+
+(* global_read(store, globaladdr) : val
+
+   [global_read(S, a) = S.GLOBALS[a].VALUE] — same idiom (embedding.rst,
+   global_read). *)
+let global_read (store : value) (globaladdr : value) : value =
+  match globaladdr with
+  | NumV (`Nat i) -> strv_access "VALUE" (listv_nth (strv_access "GLOBALS" store) (Z.to_int i))
+  | _ -> failwith "global_read: expected nat globaladdr"
+
+(* global_write(store, globaladdr, val) : store | error
+
+   Per embedding.rst: if the global's mut is empty (immutable), return
+   [error]; otherwise replace GLOBALS[a].VALUE with [v] and return the
+   updated store. Unlike [func_type]/[global_read], this *does* mutate: a
+   globalinst's fields are [Record]'s own [ref] cells (see
+   [util/record.ml]), so [Record.replace] updates GLOBALS[a].VALUE in place
+   and the same (now-updated) [store] value is what's returned — no
+   [Ds.Store]/AL-interpreter involvement needed, same as the rest of this
+   module's pure structural embedding functions. *)
+let global_write (store : value) (globaladdr : value) (v : value) : value =
+  match globaladdr with
+  | NumV (`Nat i) ->
+    let gi = listv_nth (strv_access "GLOBALS" store) (Z.to_int i) in
+    (match strv_access "TYPE" gi, gi with
+     | CaseV (_, OptV None :: _), _ -> embedding_error
+     | CaseV (_, OptV (Some _) :: _), StrV r ->
+       Util.Record.replace "VALUE" v r; store
+     | _ -> failwith "global_write: unexpected globalinst/globaltype shape")
+  | _ -> failwith "global_write: expected nat globaladdr"
+
 (* func_invoke(store, funcaddr, val* ) : (store, val* )
 
    The caller's [store] is installed as the global store first; [vals] is

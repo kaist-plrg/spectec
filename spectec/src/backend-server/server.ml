@@ -136,6 +136,19 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.func_type store funcaddr)
+    | "global_type" ->
+      let store = params |> member "store" |> value_of_json in
+      let globaladdr = params |> member "globaladdr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.global_type store globaladdr)
+    | "global_read" ->
+      let store = params |> member "store" |> value_of_json in
+      let globaladdr = params |> member "globaladdr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.global_read store globaladdr)
+    | "global_write" ->
+      let store = params |> member "store" |> value_of_json in
+      let globaladdr = params |> member "globaladdr" |> value_of_json in
+      let v = params |> member "value" |> value_of_json in
+      ok (Backend_interpreter.Embedding.global_write store globaladdr v)
     | "func_invoke" ->
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
