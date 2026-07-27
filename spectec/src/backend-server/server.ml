@@ -78,6 +78,19 @@ let call_signed (bits : int) (i : value) : value =
   | Some result -> result
   | None -> failwith (Printf.sprintf "signed_%d: no result" bits)
 
+(* inv_signed_31/inv_signed_32/inv_signed_64 -- "inv_signed_N" isn't spec-link
+   text at all (js-api prose never names $signed_N's inverse directly, only
+   describes it via "the unsigned integer such that |i| is [=signed_N=](|u|)"
+   -- WJI's own ExpandSuchThatPass recognizes that idiom and calls this),
+   but it's translated the exact same way as call_signed above: per-width
+   name in, real parametric `$inv_signed_(N, int)` call out
+   (3.1-numerics.scalar.spectec, `hint(inverse $signed_)` on its own inverse
+   pointing back the other way). *)
+let call_inv_signed (bits : int) (i : value) : value =
+  match Backend_interpreter.Interpreter.call_func "inv_signed_" [ NumV (`Nat (Z.of_int bits)); i ] with
+  | Some result -> result
+  | None -> failwith (Printf.sprintf "inv_signed_%d: no result" bits)
+
 (* These four are mutually recursive: servicing a [func_invoke] runs the AL
    interpreter, which may perform [Host.Host_invoke] (a host function in the
    invoked code); the effect handler calls [host_func_invoke] -> [send_request];
@@ -198,6 +211,15 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "signed_64" ->
       let i = params |> member "i" |> value_of_json in
       ok (call_signed 64 i)
+    | "inv_signed_31" ->
+      let i = params |> member "i" |> value_of_json in
+      ok (call_inv_signed 31 i)
+    | "inv_signed_32" ->
+      let i = params |> member "i" |> value_of_json in
+      ok (call_inv_signed 32 i)
+    | "inv_signed_64" ->
+      let i = params |> member "i" |> value_of_json in
+      ok (call_inv_signed 64 i)
     | _ ->
       err (-32601) ("method not implemented: " ^ meth)
   with
