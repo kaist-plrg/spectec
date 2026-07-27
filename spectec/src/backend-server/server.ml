@@ -62,14 +62,19 @@ let next_request_id = ref 0
 let fresh_id () = let i = !next_request_id in incr next_request_id; i
 
 (* signed_31/signed_32/signed_64 are js-api's rendered names for Wasm Core
-   spec's parametric `signed_(N)` numeric op; SpecTec itself only exposes a
-   single numerics function "signed" taking the bit width as an explicit
-   first argument (see backend-interpreter/numerics.ml's `signed`). This
+   spec's parametric `$signed_(N, nat)` numeric function, taking the bit
+   width as an explicit first argument (3.1-numerics.scalar.spectec). This
    translation lives here rather than on the wjmeta/Scala side, since
    SpecTec is the one that knows its own rendering convention -- wjmeta just
-   calls "signed_32" as if it were any other embedding function. *)
+   calls "signed_32" as if it were any other embedding function. Note the
+   trailing underscore: `$signed_` is a real spec-defined function (two
+   `if`-guarded equations, `hint(inverse $inv_signed_)`, no `hint(builtin)`),
+   not one of `numerics.ml`'s hardcoded OCaml builtins -- calling it under the
+   name "signed" (no underscore) would still resolve, but only via
+   `Numerics.mem`'s fallback path, which warns "not defined in source" since
+   that bare name has no matching `hint(builtin)` anywhere in the spec. *)
 let call_signed (bits : int) (i : value) : value =
-  match Backend_interpreter.Interpreter.call_func "signed" [ NumV (`Nat (Z.of_int bits)); i ] with
+  match Backend_interpreter.Interpreter.call_func "signed_" [ NumV (`Nat (Z.of_int bits)); i ] with
   | Some result -> result
   | None -> failwith (Printf.sprintf "signed_%d: no result" bits)
 
