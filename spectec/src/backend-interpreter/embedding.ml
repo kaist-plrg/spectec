@@ -2,7 +2,7 @@ open Reference_interpreter
 open Al.Ast
 open Al.Al_util
 
-let embedding_error = caseV ("error", [])
+let embedding_error = caseV ("ERROR", [])
 
 let module_decode (bytes_val : value) : value =
   match bytes_val with
@@ -292,17 +292,30 @@ let global_write (store : value) (globaladdr : value) (v : value) : value =
      | _ -> failwith "global_write: unexpected globalinst/globaltype shape")
   | _ -> failwith "global_write: expected nat globaladdr"
 
-(* func_invoke(store, funcaddr, val* ) : (store, val* )
+(* func_invoke(store, funcaddr, val* ) : (store, val* | exception | error)
 
    The caller's [store] is installed as the global store first; [vals] is
    already a list value. [Interpreter.invoke] initializes the Wasm context
    internally and drives the AL [invoke] algorithm, which for a host-function
    funcaddr runs the [call_ref-host] rule -> [$callhostfunc] (see [host.ml]).
-   The post-state is read back from [Ds.Store]. *)
+   The post-state is read back from [Ds.Store].
+
+   Per embedding.rst's three-way result, a plain trap (e.g. [unreachable])
+   becomes [ERROR], mirroring [module_instantiate] below. A genuine Wasm
+   exception ([Exception.Throw], the exception-handling proposal's [throw])
+   is kept distinct and reported as [EXCEPTION exnaddr] -- but [exnaddr] here
+   is a stub ([natV_of_int 0]): [interpreter.ml]'s [ThrowI _ -> raise
+   Exception.Throw] already discards the actual thrown value before it can
+   reach here, and none of [exn_alloc]/[exn_tag]/[exn_read] exist on this
+   embedding boundary yet, so no fixture can observe the stub. Real support
+   needs threading the thrown value through [Exception.Throw] itself. *)
 let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
   Ds.Store.set store; (* install the caller's store as the global store *)
-  let results = Interpreter.invoke [ funcaddr; vals ] in
-  TupV [ Ds.Store.get (); results ]
+  match Interpreter.invoke [ funcaddr; vals ] with
+  | results -> TupV [ Ds.Store.get (); results ]
+  | exception Exception.Trap -> TupV [ Ds.Store.get (); embedding_error ]
+  | exception Exception.Throw ->
+    TupV [ Ds.Store.get (); caseV ("EXCEPTION", [ natV_of_int 0 ]) ]
 
 (* module_instantiate(store, module, externval* ) : (store, moduleinst | error)
 
