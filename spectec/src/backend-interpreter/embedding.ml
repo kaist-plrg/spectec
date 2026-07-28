@@ -292,6 +292,97 @@ let global_write (store : value) (globaladdr : value) (v : value) : value =
      | _ -> failwith "global_write: unexpected globalinst/globaltype shape")
   | _ -> failwith "global_write: expected nat globaladdr"
 
+(* mem_type(store, memaddr) : memtype
+
+   [mem_type(S, a) = S.MEMS[a].TYPE] — same structural-lookup idiom as
+   [func_type]/[global_type] above (embedding.rst, mem_type). *)
+let mem_type (store : value) (memaddr : value) : value =
+  match memaddr with
+  | NumV (`Nat i) -> strv_access "TYPE" (listv_nth (strv_access "MEMS" store) (Z.to_int i))
+  | _ -> failwith "mem_type: expected nat memaddr"
+
+(* mem_size(store, memaddr) : u64
+
+   [mem_size(S, a) = |S.MEMS[a].BYTES| / 65536] (embedding.rst, mem_size) —
+   the memory instance's length in Wasm pages (64 KiB each). Pure structural
+   computation on the caller-supplied [store], no AL-interpreter call
+   needed, same idiom as [func_type]/[global_type] above. *)
+let mem_size (store : value) (memaddr : value) : value =
+  match memaddr with
+  | NumV (`Nat i) ->
+    let bytes_ = strv_access "BYTES" (listv_nth (strv_access "MEMS" store) (Z.to_int i)) in
+    natV (Z.of_int (listv_len bytes_ / 65536))
+  | _ -> failwith "mem_size: expected nat memaddr"
+
+(* mem_read_bytes(store, memaddr) : byte*
+
+   Not part of the Wasm Core Spec's own Embedding API (embedding.rst's
+   [mem_read] is byte-at-a-time, and — unlike this one — unused by js-api
+   itself; see docs/hardcodes.md on the wjmeta side). A wjmeta-bridge-specific
+   bulk read of [store.MEMS[memaddr].BYTES] wholesale, for the JS-side
+   ArrayBuffer/Data-Block sync bridge that stands in for the real
+   cross-process memory aliasing js-api's own text assumes. *)
+let mem_read_bytes (store : value) (memaddr : value) : value =
+  match memaddr with
+  | NumV (`Nat i) -> strv_access "BYTES" (listv_nth (strv_access "MEMS" store) (Z.to_int i))
+  | _ -> failwith "mem_read_bytes: expected nat memaddr"
+
+(* mem_write_bytes(store, memaddr, byte* ) : store
+
+   Bulk write counterpart to [mem_read_bytes] — replaces
+   [store.MEMS[memaddr].BYTES] wholesale via [Util.Record.replace], same
+   mutate-in-place idiom as [global_write] above. Every incoming byte is
+   re-tagged as [NumV (`Nat ...)] regardless of how it arrives (a freshly
+   wjmeta-side-converted [Math] value tags as [`Int], not [`Nat] — see
+   [Interpreter.toAL] on the wjmeta side), so the result matches [host.ml]'s
+   own [BYTES] construction, which real Wasm instruction execution depends
+   on. *)
+let mem_write_bytes (store : value) (memaddr : value) (bytes_ : value) : value =
+  match memaddr, bytes_ with
+  | NumV (`Nat i), ListV arr_ref ->
+    let renatted =
+      ref (Array.map
+        (function
+          | NumV (`Nat _ as n) -> NumV n
+          | NumV (`Int n) -> NumV (`Nat n)
+          | v -> failwith ("mem_write_bytes: expected nat/int byte, got " ^ Al.Print.string_of_value v))
+        !arr_ref)
+    in
+    (match listv_nth (strv_access "MEMS" store) (Z.to_int i) with
+     | StrV r -> Util.Record.replace "BYTES" (ListV renatted) r; store
+     | _ -> failwith "mem_write_bytes: unexpected meminst shape")
+  | _ -> failwith "mem_write_bytes: expected nat memaddr and list bytes"
+
+(* mem_grow(store, memaddr, n: u64) : store | error
+
+   Defers to the spec's own [$growmem(meminst, nat) : meminst]
+   (4.0-execution.configurations.spectec, [hint(partial)] — a genuine partial
+   function: some inputs have no matching equation at all, [n] is a
+   page-count delta), driven through the AL interpreter, mirroring
+   [func_alloc]'s "call the mechanized AL function" pattern above rather than
+   [global_write]'s pure-structural one. Unlike [$allocfunc], [$growmem]
+   takes a bare [meminst], not [(store, memaddr)] — read [MEMS[i]] out of the
+   caller's [store], call [growmem] on it, and on success replace [MEMS[i]]
+   in place (the global array backing a [ListV] is a mutable
+   [value array ref], same idiom [func_alloc]'s own doc describes for
+   appending to [FUNCS]). [Interpreter.call_func] returns [None] exactly when
+   no equation matched — the legitimate "grow failed" outcome for a
+   [hint(partial)] function, unlike [func_alloc]/[module_validate]'s own
+   [None] cases above (which [failwith], since those two are supposed to be
+   total for valid inputs). *)
+let mem_grow (store : value) (memaddr : value) (n : value) : value =
+  match memaddr with
+  | NumV (`Nat i) ->
+    let mems = strv_access "MEMS" store in
+    let mi = listv_nth mems (Z.to_int i) in
+    (match Interpreter.call_func "growmem" [ mi; n ] with
+     | Some mi' ->
+       (match mems with
+        | ListV arr_ref -> Array.set !arr_ref (Z.to_int i) mi'; store
+        | _ -> failwith "mem_grow: unexpected MEMS shape")
+     | None -> embedding_error)
+  | _ -> failwith "mem_grow: expected nat memaddr"
+
 (* func_invoke(store, funcaddr, val* ) : (store, val* | exception | error)
 
    The caller's [store] is installed as the global store first; [vals] is

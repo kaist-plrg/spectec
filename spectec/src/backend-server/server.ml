@@ -162,6 +162,28 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let globaladdr = params |> member "globaladdr" |> value_of_json in
       let v = params |> member "value" |> value_of_json in
       ok (Backend_interpreter.Embedding.global_write store globaladdr v)
+    | "mem_type" ->
+      let store = params |> member "store" |> value_of_json in
+      let memaddr = params |> member "memaddr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.mem_type store memaddr)
+    | "mem_size" ->
+      let store = params |> member "store" |> value_of_json in
+      let memaddr = params |> member "memaddr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.mem_size store memaddr)
+    | "mem_read_bytes" ->
+      let store = params |> member "store" |> value_of_json in
+      let memaddr = params |> member "memaddr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.mem_read_bytes store memaddr)
+    | "mem_write_bytes" ->
+      let store = params |> member "store" |> value_of_json in
+      let memaddr = params |> member "memaddr" |> value_of_json in
+      let bytes_ = params |> member "bytes" |> value_of_json in
+      ok (Backend_interpreter.Embedding.mem_write_bytes store memaddr bytes_)
+    | "mem_grow" ->
+      let store = params |> member "store" |> value_of_json in
+      let memaddr = params |> member "memaddr" |> value_of_json in
+      let n = params |> member "n" |> value_of_json in
+      ok (Backend_interpreter.Embedding.mem_grow store memaddr n)
     | "func_invoke" ->
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
