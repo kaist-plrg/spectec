@@ -171,14 +171,12 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let memaddr = params |> member "memaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_size store memaddr)
     | "mem_read_bytes" ->
-      let store = params |> member "store" |> value_of_json in
       let memaddr = params |> member "memaddr" |> value_of_json in
-      ok (Backend_interpreter.Embedding.mem_read_bytes store memaddr)
+      ok (Backend_interpreter.Embedding.mem_read_bytes memaddr)
     | "mem_write_bytes" ->
-      let store = params |> member "store" |> value_of_json in
       let memaddr = params |> member "memaddr" |> value_of_json in
       let bytes_ = params |> member "bytes" |> value_of_json in
-      ok (Backend_interpreter.Embedding.mem_write_bytes store memaddr bytes_)
+      ok (Backend_interpreter.Embedding.mem_write_bytes memaddr bytes_)
     | "mem_grow" ->
       let store = params |> member "store" |> value_of_json in
       let memaddr = params |> member "memaddr" |> value_of_json in
