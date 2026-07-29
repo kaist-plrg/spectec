@@ -31,7 +31,6 @@ let try_with_error fname at stringifier f step =
   | Exception.UnknownFunc _
   | Exception.FreeVar _) as e -> error at (prefix ^ Printexc.to_string e) (stringifier step)
   | Failure msg -> error at (prefix ^ msg) (stringifier step)
-  | Exception.Fail -> error at (prefix ^ "fail") (stringifier step)
 
 (* stderr, not stdout: in `--server` mode stdout is a JSON-RPC frame stream
    (one JSON value per line), and any stray text on it desyncs the client's
