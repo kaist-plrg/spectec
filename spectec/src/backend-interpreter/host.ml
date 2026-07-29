@@ -214,14 +214,16 @@ let call name =
 let mem fname = fname = "callhostfunc"
 
 (* Effect performed to reenter the embedder (wjmeta) while executing a host
-   function: given the host-function id and its argument [val*], it yields the
-   resulting [val*]. The interpreter merely *performs* this effect; the party
-   that owns the JSON-RPC stdio ([backend_server]) installs the handler around
-   the [func_invoke] it is servicing. Using an effect (rather than a mutable
+   function: given the host-function id, the live store, and the argument
+   [val*], it yields the (possibly-updated) store paired with the resulting
+   [val*]. The interpreter merely *performs* this effect; the party that owns
+   the JSON-RPC stdio ([backend_server]) installs the handler around the
+   [func_invoke] it is servicing. Using an effect (rather than a mutable
    [ref] or threading an invoker through the whole interpreter) keeps this
    module dependency-free, the binding dynamically scoped, and the library
    graph a DAG. *)
-type _ Effect.t += Host_invoke : string * value list -> value list Effect.t
+type _ Effect.t +=
+  Host_invoke : string * value * value list -> (value * value list) Effect.t
 
 (* Implements the spec's [$callhostfunc(state, hostfunc, val* ) : (state, val* )],
    invoked from the [call_ref-host] rule. [hostfunc] is the opaque
@@ -229,15 +231,20 @@ type _ Effect.t += Host_invoke : string * value list -> value list Effect.t
    the id back out and perform the [Host_invoke] effect. *)
 let call_func name args =
   match name, args with
-  (* In interp mode the [state] parameter (both in and out) is elided by
-     [hide_state]/[hide_state_args], so the spec's
-     [$callhostfunc(state, hostfunc, val* ) : (state, val* )] arrives here as
-     [hostfunc; val*] and returns just [val*] — [Ds.Store] (not this
-     parameter) is the live source of truth during a reentrant call, same as
-     [mem_read_bytes]/[mem_write_bytes] in [embedding.ml]. *)
+  (* In interp mode the [state] parameter is elided from [args] by
+     [hide_state]/[hide_state_args] (same as every other explicit-store
+     embedding call), so it's fetched directly from the live [Ds.Store] here
+     instead -- mirrors [mem_read_bytes]'s own "the global store is
+     authoritative" idiom in [embedding.ml]. Unlike that function, the
+     result genuinely does need to flow back out (a host function can mutate
+     the store), so [Ds.Store] is updated with whatever [Host_invoke]
+     returns before resuming. *)
   | "callhostfunc", [ CaseV ("HOSTFUNC", [ TextV id ]); vals ] ->
     let stack = WasmContext.get_context_stack () in
-    let results = Effect.perform (Host_invoke (id, Al_util.unwrap_listv_to_list vals)) in
+    let state = Ds.Store.get () in
+    let (newState, results) =
+      Effect.perform (Host_invoke (id, state, Al_util.unwrap_listv_to_list vals)) in
+    Ds.Store.set newState;
     WasmContext.set_context_stack stack;
     listV_of_list results
   | "callhostfunc", _ -> failwith "callhostfunc: unexpected arguments"

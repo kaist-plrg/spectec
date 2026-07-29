@@ -173,10 +173,6 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "mem_read_bytes" ->
       let memaddr = params |> member "memaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_read_bytes memaddr)
-    | "mem_write_bytes" ->
-      let memaddr = params |> member "memaddr" |> value_of_json in
-      let bytes_ = params |> member "bytes" |> value_of_json in
-      ok (Backend_interpreter.Embedding.mem_write_bytes memaddr bytes_)
     | "mem_grow" ->
       let store = params |> member "store" |> value_of_json in
       let memaddr = params |> member "memaddr" |> value_of_json in
@@ -195,9 +191,9 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
           ()
           { effc = (fun (type a) (eff : a Effect.t) ->
               match eff with
-              | Backend_interpreter.Host.Host_invoke (hid, vals) ->
+              | Backend_interpreter.Host.Host_invoke (hid, state, vals) ->
                 Some (fun (k : (a, value) Effect.Deep.continuation) ->
-                  Effect.Deep.continue k (host_func_invoke hid vals))
+                  Effect.Deep.continue k (host_func_invoke hid state vals))
               | _ -> None) }
       in
       ok result
@@ -213,9 +209,9 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
           ()
           { effc = (fun (type a) (eff : a Effect.t) ->
               match eff with
-              | Backend_interpreter.Host.Host_invoke (hid, vals) ->
+              | Backend_interpreter.Host.Host_invoke (hid, state, vals) ->
                 Some (fun (k : (a, value) Effect.Deep.continuation) ->
-                  Effect.Deep.continue k (host_func_invoke hid vals))
+                  Effect.Deep.continue k (host_func_invoke hid state vals))
               | _ -> None) }
       in
       ok result
@@ -252,14 +248,16 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
   | e ->
     err (-32603) (Printexc.to_string e ^ "\n" ^ Printexc.get_backtrace ()))
 
-(* Reenter wjmeta to run host function [hid] with [vals], returning its [val*]. *)
-and host_func_invoke (hid : string) (vals : value list) : value list =
+(* Reenter wjmeta to run host function [hid] with [state] and [vals],
+   returning the (possibly-updated) store paired with its [val*] result. *)
+and host_func_invoke (hid : string) (state : value) (vals : value list) : value * value list =
   let params =
     `Assoc [("id", `String hid);
+            ("store", json_of_value state);
             ("args", `List (List.map json_of_value vals))] in
   match send_request "host_func_invoke" params with
-  | ListV vs -> Array.to_list !vs
-  | _ -> failwith "host_func_invoke: expected list result"
+  | TupV [ newState; ListV vs ] -> (newState, Array.to_list !vs)
+  | _ -> failwith "host_func_invoke: expected a (store, results) pair"
 
 (* Read+handle+answer a single inbound request. *)
 and serve_request (json : Yojson.Safe.t) : unit =

@@ -319,70 +319,20 @@ let mem_size (store : value) (memaddr : value) : value =
    Not part of the Wasm Core Spec's own Embedding API (embedding.rst's
    [mem_read] is byte-at-a-time, and — unlike this one — unused by js-api
    itself; see docs/hardcodes.md on the wjmeta side). A wjmeta-bridge-specific
-   bulk read of [store.MEMS[memaddr].BYTES] wholesale, for the JS-side
-   ArrayBuffer/Data-Block sync bridge that stands in for the real
-   cross-process memory aliasing js-api's own text assumes.
+   bulk read of [store.MEMS[memaddr].BYTES] wholesale, used by
+   ExpandDataBlockOfPass (the "a Data Block which is identified with the
+   underlying memory of |memaddr|" idiom in
+   create_a_fixed_length_memory_buffer/refresh_the_memory_buffer).
 
    Deliberately *implicit*-store, unlike [func_type]/[global_read] above
    (mirrors [func_alloc]/[func_invoke]'s own "the global [Ds.Store] is
-   authoritative" convention instead): the wjmeta-side sync hook calling this
-   needs it to reflect [Ds.Store]'s live state at the exact moment it calls,
-   which can be *mid* a still-in-flight [func_invoke] (a reentrant
-   [host_func_invoke] callback, wjmeta-side [Interpreter.toHostFunc]) — there
-   is no separate "caller's store" value available there to pass explicitly
-   at all, only whatever [Ds.Store] currently holds. Taking an explicit
-   [store] parameter here (an earlier version of this function did) is
-   actively wrong even in the simpler post-[func_invoke]-return case: wjmeta
-   only writes the fresh returned store back to its own
-   `[surrounding agent].[[associated store]]` mirror as the *next* IR
-   instruction after the `func_invoke` call-embed itself, so a sync hook
-   reading that mirror immediately afterward (inside the same call-embed
-   dispatch) would still see the *previous* call's stale store. *)
+   authoritative" convention instead) — always reads whatever [Ds.Store]
+   currently holds, no separate "caller's store" argument needed. *)
 let mem_read_bytes (memaddr : value) : value =
   let store = Ds.Store.get () in
   match memaddr with
   | NumV (`Nat i) -> strv_access "BYTES" (listv_nth (strv_access "MEMS" store) (Z.to_int i))
   | _ -> failwith "mem_read_bytes: expected nat memaddr"
-
-(* mem_write_bytes(memaddr, byte* ) : store
-
-   Bulk write counterpart to [mem_read_bytes] — replaces
-   [store.MEMS[memaddr].BYTES] wholesale via [Util.Record.replace], same
-   mutate-in-place idiom as [global_write] above, and the same implicit-
-   [Ds.Store]-*input* convention as [mem_read_bytes] just above (no separate
-   "caller's store" parameter needed, and none would even be correct at the
-   reentrant call sites this is used from).
-
-   Unlike [mem_read_bytes], this still *returns* the (now-mutated) store —
-   NOT for symmetry, but because it's load-bearing: [func_invoke]/
-   [module_instantiate] each take an *explicit* [store] argument and
-   unconditionally [Ds.Store.set] it at their own start, discarding whatever
-   [Ds.Store] currently holds. wjmeta's own copy of "the store"
-   (`[surrounding agent].[[associated store]]`) is a plain snapshot *value*,
-   not a live reference — so if this function didn't hand its mutation back
-   for wjmeta to write into that snapshot, the *next* [func_invoke] call
-   would silently clobber this write with the stale pre-write snapshot it's
-   still holding. Every incoming byte is re-tagged as [NumV (`Nat ...)]
-   regardless of how it arrives (a freshly wjmeta-side-converted [Math] value
-   tags as [`Int], not [`Nat] — see [Interpreter.toAL] on the wjmeta side),
-   so the result matches [host.ml]'s own [BYTES] construction, which real
-   Wasm instruction execution depends on. *)
-let mem_write_bytes (memaddr : value) (bytes_ : value) : value =
-  let store = Ds.Store.get () in
-  match memaddr, bytes_ with
-  | NumV (`Nat i), ListV arr_ref ->
-    let renatted =
-      ref (Array.map
-        (function
-          | NumV (`Nat _ as n) -> NumV n
-          | NumV (`Int n) -> NumV (`Nat n)
-          | v -> failwith ("mem_write_bytes: expected nat/int byte, got " ^ Al.Print.string_of_value v))
-        !arr_ref)
-    in
-    (match listv_nth (strv_access "MEMS" store) (Z.to_int i) with
-     | StrV r -> Util.Record.replace "BYTES" (ListV renatted) r; store
-     | _ -> failwith "mem_write_bytes: unexpected meminst shape")
-  | _ -> failwith "mem_write_bytes: expected nat memaddr and list bytes"
 
 (* mem_grow(store, memaddr, n: u64) : store | error
 
