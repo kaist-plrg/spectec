@@ -8948,7 +8948,7 @@ $$
 
 $$
 \begin{array}[t]{@{}lrrl@{}l@{}}
-\mbox{(host function)} & {\mathit{hostfunc}} & ::= & \ldots \\
+\mbox{(host function)} & {\mathit{hostfunc}} & ::= & \mathsf{hostfunc}~\mathbb{T} \\
 & {\mathit{code}} & ::= & {\mathit{func}} ~~|~~ {\mathit{hostfunc}} \\
 \mbox{(tag instance)} & {\mathit{taginst}} & ::= & \{ \begin{array}[t]{@{}l@{}l@{}}
 \mathsf{type}~{\mathit{tagtype}} \} \\
@@ -9896,8 +9896,13 @@ $$
 $$
 \begin{array}[t]{@{}lrcl@{}l@{}}
 {[\textsc{\scriptsize E{-}call}]} \quad & z ; (\mathsf{call}~x) & \hookrightarrow & (\mathsf{ref{.}func}~a)~(\mathsf{call\_ref}~z{.}\mathsf{funcs}{}[a]{.}\mathsf{type}) & \quad \mbox{if}~ z{.}\mathsf{module}{.}\mathsf{funcs}{}[x] = a \\
-{[\textsc{\scriptsize E{-}call\_ref{-}null}]} \quad & z ; (\mathsf{ref{.}null})~(\mathsf{call\_ref}~y) & \hookrightarrow & \mathsf{trap} \\
-{[\textsc{\scriptsize E{-}call\_ref{-}func}]} \quad & z ; {{\mathit{val}}^{n}}~(\mathsf{ref{.}func}~a)~(\mathsf{call\_ref}~y) & \hookrightarrow & ({{\mathsf{frame}}_{m}}{\{ f \}}~({{\mathsf{label}}_{m}}{\{ \epsilon \}}~{{\mathit{instr}}^\ast})) &  \\
+\end{array}
+$$
+
+$$
+\begin{array}[t]{@{}lrcl@{}l@{}}
+{[\textsc{\scriptsize E{-}call\_ref{-}null}]} \quad & z ; (\mathsf{ref{.}null})~(\mathsf{call\_ref}~y) & \hookrightarrow & z ; \mathsf{trap} \\
+{[\textsc{\scriptsize E{-}call\_ref{-}func}]} \quad & z ; {{\mathit{val}}^{n}}~(\mathsf{ref{.}func}~a)~(\mathsf{call\_ref}~y) & \hookrightarrow & z ; ({{\mathsf{frame}}_{m}}{\{ f \}}~({{\mathsf{label}}_{m}}{\{ \epsilon \}}~{{\mathit{instr}}^\ast})) &  \\
 &&& \multicolumn{2}{@{}l@{}}{\quad
 \quad
 \begin{array}[t]{@{}l@{}}
@@ -9905,6 +9910,16 @@ $$
 {\land}~ {\mathit{fi}}{.}\mathsf{type} \approx \mathsf{func}~{t_1^{n}} \rightarrow {t_2^{m}} \\
 {\land}~ {\mathit{fi}}{.}\mathsf{code} = \mathsf{func}~x~{(\mathsf{local}~t)^\ast}~({{\mathit{instr}}^\ast}) \\
 {\land}~ f = \{ \mathsf{locals}~{{\mathit{val}}^{n}}~{({{\mathrm{default}}}_{t})^\ast},\;\allowbreak \mathsf{module}~{\mathit{fi}}{.}\mathsf{module} \} \\
+\end{array}
+} \\
+{[\textsc{\scriptsize E{-}call\_ref{-}host}]} \quad & z ; {{\mathit{val}}^{n}}~(\mathsf{ref{.}func}~a)~(\mathsf{call\_ref}~y) & \hookrightarrow & {z'} ; {{\mathit{val}'}^\ast} &  \\
+&&& \multicolumn{2}{@{}l@{}}{\quad
+\quad
+\begin{array}[t]{@{}l@{}}
+\mbox{if}~ z{.}\mathsf{funcs}{}[a] = {\mathit{fi}} \\
+{\land}~ {\mathit{fi}}{.}\mathsf{type} \approx \mathsf{func}~{t_1^{n}} \rightarrow {t_2^{m}} \\
+{\land}~ {\mathit{fi}}{.}\mathsf{code} = \mathsf{hostfunc}~\mathbb{T} \\
+{\land}~ ({z'}, {{\mathit{val}'}^\ast}) = {\mathrm{callhostfunc}}(z, \mathsf{hostfunc}~\mathbb{T}, {{\mathit{val}}^{n}}) \\
 \end{array}
 } \\
 \end{array}

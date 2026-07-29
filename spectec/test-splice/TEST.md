@@ -1252,6 +1252,9 @@ warning: rule `Step/ctxt-instrs` was never spliced
 warning: rule `Step/ctxt-label` was never spliced
 warning: rule `Step/ctxt-handler` was never spliced
 warning: rule `Step/ctxt-frame` was never spliced
+warning: rule `Step/call_ref-null` was never spliced
+warning: rule `Step/call_ref-func` was never spliced
+warning: rule `Step/call_ref-host` was never spliced
 warning: rule `Step/throw` was never spliced
 warning: rule `Step/local.set` was never spliced
 warning: rule `Step/global.set` was never spliced
@@ -1362,8 +1365,6 @@ warning: rule `Step_read/br_on_cast-fail` was never spliced
 warning: rule `Step_read/br_on_cast_fail-succeed` was never spliced
 warning: rule `Step_read/br_on_cast_fail-fail` was never spliced
 warning: rule `Step_read/call` was never spliced
-warning: rule `Step_read/call_ref-null` was never spliced
-warning: rule `Step_read/call_ref-func` was never spliced
 warning: rule `Step_read/return_call` was never spliced
 warning: rule `Step_read/return_call_ref-label` was never spliced
 warning: rule `Step_read/return_call_ref-handler` was never spliced
@@ -1556,6 +1557,7 @@ warning: definition `before` was never spliced
 warning: definition `binop_` was never spliced
 warning: definition `blocktype_` was never spliced
 warning: definition `bool` was never spliced
+warning: definition `callhostfunc` was never spliced
 warning: definition `canon_` was never spliced
 warning: definition `cbytes_` was never spliced
 warning: definition `ceilz` was never spliced
@@ -2271,6 +2273,7 @@ warning: rule prose `Start_ok` was never spliced
 warning: rule prose `State_ok` was never spliced
 warning: rule prose `Step/array.new_fixed` was never spliced
 warning: rule prose `Step/array.set` was never spliced
+warning: rule prose `Step/call_ref` was never spliced
 warning: rule prose `Step/data.drop` was never spliced
 warning: rule prose `Step/elem.drop` was never spliced
 warning: rule prose `Step/global.set` was never spliced
@@ -2351,7 +2354,6 @@ warning: rule prose `Step_read/block` was never spliced
 warning: rule prose `Step_read/br_on_cast` was never spliced
 warning: rule prose `Step_read/br_on_cast_fail` was never spliced
 warning: rule prose `Step_read/call` was never spliced
-warning: rule prose `Step_read/call_ref` was never spliced
 warning: rule prose `Step_read/global.get` was never spliced
 warning: rule prose `Step_read/load` was never spliced
 warning: rule prose `Step_read/load-num-*` was never spliced
