@@ -223,14 +223,18 @@ let mem fname = fname = "callhostfunc"
    graph a DAG. *)
 type _ Effect.t += Host_invoke : string * value list -> value list Effect.t
 
-(* Implements the spec's [$callhostfunc(hostfunc, state, val* ) : val*], invoked
-   from the [call_ref-host] rule. [hostfunc] is the opaque
+(* Implements the spec's [$callhostfunc(state, hostfunc, val* ) : (state, val* )],
+   invoked from the [call_ref-host] rule. [hostfunc] is the opaque
    [CaseV ("HOSTFUNC", [TextV id])] token stored as the funcinst CODE; we read
    the id back out and perform the [Host_invoke] effect. *)
 let call_func name args =
   match name, args with
-  (* In interp mode the implicit [state] parameter is dropped, so the spec's
-     [$callhostfunc(hostfunc, state, val* )] arrives here as [hostfunc; val*]. *)
+  (* In interp mode the [state] parameter (both in and out) is elided by
+     [hide_state]/[hide_state_args], so the spec's
+     [$callhostfunc(state, hostfunc, val* ) : (state, val* )] arrives here as
+     [hostfunc; val*] and returns just [val*] — [Ds.Store] (not this
+     parameter) is the live source of truth during a reentrant call, same as
+     [mem_read_bytes]/[mem_write_bytes] in [embedding.ml]. *)
   | "callhostfunc", [ CaseV ("HOSTFUNC", [ TextV id ]); vals ] ->
     let stack = WasmContext.get_context_stack () in
     let results = Effect.perform (Host_invoke (id, Al_util.unwrap_listv_to_list vals)) in
