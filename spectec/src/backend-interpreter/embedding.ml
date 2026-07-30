@@ -238,6 +238,19 @@ let func_alloc (store : value) (deftype : value) (hostfunc : value) : value =
   | Some funcaddr -> TupV [ Ds.Store.get (); funcaddr ]
   | None -> failwith "func_alloc: allocfunc returned no value"
 
+(* tag_alloc(store, tagtype) : (store, tagaddr)
+
+   Defers to the spec's own allocation function [$alloctag(store, tagtype) :
+   (store, tagaddr)] (4.4-execution.modules.spectec), the same idiom as
+   [func_alloc] above (and for the same reason: build the taginst via the
+   mechanized AL function rather than by hand). Store parameter dropped in
+   interp mode, same as [allocfunc]. *)
+let tag_alloc (store : value) (tagtype : value) : value =
+  Ds.Store.set store;
+  match Interpreter.call_func "alloctag" [ tagtype ] with
+  | Some tagaddr -> TupV [ Ds.Store.get (); tagaddr ]
+  | None -> failwith "tag_alloc: alloctag returned no value"
+
 (* func_type(store, funcaddr) : deftype
 
    Per the Wasm core spec's embedding API (embedding.rst, func_type),
