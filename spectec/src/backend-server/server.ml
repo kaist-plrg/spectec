@@ -153,6 +153,10 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.func_type store funcaddr)
+    | "ref_type" ->
+      let store = params |> member "store" |> value_of_json in
+      let ref_ = params |> member "ref" |> value_of_json in
+      ok (Backend_interpreter.Embedding.ref_type store ref_)
     | "global_type" ->
       let store = params |> member "store" |> value_of_json in
       let globaladdr = params |> member "globaladdr" |> value_of_json in

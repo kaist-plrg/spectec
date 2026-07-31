@@ -266,6 +266,36 @@ let func_type (store : value) (funcaddr : value) : value =
   | NumV (`Nat i) -> strv_access "TYPE" (listv_nth (strv_access "FUNCS" store) (Z.to_int i))
   | _ -> failwith "func_type: expected nat funcaddr"
 
+(* ref_type(store, ref) : reftype
+
+   [ref_type(S, r) = t] where [S \vdashval r : t] (embedding.rst, "Values") —
+   a reference's *principal* reftype, derived structurally from its runtime
+   representation: null/i31/host/exn are fixed heap types, extern is opaque,
+   and every other [REF.<X>_ADDR] variant (func/struct/array) reads its
+   declared TYPE off the corresponding store array, the same idiom as
+   [func_type] above. Ported from [relation.ml]'s [ref_ok] (its
+   [get_principal] helper, the only existing embodiment of this logic —
+   there is no separate mechanized AL judgment for it), parameterized on the
+   caller-supplied [store] instead of the global [Ds.Store]: like
+   [func_type], this can't observe or change store state, so it just reads
+   straight out of [store]. *)
+let ref_type (store : value) (r : value) : value =
+  let null = some "NULL" in
+  let nonull = none "NULL" in
+  match r with
+  | CaseV ("REF.NULL_ADDR", []) -> CaseV ("REF", [ null; nullary "BOT" ])
+  | CaseV ("REF.I31_NUM", [ _ ]) -> CaseV ("REF", [ nonull; nullary "I31" ])
+  | CaseV ("REF.HOST_ADDR", [ _ ]) -> CaseV ("REF", [ nonull; nullary "ANY" ])
+  | CaseV ("REF.EXN_ADDR", [ _ ]) -> CaseV ("REF", [ nonull; nullary "EXN" ])
+  | CaseV (name, [ NumV (`Nat i) ])
+    when String.starts_with ~prefix:"REF." name && String.ends_with ~suffix:"_ADDR" name ->
+    let field_name = String.sub name 4 (String.length name - 9) in
+    let object_ = listv_nth (strv_access (field_name ^ "S") store) (Z.to_int i) in
+    let dt = strv_access "TYPE" object_ in
+    CaseV ("REF", [ nonull; dt ])
+  | CaseV ("REF.EXTERN", [ _ ]) -> CaseV ("REF", [ nonull; nullary "EXTERN" ])
+  | _ -> failwith "ref_type: unrecognized ref shape"
+
 (* global_type(store, globaladdr) : globaltype
 
    [global_type(S, a) = S.GLOBALS[a].TYPE] — same structural-lookup idiom as
