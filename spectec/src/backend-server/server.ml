@@ -149,6 +149,11 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let store = params |> member "store" |> value_of_json in
       let tagtype = params |> member "tagtype" |> value_of_json in
       ok (Backend_interpreter.Embedding.tag_alloc store tagtype)
+    | "exn_alloc" ->
+      let store = params |> member "store" |> value_of_json in
+      let tagaddr = params |> member "tagaddr" |> value_of_json in
+      let vals = params |> member "vals" |> value_of_json in
+      ok (Backend_interpreter.Embedding.exn_alloc store tagaddr vals)
     | "func_type" ->
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in

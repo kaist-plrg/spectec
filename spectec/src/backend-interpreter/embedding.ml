@@ -251,6 +251,29 @@ let tag_alloc (store : value) (tagtype : value) : value =
   | Some tagaddr -> TupV [ Ds.Store.get (); tagaddr ]
   | None -> failwith "tag_alloc: alloctag returned no value"
 
+(* exn_alloc(store, tagaddr, val* ) : (store, exnaddr)
+
+   embedding.rst's `embed-exn-alloc`: [exn_alloc(S, tagaddr, val* ) = (S ++
+   {EXNS exninst}, |S.EXNS|), iff exninst = {TAG tagaddr, FIELDS val* }]. Not
+   mechanized anywhere in this fork's `.spectec` sources -- the Wasm Core
+   spec's own mechanization only ever builds an [exninst] inline, as part of
+   the [THROW] instruction's reduction rule
+   (4.3-execution.instructions.spectec:238-241), never as a standalone
+   function -- so there's no `$allocexn` for [Interpreter.call_func] to
+   defer to (docs/hardcodes.md #13). Hand-codes the formula above directly
+   instead, keeping [func_alloc]/[tag_alloc]'s "install as global store,
+   mutate in place, read back store" shape for consistency. *)
+let exn_alloc (store : value) (tagaddr : value) (vals : value) : value =
+  Ds.Store.set store;
+  let exns = unwrap_listv (Ds.Store.access "EXNS") in
+  let exnaddr = natV_of_int (Array.length !exns) in
+  let exninst =
+    strV
+      Util.Record.(empty |> add "TAG" tagaddr |> add "FIELDS" vals)
+  in
+  exns := Array.append !exns [| exninst |];
+  TupV [ Ds.Store.get (); exnaddr ]
+
 (* func_type(store, funcaddr) : deftype
 
    Per the Wasm core spec's embedding API (embedding.rst, func_type),
@@ -419,11 +442,14 @@ let mem_grow (store : value) (memaddr : value) (n : value) : value =
    becomes [ERROR], mirroring [module_instantiate] below. A genuine Wasm
    exception ([Exception.Throw], the exception-handling proposal's [throw])
    is kept distinct and reported as [EXCEPTION exnaddr] -- but [exnaddr] here
-   is a stub ([natV_of_int 0]): [interpreter.ml]'s [ThrowI _ -> raise
+   is still a stub ([natV_of_int 0]): [interpreter.ml]'s [ThrowI _ -> raise
    Exception.Throw] already discards the actual thrown value before it can
-   reach here, and none of [exn_alloc]/[exn_tag]/[exn_read] exist on this
-   embedding boundary yet, so no fixture can observe the stub. Real support
-   needs threading the thrown value through [Exception.Throw] itself. *)
+   reach here. [exn_alloc] above now exists (so a value can be boxed *into*
+   an exnaddr going into Wasm), but [exn_tag]/[exn_read] still don't (so one
+   can't be read back out here) -- and wiring those up wouldn't help by
+   itself anyway, since there is no real exnaddr to read at this point yet.
+   Real support needs threading the thrown value through [Exception.Throw]
+   itself first. *)
 let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
   Ds.Store.set store; (* install the caller's store as the global store *)
   match Interpreter.invoke [ funcaddr; vals ] with
