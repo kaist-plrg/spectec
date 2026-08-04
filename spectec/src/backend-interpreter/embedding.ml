@@ -274,6 +274,26 @@ let exn_alloc (store : value) (tagaddr : value) (vals : value) : value =
   exns := Array.append !exns [| exninst |];
   TupV [ Ds.Store.get (); exnaddr ]
 
+(* exn_tag(store, exnaddr) : tagaddr
+
+   embedding.rst's `embed-exn-tag`: [exn_tag(S, a) = S.EXNS[a].TAG]. Same
+   "no Ds.Store, read straight out of the caller-supplied store" idiom as
+   [func_type]/[ref_type] below -- this can't observe or change store
+   state either. [exnaddr] is a bare nat, as elsewhere in this module. *)
+let exn_tag (store : value) (exnaddr : value) : value =
+  match exnaddr with
+  | NumV (`Nat i) -> strv_access "TAG" (listv_nth (strv_access "EXNS" store) (Z.to_int i))
+  | _ -> failwith "exn_tag: expected nat exnaddr"
+
+(* exn_read(store, exnaddr) : val*
+
+   embedding.rst's `embed-exn-read`: [exn_read(S, a) = S.EXNS[a].FIELDS] --
+   same idiom as [exn_tag] directly above. *)
+let exn_read (store : value) (exnaddr : value) : value =
+  match exnaddr with
+  | NumV (`Nat i) -> strv_access "FIELDS" (listv_nth (strv_access "EXNS" store) (Z.to_int i))
+  | _ -> failwith "exn_read: expected nat exnaddr"
+
 (* func_type(store, funcaddr) : deftype
 
    Per the Wasm core spec's embedding API (embedding.rst, func_type),
@@ -441,22 +461,25 @@ let mem_grow (store : value) (memaddr : value) (n : value) : value =
    Per embedding.rst's three-way result, a plain trap (e.g. [unreachable])
    becomes [ERROR], mirroring [module_instantiate] below. A genuine Wasm
    exception ([Exception.Throw], the exception-handling proposal's [throw])
-   is kept distinct and reported as [EXCEPTION exnaddr] -- but [exnaddr] here
-   is still a stub ([natV_of_int 0]): [interpreter.ml]'s [ThrowI _ -> raise
-   Exception.Throw] already discards the actual thrown value before it can
-   reach here. [exn_alloc] above now exists (so a value can be boxed *into*
-   an exnaddr going into Wasm), but [exn_tag]/[exn_read] still don't (so one
-   can't be read back out here) -- and wiring those up wouldn't help by
-   itself anyway, since there is no real exnaddr to read at this point yet.
-   Real support needs threading the thrown value through [Exception.Throw]
-   itself first. *)
+   is kept distinct and reported as [EXCEPTION exnaddr] -- [exnaddr] is now
+   the real address [ThrowI]'s own expr carries (see [Exception.Throw]'s
+   own doc), not a stub, so [exn_tag]/[exn_read] below can meaningfully
+   read it back. [unwrap_exnaddr] tolerates [ThrowI]'s payload coming
+   through as either the bare address or the [REF.EXN_ADDR addr] ref
+   wrapping it, since which one [il2al]'s own "HARDCODE: Insert ThrowI"
+   translation extracts isn't pinned down by anything other than this call
+   site actually observing it. *)
+let unwrap_exnaddr = function
+  | CaseV ("REF.EXN_ADDR", [ addr ]) -> addr
+  | addr -> addr
+
 let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
   Ds.Store.set store; (* install the caller's store as the global store *)
   match Interpreter.invoke [ funcaddr; vals ] with
   | results -> TupV [ Ds.Store.get (); results ]
   | exception Exception.Trap -> TupV [ Ds.Store.get (); embedding_error ]
-  | exception Exception.Throw ->
-    TupV [ Ds.Store.get (); caseV ("EXCEPTION", [ natV_of_int 0 ]) ]
+  | exception Exception.Throw v ->
+    TupV [ Ds.Store.get (); caseV ("EXCEPTION", [ unwrap_exnaddr v ]) ]
 
 (* module_instantiate(store, module, externval* ) : (store, moduleinst | error)
 
@@ -468,14 +491,15 @@ let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
 
    Instantiation can fail either by trapping (e.g. an out-of-bounds active
    segment) or by the module's start function throwing (Wasm
-   exception-handling proposal). Both collapse to [embedding_error] here:
-   [Exception.Throw] carries no payload on the OCaml side ([interpreter.ml]'s
-   [ThrowI _ -> raise Exception.Throw] discards the thrown value), so there is
-   no distinct "exception" result to return yet, only trap-shaped "error". *)
+   exception-handling proposal) -- embedding.rst's own declared type is the
+   same three-way (store, moduleinst | exception | error) [func_invoke] has
+   above, but unlike that one, both still collapse to [embedding_error] here
+   -- distinguishing them (mirroring [func_invoke]'s [EXCEPTION exnaddr])
+   is unaddressed; no fixture exercises a throwing start function yet. *)
 let module_instantiate
   (store : value) (module_ : value) (externvals : value) : value =
   Ds.Store.set store;
   match Interpreter.instantiate [ module_; externvals ] with
   | moduleinst -> TupV [ Ds.Store.get (); moduleinst ]
-  | exception (Exception.Trap | Exception.Throw) ->
+  | exception (Exception.Trap | Exception.Throw _) ->
     TupV [ Ds.Store.get (); embedding_error ]

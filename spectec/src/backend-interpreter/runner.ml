@@ -197,7 +197,7 @@ let test_assertion assertion =
   )
   | AssertException action ->
     (match run_action action with
-    | exception Exception.Throw -> success
+    | exception Exception.Throw _ -> success
     | _ -> Assert.error assertion.at "expected exception"
     )
   | AssertInvalid (def, re) when !Construct.version = 3 ->

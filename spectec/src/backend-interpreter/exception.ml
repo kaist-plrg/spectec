@@ -1,6 +1,7 @@
 exception Invalid of exn * Printexc.raw_backtrace
 exception Trap
-exception Throw
+(* Carries the thrown [ref.exn]'s exnaddr. *)
+exception Throw of Al.Ast.value
 exception OutOfMemory
 exception Timeout
 exception MissingReturnValue of string

@@ -649,7 +649,7 @@ and step_instr (fname: string) (ctx: AlContext.t) (env: value Env.t) (instr: ins
     call_func f args |> ignore;
     ctx
   | TrapI -> raise Exception.Trap
-  | ThrowI _ -> raise Exception.Throw
+  | ThrowI e -> raise (Exception.Throw (eval_expr env e))
   | FailI -> raise Exception.Fail
   | NopI -> ctx
   | ReturnI None -> AlContext.tl ctx
