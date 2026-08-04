@@ -216,16 +216,19 @@ let mem fname = fname = "callhostfunc"
 (* Effect performed to reenter the embedder (wjmeta) while executing a host
    function: given the host-function id, the live store, and the argument
    [val*], it yields the (possibly-updated) store paired with the resulting
-   [val*]. The interpreter merely *performs* this effect; the party that owns
-   the JSON-RPC stdio ([backend_server]) installs the handler around the
-   [func_invoke] it is servicing. Using an effect (rather than a mutable
-   [ref] or threading an invoker through the whole interpreter) keeps this
-   module dependency-free, the binding dynamically scoped, and the library
-   graph a DAG. *)
+   [instr*] (the host function's own return value(s), an escaping
+   [(ref.exn a) throw_ref], or a [TRAP] -- verbatim, uninterpreted here; see
+   [$callhostfunc]'s own doc for why this isn't the spec's [result] syntax
+   wrapped instead). The interpreter merely *performs* this effect; the
+   party that owns the JSON-RPC stdio ([backend_server]) installs the
+   handler around the [func_invoke] it is servicing. Using an effect
+   (rather than a mutable [ref] or threading an invoker through the whole
+   interpreter) keeps this module dependency-free, the binding dynamically
+   scoped, and the library graph a DAG. *)
 type _ Effect.t +=
   Host_invoke : string * value * value list -> (value * value list) Effect.t
 
-(* Implements the spec's [$callhostfunc(state, hostfunc, val* ) : (state, val* )],
+(* Implements the spec's [$callhostfunc(state, hostfunc, val* ) : (state, instr* )],
    invoked from the [call_ref-host] rule. [hostfunc] is the opaque
    [CaseV ("HOSTFUNC", [TextV id])] token stored as the funcinst CODE; we read
    the id back out and perform the [Host_invoke] effect. *)
@@ -242,10 +245,10 @@ let call_func name args =
   | "callhostfunc", [ CaseV ("HOSTFUNC", [ TextV id ]); vals ] ->
     let stack = WasmContext.get_context_stack () in
     let state = Ds.Store.get () in
-    let (newState, results) =
+    let (newState, instrs) =
       Effect.perform (Host_invoke (id, state, Al_util.unwrap_listv_to_list vals)) in
     Ds.Store.set newState;
     WasmContext.set_context_stack stack;
-    listV_of_list results
+    listV_of_list instrs
   | "callhostfunc", _ -> failwith "callhostfunc: unexpected arguments"
   | _ -> raise (Exception.UnknownFunc ("No host function: " ^ name))

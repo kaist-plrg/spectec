@@ -168,6 +168,16 @@ let rec is_wasm_value e =
 let is_wasm_instr e =
   (* TODO: use hint? *)
   Valid.sub_typ e.note instrT || Valid.sub_typ e.note admininstrT
+(* like [is_wasm_instr], but for an expression whose type is itself an
+   `instr*`/`admininstr*` sequence (e.g. a function call returning `instr*`)
+   rather than a single instr -- `Valid.sub_typ` only recurses into `IterT`
+   when *both* sides are already iterated, so it never fires against the bare
+   `instrT`/`admininstrT` this compares to; unwrap the `IterT` by hand instead. *)
+let is_wasm_instr_seq e =
+  match (Valid.ground_typ_of e.note).it with
+  | Il.IterT (elem_typ, Il.List) ->
+    Valid.sub_typ elem_typ instrT || Valid.sub_typ elem_typ admininstrT
+  | _ -> false
 
 (** Translation *)
 
@@ -480,6 +490,10 @@ let rec translate_rhs exp =
   | _ when is_wasm_value exp -> [ pushI (translate_exp exp |> subst_instr_typ) ]
   (* Instr *)
   | _ when is_wasm_instr exp -> [ executeI (translate_exp exp) ]
+  (* Instr sequence, e.g. a function call returning `instr*` directly
+     rather than a literal concatenation the CatE/ListE cases above already
+     decompose -- splice the whole evaluated list onto the continuation. *)
+  | _ when is_wasm_instr_seq exp -> [ executeSeqI (translate_exp exp) ]
   | _ -> error_exp exp "expression on rhs of reduction"
 
 and translate_context_instrs e' =

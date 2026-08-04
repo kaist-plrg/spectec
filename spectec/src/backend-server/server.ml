@@ -262,7 +262,10 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     err (-32603) (Printexc.to_string e ^ "\n" ^ Printexc.get_backtrace ()))
 
 (* Reenter wjmeta to run host function [hid] with [state] and [vals],
-   returning the (possibly-updated) store paired with its [val*] result. *)
+   returning the (possibly-updated) store paired with its [instr*] (the
+   host function's own return value(s), an escaping [throw_ref], or a
+   [TRAP] -- verbatim; see [Host.call_func]'s doc for why the wjmeta side
+   isn't asked to tag this as the spec's [result] syntax). *)
 and host_func_invoke (hid : string) (state : value) (vals : value list) : value * value list =
   let params =
     `Assoc [("id", `String hid);
@@ -270,7 +273,7 @@ and host_func_invoke (hid : string) (state : value) (vals : value list) : value 
             ("args", `List (List.map json_of_value vals))] in
   match send_request "host_func_invoke" params with
   | TupV [ newState; ListV vs ] -> (newState, Array.to_list !vs)
-  | _ -> failwith "host_func_invoke: expected a (store, results) pair"
+  | _ -> failwith "host_func_invoke: expected a (store, instrs) pair"
 
 (* Read+handle+answer a single inbound request. *)
 and serve_request (json : Yojson.Safe.t) : unit =

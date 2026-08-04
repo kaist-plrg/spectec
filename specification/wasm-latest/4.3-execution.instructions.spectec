@@ -166,7 +166,16 @@ rule Step_read/br_on_cast_fail-fail:
 
 ;; Function instructions
 
-def $callhostfunc(state, hostfunc, val*): (state, val*)
+;; `result` (plain values / an escaping `throw_ref` / a trap,
+;; 4.0-execution.configurations.spectec) was tried here first, but its
+;; escaping-throw case is a mixfix mouthful (`(REF.EXN_ADDR%)THROW_REF`)
+;; whose compiled runtime tag isn't derivable without it -- and it was
+;; always going to be immediately unpacked back into `instr*` for splicing
+;; onto the continuation anyway (`Step/call_ref-host` below), since all
+;; three of its cases already *are* valid `instr*`. So `$callhostfunc`
+;; returns `instr*` directly instead: the host function's own return
+;; value/thrown exception/trap, verbatim, uninterpreted by this def.
+def $callhostfunc(state, hostfunc, val*): (state, instr*)
 
 rule Step_read/call:
   z; (CALL x)  ~>  (REF.FUNC_ADDR a) (CALL_REF $funcinst(z)[a].TYPE)
@@ -184,12 +193,12 @@ rule Step/call_ref-func:
   -- if f = {LOCALS val^n ($default_(t))*, MODULE fi.MODULE}
 
 rule Step/call_ref-host:
-  z; val^n (REF.FUNC_ADDR a) (CALL_REF yy)  ~>  z'; val'*
+  z; val^n (REF.FUNC_ADDR a) (CALL_REF yy)  ~>  z'; instr*
   ----
   -- if $funcinst(z)[a] = fi
   -- Expand: fi.TYPE ~~ FUNC t_1^n -> t_2^m
   -- if fi.CODE = HOSTFUNC text
-  -- if (z', val'*) = $callhostfunc(z, HOSTFUNC text, val^n)
+  -- if (z', instr*) = $callhostfunc(z, HOSTFUNC text, val^n)
 
 
 rule Step_read/return_call:

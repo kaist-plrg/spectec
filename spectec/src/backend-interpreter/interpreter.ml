@@ -717,10 +717,21 @@ and try_step_instr fname ctx env instr =
 and step_wasm (ctx: AlContext.t) : value -> AlContext.t = function
   | CaseV ("REF.NULL" as name, ([ CaseV ("_IDX", _) ] as args)) when !Construct.version <= 2 ->
     create_context name args :: ctx
-  | CaseV ("REF.NULL", _) as v when !Construct.version <= 2 ->
-    WasmContext.push_value v; ctx
-  | CaseV ("CONST", _)
-  | CaseV ("VCONST", _) as v -> WasmContext.push_value v; ctx
+  (* Every other already-a-value instr (CONST/VCONST, and any REF.*-tagged
+     ref -- REF.NULL_ADDR/REF.FUNC_ADDR/REF.EXN_ADDR/...) is pushed as-is,
+     never dispatched to create_context below: [WasmContext.is_value]'s own
+     REF.* prefix check already covers every one of them uniformly, unlike
+     this function's previous CONST/VCONST-only special case, which left
+     every REF.* value to wrongly fall through to create_context (looking
+     up e.g. "REF.EXN_ADDR" as if it named a reduction rule/algorithm, not a
+     value) -- normally never observed because every literal instr sequence
+     a reduction rule's own RHS writes gets this same push/execute split at
+     *compile* time instead (il2al/translate.ml's is_wasm_value/is_wasm_instr),
+     so step_wasm's own runtime fallback here was only ever exercised for
+     CONST/VCONST. A *runtime*-computed instr* (e.g. $callhostfunc's, per
+     ExecuteSeqI) can't get that compile-time split, so it depends on this
+     generic runtime check being complete too. *)
+  | v when WasmContext.is_value v -> WasmContext.push_value v; ctx
   | CaseV (name, []) when Host.is_host name -> Host.call name; ctx
   | CaseV (name, args) -> create_context name args :: ctx
   | v -> fail_value "cannot step a wasm instr" v

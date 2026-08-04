@@ -91,6 +91,7 @@ module WasmContext : sig
 
   val get_value_stack : unit -> value list
   val pop_value_stack : unit -> value list
+  val is_value : value -> bool
   val push_value : value -> unit
   val pop_value : unit -> value
 
