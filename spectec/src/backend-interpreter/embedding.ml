@@ -164,6 +164,31 @@ let expand (deftype : value) : value =
   | None -> failwith "expand: Expand returned no value"
   | exception Exception.Invalid _ -> embedding_error
 
+(* fold(comptype) : deftype
+
+   The construction-direction mirror of [expand] just above: also not part of
+   the Wasm Core Spec's own Embedding API, and exists for the same reason in
+   reverse — js-api/index.bs's own prose builds a bare [comptype] directly
+   (e.g. [tag_alloc]'s `|wasmParameters| -> « »` argument, js-api/index.bs
+   :1559/:1798) where the Wasm Core Spec's embedding API actually expects a
+   [deftype] ([tag_alloc(store, tagtype)]), again without ever calling out to
+   a step that builds one (docs/spec_errors.md, wjmeta side). Wraps [comptype]
+   into a fresh, standalone (non-recursive, final, no supertypes) deftype:
+   [_DEF (REC [SUB (some FINAL) [] comptype]) 0]. Unlike [expand], this
+   doesn't defer to a mechanized `.spectec` function: [$rolldt]/[$rollrt]
+   exist (1.2-syntax.types.spectec) and could build this too, but their only
+   real work — substituting a rec group's internal self-references into
+   absolute indices — is a no-op for a lone, non-self-referential type (every
+   type js-api ever builds this way), so routing through the AL interpreter
+   for that would be pure overhead here; hand-builds the fixed shape directly
+   instead, the same [exn_alloc] idiom elsewhere in this file for the same
+   reason (mechanized route exists but adds nothing for this specific,
+   always-fixed-shape case). *)
+let fold (comptype : value) : value =
+  let subtype = caseV ("SUB", [ some "FINAL"; listV_of_list []; comptype ]) in
+  let rectype = caseV ("REC", [ listV_of_list [ subtype ] ]) in
+  caseV ("_DEF", [ rectype; natV_of_int 0 ])
+
 (* match_valtype(valtype1, valtype2) : bool
 
    Per the Wasm core spec's embedding API (embedding.rst, "Matching"): true

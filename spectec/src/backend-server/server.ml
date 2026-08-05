@@ -127,6 +127,9 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "expand" ->
       let deftype = params |> member "deftype" |> value_of_json in
       ok (Backend_interpreter.Embedding.expand deftype)
+    | "fold" ->
+      let comptype = params |> member "comptype" |> value_of_json in
+      ok (Backend_interpreter.Embedding.fold comptype)
     | "match_valtype" ->
       let valtype1 = params |> member "valtype1" |> value_of_json in
       let valtype2 = params |> member "valtype2" |> value_of_json in
