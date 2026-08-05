@@ -294,6 +294,17 @@ let exn_read (store : value) (exnaddr : value) : value =
   | NumV (`Nat i) -> strv_access "FIELDS" (listv_nth (strv_access "EXNS" store) (Z.to_int i))
   | _ -> failwith "exn_read: expected nat exnaddr"
 
+(* tag_type(store, tagaddr) : tagtype
+
+   Per the Wasm core spec's embedding API (embedding.rst, tag_type),
+   [tag_type(S, a) = S.TAGS[a].TYPE] -- same structural-lookup idiom as
+   [func_type]/[global_type] below. [tagaddr] is a bare nat, as elsewhere in
+   this module. *)
+let tag_type (store : value) (tagaddr : value) : value =
+  match tagaddr with
+  | NumV (`Nat i) -> strv_access "TYPE" (listv_nth (strv_access "TAGS" store) (Z.to_int i))
+  | _ -> failwith "tag_type: expected nat tagaddr"
+
 (* func_type(store, funcaddr) : deftype
 
    Per the Wasm core spec's embedding API (embedding.rst, func_type),
