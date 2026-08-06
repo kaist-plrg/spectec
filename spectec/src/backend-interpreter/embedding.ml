@@ -486,6 +486,85 @@ let mem_grow (store : value) (memaddr : value) (n : value) : value =
      | None -> embedding_error)
   | _ -> failwith "mem_grow: expected nat memaddr"
 
+(* table_alloc(store, tabletype, ref) : (store, tableaddr)
+
+   Defers to the spec's own allocation function [$alloctable(store,
+   tabletype, ref) : (store, tableaddr)] (4.4-execution.modules.spectec), the
+   same idiom as [func_alloc]/[tag_alloc] above. *)
+let table_alloc (store : value) (tabletype : value) (r : value) : value =
+  Ds.Store.set store;
+  match Interpreter.call_func "alloctable" [ tabletype; r ] with
+  | Some tableaddr -> TupV [ Ds.Store.get (); tableaddr ]
+  | None -> failwith "table_alloc: alloctable returned no value"
+
+(* table_type(store, tableaddr) : tabletype
+
+   [table_type(S, a) = S.TABLES[a].TYPE] — same structural-lookup idiom as
+   [global_type]/[mem_type] above (embedding.rst, table_type). *)
+let table_type (store : value) (tableaddr : value) : value =
+  match tableaddr with
+  | NumV (`Nat i) ->
+    strv_access "TYPE" (listv_nth (strv_access "TABLES" store) (Z.to_int i))
+  | _ -> failwith "table_type: expected nat tableaddr"
+
+(* table_read(store, tableaddr, i: u64) : ref | error
+
+   [table_read(S, a, i) = S.TABLES[a].REFS[i]], or [error] if [i] is out of
+   bounds (embedding.rst, table_read). *)
+let table_read (store : value) (tableaddr : value) (i : value) : value =
+  match tableaddr, i with
+  | NumV (`Nat a), NumV (`Nat idx) ->
+    let refs = strv_access "REFS" (listv_nth (strv_access "TABLES" store) (Z.to_int a)) in
+    let idx = Z.to_int idx in
+    if idx >= 0 && idx < listv_len refs then listv_nth refs idx
+    else embedding_error
+  | _ -> failwith "table_read: expected nat tableaddr/i"
+
+(* table_write(store, tableaddr, i: u64, ref) : store | error
+
+   [table_write(S, a, i, r) = S']  with [S'.TABLES[a].REFS[i] = r], or
+   [error] if [i] is out of bounds (embedding.rst, table_write). Mutates in
+   place like [global_write]/[mem_grow] — REFS is backed by a mutable [value
+   array ref], so an in-bounds write updates the caller's [store] directly
+   and returns it. *)
+let table_write (store : value) (tableaddr : value) (i : value) (r : value) : value =
+  match tableaddr, i with
+  | NumV (`Nat a), NumV (`Nat idx) ->
+    let refs = unwrap_listv (strv_access "REFS" (listv_nth (strv_access "TABLES" store) (Z.to_int a))) in
+    let idx = Z.to_int idx in
+    if idx >= 0 && idx < Array.length !refs then (Array.set !refs idx r; store)
+    else embedding_error
+  | _ -> failwith "table_write: expected nat tableaddr/i"
+
+(* table_size(store, tableaddr) : u64
+
+   [table_size(S, a) = |S.TABLES[a].REFS|] (embedding.rst, table_size). *)
+let table_size (store : value) (tableaddr : value) : value =
+  match tableaddr with
+  | NumV (`Nat i) ->
+    let refs = strv_access "REFS" (listv_nth (strv_access "TABLES" store) (Z.to_int i)) in
+    natV (Z.of_int (listv_len refs))
+  | _ -> failwith "table_size: expected nat tableaddr"
+
+(* table_grow(store, tableaddr, n: u64, ref) : store | error
+
+   Defers to the spec's own [$growtable(tableinst, nat, ref) : tableinst]
+   (4.0-execution.configurations.spectec, [hint(partial)]), the same idiom as
+   [mem_grow] above — read [TABLES[i]] out of the caller's [store], call
+   [growtable] on it, and on success replace [TABLES[i]] in place. *)
+let table_grow (store : value) (tableaddr : value) (n : value) (r : value) : value =
+  match tableaddr with
+  | NumV (`Nat i) ->
+    let tables = strv_access "TABLES" store in
+    let ti = listv_nth tables (Z.to_int i) in
+    (match Interpreter.call_func "growtable" [ ti; n; r ] with
+     | Some ti' ->
+       (match tables with
+        | ListV arr_ref -> Array.set !arr_ref (Z.to_int i) ti'; store
+        | _ -> failwith "table_grow: unexpected TABLES shape")
+     | None -> embedding_error)
+  | _ -> failwith "table_grow: expected nat tableaddr"
+
 (* func_invoke(store, funcaddr, val* ) : (store, val* | exception | error)
 
    The caller's [store] is installed as the global store first; [vals] is

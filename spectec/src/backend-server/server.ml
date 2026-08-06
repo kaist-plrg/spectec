@@ -206,6 +206,36 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let memaddr = params |> member "memaddr" |> value_of_json in
       let n = params |> member "n" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_grow store memaddr n)
+    | "table_alloc" ->
+      let store = params |> member "store" |> value_of_json in
+      let tabletype = params |> member "tabletype" |> value_of_json in
+      let r = params |> member "ref" |> value_of_json in
+      ok (Backend_interpreter.Embedding.table_alloc store tabletype r)
+    | "table_type" ->
+      let store = params |> member "store" |> value_of_json in
+      let tableaddr = params |> member "tableaddr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.table_type store tableaddr)
+    | "table_read" ->
+      let store = params |> member "store" |> value_of_json in
+      let tableaddr = params |> member "tableaddr" |> value_of_json in
+      let i = params |> member "i" |> value_of_json in
+      ok (Backend_interpreter.Embedding.table_read store tableaddr i)
+    | "table_write" ->
+      let store = params |> member "store" |> value_of_json in
+      let tableaddr = params |> member "tableaddr" |> value_of_json in
+      let i = params |> member "i" |> value_of_json in
+      let r = params |> member "ref" |> value_of_json in
+      ok (Backend_interpreter.Embedding.table_write store tableaddr i r)
+    | "table_size" ->
+      let store = params |> member "store" |> value_of_json in
+      let tableaddr = params |> member "tableaddr" |> value_of_json in
+      ok (Backend_interpreter.Embedding.table_size store tableaddr)
+    | "table_grow" ->
+      let store = params |> member "store" |> value_of_json in
+      let tableaddr = params |> member "tableaddr" |> value_of_json in
+      let n = params |> member "n" |> value_of_json in
+      let r = params |> member "ref" |> value_of_json in
+      ok (Backend_interpreter.Embedding.table_grow store tableaddr n r)
     | "func_invoke" ->
       let store = params |> member "store" |> value_of_json in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
