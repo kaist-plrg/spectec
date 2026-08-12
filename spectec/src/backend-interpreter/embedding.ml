@@ -462,26 +462,48 @@ let mem_read_bytes (memaddr : value) : value =
    (4.0-execution.configurations.spectec, [hint(partial)] — a genuine partial
    function: some inputs have no matching equation at all, [n] is a
    page-count delta), driven through the AL interpreter, mirroring
-   [func_alloc]'s "call the mechanized AL function" pattern above rather than
-   [global_write]'s pure-structural one. Unlike [$allocfunc], [$growmem]
-   takes a bare [meminst], not [(store, memaddr)] — read [MEMS[i]] out of the
-   caller's [store], call [growmem] on it, and on success replace [MEMS[i]]
-   in place (the global array backing a [ListV] is a mutable
-   [value array ref], same idiom [func_alloc]'s own doc describes for
-   appending to [FUNCS]). [Interpreter.call_func] returns [None] exactly when
-   no equation matched — the legitimate "grow failed" outcome for a
-   [hint(partial)] function, unlike [func_alloc]/[module_validate]'s own
-   [None] cases above (which [failwith], since those two are supposed to be
-   total for valid inputs). *)
+   [func_alloc]'s full pattern above (not just "call the mechanized AL
+   function", but also its [Ds.Store.set]/[Ds.Store.get] bracketing) rather
+   than [global_write]'s pure-structural one — this used to skip that
+   bracketing, updating only the caller-supplied [store] value's [MEMS] array
+   in place and returning it directly; correct for the RPC round trip itself
+   (that's the value ESMeta's own bookkeeping goes on to track), but it left
+   the separate global [Ds.Store] — what implicit-store functions like
+   [mem_read_bytes] above actually read from — still holding the pre-grow
+   byte count, silently freezing any [Memory] object's buffer at its size at
+   allocation time no matter how much the wasm side (or a JS-side
+   [Memory.prototype.grow] call) grew it afterward. Unlike [$allocfunc],
+   [$growmem] takes a bare [meminst], not [(store, memaddr)] — read [MEMS[i]]
+   out of the (now-installed-as-global) store, call [growmem] on it, and on
+   success replace [MEMS[i]] in place (the global array backing a [ListV] is
+   a mutable [value array ref], same idiom [func_alloc]'s own doc describes
+   for appending to [FUNCS]).
+
+   A genuinely failed match — growing past the memtype's declared max, the
+   legitimate "fail" outcome a [hint(partial)] function is supposed to have —
+   does *not* come back from [Interpreter.call_func] as a clean [None] the
+   way the comment above (and [table_grow] below, same idiom) used to assume;
+   il2al's own codegen for a [Partial] definition appends an explicit fail
+   block as its final, unconditional equation
+   ([Il2al.Translate.append_fail_block]), which the interpreter's [FailI]
+   case raises as a real [Exception.Fail] instead of returning control
+   normally — so it has to be caught here and folded into the same [None]
+   case [func_alloc]/[module_validate]'s own (unreachable-for-valid-input)
+   [None] branches don't need to worry about, since those two are total. *)
 let mem_grow (store : value) (memaddr : value) (n : value) : value =
+  Ds.Store.set store; (* install the caller's store as the global store *)
   match memaddr with
   | NumV (`Nat i) ->
-    let mems = strv_access "MEMS" store in
+    let mems = strv_access "MEMS" (Ds.Store.get ()) in
     let mi = listv_nth mems (Z.to_int i) in
-    (match Interpreter.call_func "growmem" [ mi; n ] with
+    let result =
+      try Interpreter.call_func "growmem" [ mi; n ]
+      with Exception.Fail -> None
+    in
+    (match result with
      | Some mi' ->
        (match mems with
-        | ListV arr_ref -> Array.set !arr_ref (Z.to_int i) mi'; store
+        | ListV arr_ref -> Array.set !arr_ref (Z.to_int i) mi'; Ds.Store.get ()
         | _ -> failwith "mem_grow: unexpected MEMS shape")
      | None -> embedding_error)
   | _ -> failwith "mem_grow: expected nat memaddr"
