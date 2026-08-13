@@ -573,13 +573,34 @@ let table_size (store : value) (tableaddr : value) : value =
    Defers to the spec's own [$growtable(tableinst, nat, ref) : tableinst]
    (4.0-execution.configurations.spectec, [hint(partial)]), the same idiom as
    [mem_grow] above — read [TABLES[i]] out of the caller's [store], call
-   [growtable] on it, and on success replace [TABLES[i]] in place. *)
+   [growtable] on it, and on success replace [TABLES[i]] in place.
+
+   Unlike [mem_grow], this does *not* need the [Ds.Store.set]/[Ds.Store.get]
+   bracketing [mem_grow] needed: every table read (js-api's own [table_read]/
+   [table_size]/[table_type]) takes the caller's [store] explicitly, the same
+   value this function's own mutation and return already keep consistent —
+   there is no [mem_read_bytes]-style *implicit*-store table reader (no
+   [Ds.Store]-only function ever reads [TABLES] independent of whatever
+   [store] value its own caller passes), so mutating just the passed-in value
+   in place, as before, is already correct on that front.
+
+   [growtable]'s own genuinely-failed-match case *does* need the same
+   [Exception.Fail] catch [mem_grow] needed, for the identical reason: a
+   [hint(partial)] function's "no equation matched" outcome is il2al's
+   [append_fail_block] raising [Exception.Fail], not [Interpreter.call_func]
+   returning a clean [None] — growing a table past its declared max is
+   supposed to reach [embedding_error] the same way [mem_grow]'s equivalent
+   case does. *)
 let table_grow (store : value) (tableaddr : value) (n : value) (r : value) : value =
   match tableaddr with
   | NumV (`Nat i) ->
     let tables = strv_access "TABLES" store in
     let ti = listv_nth tables (Z.to_int i) in
-    (match Interpreter.call_func "growtable" [ ti; n; r ] with
+    let result =
+      try Interpreter.call_func "growtable" [ ti; n; r ]
+      with Exception.Fail -> None
+    in
+    (match result with
      | Some ti' ->
        (match tables with
         | ListV arr_ref -> Array.set !arr_ref (Z.to_int i) ti'; store
