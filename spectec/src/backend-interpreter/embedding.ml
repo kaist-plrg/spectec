@@ -145,6 +145,34 @@ let module_validate (module_val : value) : value =
   | None -> failwith "module_validate: Module_ok returned no value"
   | exception Exception.Invalid _ -> embedding_error
 
+(* valid_memtype(memtype) / valid_tabletype(tabletype) : bool
+
+   Not part of the Wasm Core Spec's own Embedding API (embedding.rst) -- a
+   wjmeta/js-api-bridge-specific convenience wrapping the [$Memtype_ok]/
+   [$Tabletype_ok] relations (2.1-validation.types.spectec), needed because
+   js-api's Memory/Table constructors (index.bs:877/1044) each check "|X| is
+   [=valid memtype|valid=]"/"[=valid tabletype|valid=]" directly on a
+   standalone memtype/tabletype with no enclosing module. Unlike
+   [module_validate]'s [$Module_ok], neither relation is IL2AL-translated/
+   bound here at all -- this build only mechanizes Wasm's *execution*
+   semantics, not the full validation relation set -- so both are
+   hand-implemented from scratch as [Relation.memtype_ok]/
+   [Relation.tabletype_ok] instead of deferring to a generated
+   interpretation; see those for the actual math (read directly off
+   2.1-validation.types.spectec's [Limits_ok]/[Memtype_ok]/[Tabletype_ok]).
+   Returns a genuine bool (unlike [module_validate]'s "nothing on success"
+   embedding-API convention) since js-api's own prose phrases this as a
+   direct boolean predicate, not an error-checked call. *)
+let valid_memtype (memtype_val : value) : value =
+  match Interpreter.call_func "Memtype_ok" [ memtype_val ] with
+  | Some b -> b
+  | None -> failwith "valid_memtype: Memtype_ok returned no value"
+
+let valid_tabletype (tabletype_val : value) : value =
+  match Interpreter.call_func "Tabletype_ok" [ tabletype_val ] with
+  | Some b -> b
+  | None -> failwith "valid_tabletype: Tabletype_ok returned no value"
+
 (* expand(deftype) : comptype
 
    Not part of the Wasm Core Spec's own Embedding API (embedding.rst) — a
