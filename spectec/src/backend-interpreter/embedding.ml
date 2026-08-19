@@ -403,6 +403,18 @@ let ref_type (store : value) (r : value) : value =
   | CaseV ("REF.EXTERN", [ _ ]) -> CaseV ("REF", [ nonull; nullary "EXTERN" ])
   | _ -> failwith "ref_type: unrecognized ref shape"
 
+(* global_alloc(store, globaltype, val) : (store, globaladdr)
+
+   Defers to the spec's own allocation function [$allocglobal(store,
+   globaltype, val) : (store, globaladdr)] (4.4-execution.modules.spectec),
+   the same idiom as [func_alloc]/[tag_alloc]/[table_alloc]/[mem_alloc]
+   above. *)
+let global_alloc (store : value) (globaltype : value) (v : value) : value =
+  Ds.Store.set store;
+  match Interpreter.call_func "allocglobal" [ globaltype; v ] with
+  | Some globaladdr -> TupV [ Ds.Store.get (); globaladdr ]
+  | None -> failwith "global_alloc: allocglobal returned no value"
+
 (* global_type(store, globaladdr) : globaltype
 
    [global_type(S, a) = S.GLOBALS[a].TYPE] — same structural-lookup idiom as
