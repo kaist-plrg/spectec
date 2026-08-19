@@ -442,6 +442,17 @@ let global_write (store : value) (globaladdr : value) (v : value) : value =
      | _ -> failwith "global_write: unexpected globalinst/globaltype shape")
   | _ -> failwith "global_write: expected nat globaladdr"
 
+(* mem_alloc(store, memtype) : (store, memaddr)
+
+   Defers to the spec's own allocation function [$allocmem(store, memtype) :
+   (store, memaddr)] (4.4-execution.modules.spectec), the same idiom as
+   [func_alloc]/[tag_alloc]/[table_alloc] above. *)
+let mem_alloc (store : value) (memtype : value) : value =
+  Ds.Store.set store;
+  match Interpreter.call_func "allocmem" [ memtype ] with
+  | Some memaddr -> TupV [ Ds.Store.get (); memaddr ]
+  | None -> failwith "mem_alloc: allocmem returned no value"
+
 (* mem_type(store, memaddr) : memtype
 
    [mem_type(S, a) = S.MEMS[a].TYPE] — same structural-lookup idiom as

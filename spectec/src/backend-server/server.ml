@@ -196,6 +196,10 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let globaladdr = params |> member "globaladdr" |> value_of_json in
       let v = params |> member "value" |> value_of_json in
       ok (Backend_interpreter.Embedding.global_write store globaladdr v)
+    | "mem_alloc" ->
+      let store = params |> member "store" |> value_of_json in
+      let memtype = params |> member "memtype" |> value_of_json in
+      ok (Backend_interpreter.Embedding.mem_alloc store memtype)
     | "mem_type" ->
       let store = params |> member "store" |> value_of_json in
       let memaddr = params |> member "memaddr" |> value_of_json in
