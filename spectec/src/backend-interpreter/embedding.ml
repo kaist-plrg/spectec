@@ -704,11 +704,21 @@ let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
    same three-way (store, moduleinst | exception | error) [func_invoke] has
    above, but unlike that one, both still collapse to [embedding_error] here
    -- distinguishing them (mirroring [func_invoke]'s [EXCEPTION exnaddr])
-   is unaddressed; no fixture exercises a throwing start function yet. *)
+   is unaddressed; no fixture exercises a throwing start function yet.
+
+   [$instantiate] itself is also a [hint(partial)] function -- its match
+   against the module's expected import types (js-api's own "bad imports"
+   fixtures deliberately supply mismatched values here) is exactly the kind
+   of failed-match outcome [mem_grow]/[table_grow] above already document:
+   il2al's codegen for a [Partial] definition's fail branch raises a real
+   [Exception.Fail] rather than returning control normally, so it has to be
+   caught here too, the same way, or it escapes as an uncaught protocol
+   error instead of the clean embedding failure JS-API's own {{LinkError}}
+   is supposed to see. *)
 let module_instantiate
   (store : value) (module_ : value) (externvals : value) : value =
   Ds.Store.set store;
   match Interpreter.instantiate [ module_; externvals ] with
   | moduleinst -> TupV [ Ds.Store.get (); moduleinst ]
-  | exception (Exception.Trap | Exception.Throw _) ->
+  | exception (Exception.Trap | Exception.Throw _ | Exception.Fail) ->
     TupV [ Ds.Store.get (); embedding_error ]
