@@ -252,6 +252,12 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let store = params |> member "store" |> value_of_json in
       let tableaddr = params |> member "tableaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_size store tableaddr)
+    | "array_write" ->
+      let store = params |> member "store" |> value_of_json in
+      let arrayaddr = params |> member "arrayaddr" |> value_of_json in
+      let i = params |> member "i" |> value_of_json in
+      let v = params |> member "fieldval" |> value_of_json in
+      ok (Backend_interpreter.Embedding.array_write store arrayaddr i v)
     | "table_grow" ->
       let store = params |> member "store" |> value_of_json in
       let tableaddr = params |> member "tableaddr" |> value_of_json in

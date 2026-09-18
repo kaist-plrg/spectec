@@ -619,6 +619,35 @@ let table_size (store : value) (tableaddr : value) : value =
     natV (Z.of_int (listv_len refs))
   | _ -> failwith "table_size: expected nat tableaddr"
 
+(* array_write(store, arrayaddr, i: u64, fieldval) : store | error
+
+   [array_write(S, a, i, v) = S']  with [S'.ARRAYS[a].FIELDS[i] = v], or
+   [error] if [i] is out of bounds — the GC array counterpart to
+   [table_write] above, filling a gap in the Wasm Core Spec's own embedding
+   appendix (embedding.rst predates the GC proposal's arrays/structs, so it
+   never defined an [array_write]/[array_read]/[array_len] triple the way it
+   does for tables/globals/memories). Mutates in place like [table_write] —
+   FIELDS is backed by a mutable [value array ref], so an in-bounds write
+   updates the caller's [store] directly and returns it. The caller hands an
+   already-correctly-packed [fieldval] (e.g. [CaseV ("PACK", [CaseV ("I16",
+   []); n])] for a `(mut i16)` array) — this does no packing/type-checking of
+   its own, exactly like [table_write] doesn't convert its [ref] argument
+   either. Only [array_write] is added here, not [array_read]/[array_len]:
+   WJI's own callers already read array length/elements directly off the
+   marshalled [store] value on the Scala side (a plain [Wasm(ALValue.ListV)]
+   read, no RPC round trip needed) — only the *write* direction needs Ocaml's
+   help, since WJI has no way to construct a new, updated [store] record
+   value of its own (see `docs/spec_errors.md`, `FixJsStringArrayParamPass`'s
+   own doc). *)
+let array_write (store : value) (arrayaddr : value) (i : value) (v : value) : value =
+  match arrayaddr, i with
+  | NumV (`Nat a), NumV (`Nat idx) ->
+    let fields = unwrap_listv (strv_access "FIELDS" (listv_nth (strv_access "ARRAYS" store) (Z.to_int a))) in
+    let idx = Z.to_int idx in
+    if idx >= 0 && idx < Array.length !fields then (Array.set !fields idx v; store)
+    else embedding_error
+  | _ -> failwith "array_write: expected nat arrayaddr/i"
+
 (* table_grow(store, tableaddr, n: u64, ref) : store | error
 
    Defers to the spec's own [$growtable(tableinst, nat, ref) : tableinst]
