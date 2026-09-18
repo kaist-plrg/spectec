@@ -55,6 +55,13 @@ let rec value_of_json (j : Yojson.Safe.t) : value =
 
 (* JSON-RPC dispatcher *)
 
+(* An RPC error response to an outbound request we initiated (e.g.
+   [host_func_invoke]) -- preserves the response's own error code, unlike a
+   bare [Failure] string, so a caller can tell a specific, expected error
+   (e.g. code -32000, "host function trap") apart from a generic
+   transport/protocol failure. *)
+exception RpcErrorResponse of int * string
+
 (* Ids for outbound requests we initiate (e.g. host_func_invoke). Independent
    from wjmeta's own id space: each side counts separately, see the
    JsonRpcConnection comment on the wjmeta side. *)
@@ -266,7 +273,15 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
               match eff with
               | Backend_interpreter.Host.Host_invoke (hid, state, vals) ->
                 Some (fun (k : (a, value) Effect.Deep.continuation) ->
-                  Effect.Deep.continue k (host_func_invoke hid state vals))
+                  (* [discontinue] on failure, not [continue (raise ...)] --
+                     the latter raises here, at the perform site's *caller*
+                     (this handler), never reaching the [Host_invoke] performer
+                     buried inside [k]'s own suspended computation, so
+                     [Interpreter.invoke]'s surrounding [exception Trap] catch
+                     in `embedding.ml` would never see it. *)
+                  match host_func_invoke hid state vals with
+                  | result -> Effect.Deep.continue k result
+                  | exception e -> Effect.Deep.discontinue k e)
               | _ -> None) }
       in
       ok result
@@ -284,7 +299,15 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
               match eff with
               | Backend_interpreter.Host.Host_invoke (hid, state, vals) ->
                 Some (fun (k : (a, value) Effect.Deep.continuation) ->
-                  Effect.Deep.continue k (host_func_invoke hid state vals))
+                  (* [discontinue] on failure, not [continue (raise ...)] --
+                     the latter raises here, at the perform site's *caller*
+                     (this handler), never reaching the [Host_invoke] performer
+                     buried inside [k]'s own suspended computation, so
+                     [Interpreter.invoke]'s surrounding [exception Trap] catch
+                     in `embedding.ml` would never see it. *)
+                  match host_func_invoke hid state vals with
+                  | result -> Effect.Deep.continue k result
+                  | exception e -> Effect.Deep.discontinue k e)
               | _ -> None) }
       in
       ok result
@@ -314,6 +337,8 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
   with
   | Failure msg | Invalid_argument msg ->
     err (-32603) msg
+  | RpcErrorResponse (code, msg) ->
+    err code msg
   | Backend_interpreter.Exception.Error (at, msg, step) ->
     err (-32603) (msg ^ " (interpreting " ^ step ^ " at " ^ Util.Source.string_of_region at ^ ")")
   | Backend_interpreter.Exception.Invalid (e, backtrace) ->
@@ -325,15 +350,26 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
    returning the (possibly-updated) store paired with its [instr*] (the
    host function's own return value(s), an escaping [throw_ref], or a
    [TRAP] -- verbatim; see [Host.call_func]'s doc for why the wjmeta side
-   isn't asked to tag this as the spec's [result] syntax). *)
+   isn't asked to tag this as the spec's [result] syntax).
+
+   A host function that traps answers with an RPC *error* instead (code
+   -32000, "host function trap" -- wjmeta's own SpecTecWasmHost.scala), since
+   there's no [instr*]-shaped value for a bare Core Wasm trap: unlike a
+   genuine [ref.exn] throw (a real addressable value), [Exception.Trap] here
+   and on wjmeta's own side carries no payload at all, only a signal. Caught
+   and re-raised as exactly that signal, so [func_invoke]/[module_instantiate]
+   (whose own [Exception.Trap] handler this reenters underneath, `embedding.
+   ml`) see it exactly like a trap hit anywhere else in the same call. *)
 and host_func_invoke (hid : string) (state : value) (vals : value list) : value * value list =
   let params =
     `Assoc [("id", `String hid);
             ("store", json_of_value state);
             ("args", `List (List.map json_of_value vals))] in
-  match send_request "host_func_invoke" params with
-  | TupV [ newState; ListV vs ] -> (newState, Array.to_list !vs)
-  | _ -> failwith "host_func_invoke: expected a (store, instrs) pair"
+  try
+    match send_request "host_func_invoke" params with
+    | TupV [ newState; ListV vs ] -> (newState, Array.to_list !vs)
+    | _ -> failwith "host_func_invoke: expected a (store, instrs) pair"
+  with RpcErrorResponse (-32000, _) -> raise Backend_interpreter.Exception.Trap
 
 (* Read+handle+answer a single inbound request. *)
 and serve_request (json : Yojson.Safe.t) : unit =
@@ -360,7 +396,10 @@ and send_request (meth : string) (params : Yojson.Safe.t) : value =
       (serve_request json; pump ())                 (* nested inbound request *)
     else if (json |> member "id") = `Int id then
       (match json |> member "result" with
-       | `Null -> failwith (json |> member "error" |> member "message" |> to_string)
+       | `Null ->
+         let code = json |> member "error" |> member "code" |> to_int in
+         let msg = json |> member "error" |> member "message" |> to_string in
+         raise (RpcErrorResponse (code, msg))
        | result -> value_of_json result)
     else
       failwith "send_request: response id mismatch"
