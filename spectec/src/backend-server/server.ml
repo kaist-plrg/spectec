@@ -98,6 +98,14 @@ let call_inv_signed (bits : int) (i : value) : value =
   | Some result -> result
   | None -> failwith (Printf.sprintf "inv_signed_%d: no result" bits)
 
+(* canon_32/canon_64 are js-api's rendered `[=canon=]<sub>N</sub>`, Wasm Core
+   spec's `$canon_(N)` (1.1-syntax.values.spectec) -- same per-width naming as
+   call_signed above. *)
+let call_canon (bits : int) : value =
+  match Backend_interpreter.Interpreter.call_func "canon_" [ NumV (`Nat (Z.of_int bits)) ] with
+  | Some result -> result
+  | None -> failwith (Printf.sprintf "canon_%d: no result" bits)
+
 (* These four are mutually recursive: servicing a [func_invoke] runs the AL
    interpreter, which may perform [Host.Host_invoke] (a host function in the
    invoked code); the effect handler calls [host_func_invoke] -> [send_request];
@@ -338,6 +346,8 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "inv_signed_64" ->
       let i = params |> member "i" |> value_of_json in
       ok (call_inv_signed 64 i)
+    | "canon_32" -> ok (call_canon 32)
+    | "canon_64" -> ok (call_canon 64)
     | _ ->
       err (-32601) ("method not implemented: " ^ meth)
   with
