@@ -106,6 +106,26 @@ let call_canon (bits : int) : value =
   | Some result -> result
   | None -> failwith (Printf.sprintf "canon_%d: no result" bits)
 
+(* The store the last request sent in full, with the id it was sent under. A
+   request passing that very same store again sends just {"cached": id}
+   (wjmeta's SpecTecWasmHost.lastStore keeps the matching side): stores only
+   grow over a session, so resending them in full dominated RPC time. An id
+   that doesn't match fails loudly rather than reusing the wrong store. *)
+let cached_store : (int * value) option ref = ref None
+
+let store_param (params : Yojson.Safe.t) : value =
+  let open Yojson.Safe.Util in
+  let store = member "store" params in
+  match member "cached" store with
+  | `Int id ->
+    (match !cached_store with
+     | Some (cached_id, value) when cached_id = id -> value
+     | _ -> failwith (Printf.sprintf "store: no cached store %d" id))
+  | _ ->
+    let value = store |> member "value" |> value_of_json in
+    cached_store := Some (store |> member "id" |> to_int, value);
+    value
+
 (* These four are mutually recursive: servicing a [func_invoke] runs the AL
    interpreter, which may perform [Host.Host_invoke] (a host function in the
    invoked code); the effect handler calls [host_func_invoke] -> [send_request];
@@ -165,115 +185,115 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
     | "store_init" ->
       ok (Backend_interpreter.Embedding.store_init ())
     | "func_alloc" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let deftype = params |> member "deftype" |> value_of_json in
       let hostfunc = params |> member "hostfunc" |> value_of_json in
       ok (Backend_interpreter.Embedding.func_alloc store deftype hostfunc)
     | "tag_alloc" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tagtype = params |> member "tagtype" |> value_of_json in
       ok (Backend_interpreter.Embedding.tag_alloc store tagtype)
     | "exn_alloc" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tagaddr = params |> member "tagaddr" |> value_of_json in
       let vals = params |> member "vals" |> value_of_json in
       ok (Backend_interpreter.Embedding.exn_alloc store tagaddr vals)
     | "exn_tag" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let exnaddr = params |> member "exnaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.exn_tag store exnaddr)
     | "exn_read" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let exnaddr = params |> member "exnaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.exn_read store exnaddr)
     | "tag_type" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tagaddr = params |> member "tagaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.tag_type store tagaddr)
     | "func_type" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.func_type store funcaddr)
     | "ref_type" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let ref_ = params |> member "ref" |> value_of_json in
       ok (Backend_interpreter.Embedding.ref_type store ref_)
     | "global_alloc" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let globaltype = params |> member "globaltype" |> value_of_json in
       let v = params |> member "value" |> value_of_json in
       ok (Backend_interpreter.Embedding.global_alloc store globaltype v)
     | "global_type" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let globaladdr = params |> member "globaladdr" |> value_of_json in
       ok (Backend_interpreter.Embedding.global_type store globaladdr)
     | "global_read" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let globaladdr = params |> member "globaladdr" |> value_of_json in
       ok (Backend_interpreter.Embedding.global_read store globaladdr)
     | "global_write" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let globaladdr = params |> member "globaladdr" |> value_of_json in
       let v = params |> member "value" |> value_of_json in
       ok (Backend_interpreter.Embedding.global_write store globaladdr v)
     | "mem_alloc" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let memtype = params |> member "memtype" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_alloc store memtype)
     | "mem_type" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let memaddr = params |> member "memaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_type store memaddr)
     | "mem_size" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let memaddr = params |> member "memaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_size store memaddr)
     | "mem_read_bytes" ->
       let memaddr = params |> member "memaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_read_bytes memaddr)
     | "mem_grow" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let memaddr = params |> member "memaddr" |> value_of_json in
       let n = params |> member "n" |> value_of_json in
       ok (Backend_interpreter.Embedding.mem_grow store memaddr n)
     | "table_alloc" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tabletype = params |> member "tabletype" |> value_of_json in
       let r = params |> member "ref" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_alloc store tabletype r)
     | "table_type" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tableaddr = params |> member "tableaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_type store tableaddr)
     | "table_read" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tableaddr = params |> member "tableaddr" |> value_of_json in
       let i = params |> member "i" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_read store tableaddr i)
     | "table_write" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tableaddr = params |> member "tableaddr" |> value_of_json in
       let i = params |> member "i" |> value_of_json in
       let r = params |> member "ref" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_write store tableaddr i r)
     | "table_size" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tableaddr = params |> member "tableaddr" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_size store tableaddr)
     | "array_write" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let arrayaddr = params |> member "arrayaddr" |> value_of_json in
       let i = params |> member "i" |> value_of_json in
       let v = params |> member "fieldval" |> value_of_json in
       ok (Backend_interpreter.Embedding.array_write store arrayaddr i v)
     | "table_grow" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let tableaddr = params |> member "tableaddr" |> value_of_json in
       let n = params |> member "n" |> value_of_json in
       let r = params |> member "ref" |> value_of_json in
       ok (Backend_interpreter.Embedding.table_grow store tableaddr n r)
     | "func_invoke" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let funcaddr = params |> member "funcaddr" |> value_of_json in
       let args = params |> member "args" |> value_of_json in
       (* Wasm execution may reenter wjmeta via the [Host_invoke] effect when the
@@ -300,7 +320,7 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       in
       ok result
     | "module_instantiate" ->
-      let store = params |> member "store" |> value_of_json in
+      let store = store_param params in
       let module_ = params |> member "module" |> value_of_json in
       let externvals = params |> member "externvals" |> value_of_json in
       (* Instantiation can run a start function, which may itself call a host
