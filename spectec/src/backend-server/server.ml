@@ -316,6 +316,11 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
                   match host_func_invoke hid state vals with
                   | result -> Effect.Deep.continue k result
                   | exception e -> Effect.Deep.discontinue k e)
+              | Backend_interpreter.Host.Memory_grow_hook (x, top, frame) ->
+                Some (fun (k : (a, value) Effect.Deep.continuation) ->
+                  match memory_grow_hook x top frame with
+                  | () -> Effect.Deep.continue k ()
+                  | exception e -> Effect.Deep.discontinue k e)
               | _ -> None) }
       in
       ok result
@@ -341,6 +346,11 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
                      in `embedding.ml` would never see it. *)
                   match host_func_invoke hid state vals with
                   | result -> Effect.Deep.continue k result
+                  | exception e -> Effect.Deep.discontinue k e)
+              | Backend_interpreter.Host.Memory_grow_hook (x, top, frame) ->
+                Some (fun (k : (a, value) Effect.Deep.continuation) ->
+                  match memory_grow_hook x top frame with
+                  | () -> Effect.Deep.continue k ()
                   | exception e -> Effect.Deep.discontinue k e)
               | _ -> None) }
       in
@@ -406,6 +416,15 @@ and host_func_invoke (hid : string) (state : value) (vals : value list) : value 
     | TupV [ newState; ListV vs ] -> (newState, Array.to_list !vs)
     | _ -> failwith "host_func_invoke: expected a (store, instrs) pair"
   with RpcErrorResponse (-32000, _) -> raise Backend_interpreter.Exception.Trap
+
+(* Ask wjmeta to run the js-api's memory.grow hook. No store goes along: the
+   hook reads memory bytes back through [mem_read_bytes], i.e. the live store. *)
+and memory_grow_hook (x : value) (top : value) (frame : value) : unit =
+  let params =
+    `Assoc [("x", json_of_value x);
+            ("top", json_of_value top);
+            ("frame", json_of_value frame)] in
+  ignore (send_request "memory_grow_hook" params)
 
 (* Read+handle+answer a single inbound request. *)
 and serve_request (json : Yojson.Safe.t) : unit =

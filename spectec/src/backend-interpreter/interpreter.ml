@@ -733,6 +733,12 @@ and step_wasm (ctx: AlContext.t) : value -> AlContext.t = function
      generic runtime check being complete too. *)
   | v when WasmContext.is_value v -> WasmContext.push_value v; ctx
   | CaseV (name, []) when Host.is_host name -> Host.call name; ctx
+  (* Run memory.grow to completion here, then the embedder's hook, which the
+     js-api specifies for the moment right after the instruction executes. *)
+  | CaseV ("MEMORY.GROW" as name, ([ x ] as args)) ->
+    ignore (run [ create_context name args ]);
+    Host.memory_grow_hook x;
+    ctx
   | CaseV (name, args) -> create_context name args :: ctx
   | v -> fail_value "cannot step a wasm instr" v
 

@@ -228,6 +228,20 @@ let mem fname = fname = "callhostfunc"
 type _ Effect.t +=
   Host_invoke : string * value * value list -> (value * value list) Effect.t
 
+(* Effect performed right after a [MEMORY.GROW x] instruction executes, so the
+   embedder can run the js-api's own hook ("Immediately after a WebAssembly
+   memory.grow |x| instruction executes, ..."). Carries [x], the top of the
+   value stack (the instruction's result) and the current frame, which the
+   hook reads. Without a handler (e.g. plain wast runs) it is a no-op. *)
+type _ Effect.t +=
+  Memory_grow_hook : value * value * value -> unit Effect.t
+
+let memory_grow_hook (x : value) : unit =
+  let top = List.hd (WasmContext.get_value_stack ()) in
+  let frame = WasmContext.get_current_context "FRAME_" |> unwrap_framev in
+  try Effect.perform (Memory_grow_hook (x, top, frame))
+  with Effect.Unhandled _ -> ()
+
 (* Implements the spec's [$callhostfunc(state, hostfunc, val* ) : (state, instr* )],
    invoked from the [call_ref-host] rule. [hostfunc] is the opaque
    [CaseV ("HOSTFUNC", [TextV id])] token stored as the funcinst CODE; we read
