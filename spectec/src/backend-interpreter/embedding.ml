@@ -719,7 +719,7 @@ let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
   | exception Exception.Throw v ->
     TupV [ Ds.Store.get (); caseV ("EXCEPTION", [ unwrap_exnaddr v ]) ]
 
-(* module_instantiate(store, module, externval* ) : (store, moduleinst | error)
+(* module_instantiate(store, module, externval* ) : (store, moduleinst | exception | error)
 
    Defers to the spec's own [$instantiate(module, externval* ) : moduleinst],
    driven through [Interpreter.instantiate] — which, like [Interpreter.invoke],
@@ -727,27 +727,22 @@ let func_invoke (store : value) (funcaddr : value) (vals : value) : value =
    installed as the global store first, and [externvals] is already a list
    value (as with [func_invoke]'s [vals]).
 
-   Instantiation can fail either by trapping (e.g. an out-of-bounds active
-   segment) or by the module's start function throwing (Wasm
-   exception-handling proposal) -- embedding.rst's own declared type is the
-   same three-way (store, moduleinst | exception | error) [func_invoke] has
-   above, but unlike that one, both still collapse to [embedding_error] here
-   -- distinguishing them (mirroring [func_invoke]'s [EXCEPTION exnaddr])
-   is unaddressed; no fixture exercises a throwing start function yet.
-
-   [$instantiate] itself is also a [hint(partial)] function -- its match
-   against the module's expected import types (js-api's own "bad imports"
-   fixtures deliberately supply mismatched values here) is exactly the kind
-   of failed-match outcome [mem_grow]/[table_grow] above already document:
-   il2al's codegen for a [Partial] definition's fail branch raises a real
-   [Exception.Fail] rather than returning control normally, so it has to be
-   caught here too, the same way, or it escapes as an uncaught protocol
-   error instead of the clean embedding failure JS-API's own {{LinkError}}
-   is supposed to see. *)
+   The three ways [$instantiate] can fail are kept apart, since js-api maps
+   them to different JS exceptions:
+   - a failed premise before any instruction runs ([Exception.Fail], e.g. an
+     import that does not match its declared type): [ERROR], a link error.
+     [$instantiate] is a [hint(partial)] function, so il2al's codegen for
+     its fail branch raises [Exception.Fail] (as for [mem_grow]/[table_grow]
+     above) rather than returning normally.
+   - a trap while running segment initializers or the start function: [TRAP].
+   - a Wasm exception escaping the start function: [EXCEPTION exnaddr], as
+     in [func_invoke]. *)
 let module_instantiate
   (store : value) (module_ : value) (externvals : value) : value =
   Ds.Store.set store;
   match Interpreter.instantiate [ module_; externvals ] with
   | moduleinst -> TupV [ Ds.Store.get (); moduleinst ]
-  | exception (Exception.Trap | Exception.Throw _ | Exception.Fail) ->
-    TupV [ Ds.Store.get (); embedding_error ]
+  | exception Exception.Fail -> TupV [ Ds.Store.get (); embedding_error ]
+  | exception Exception.Trap -> TupV [ Ds.Store.get (); caseV ("TRAP", []) ]
+  | exception Exception.Throw v ->
+    TupV [ Ds.Store.get (); caseV ("EXCEPTION", [ unwrap_exnaddr v ]) ]
