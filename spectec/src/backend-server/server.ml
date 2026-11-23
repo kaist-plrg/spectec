@@ -286,6 +286,15 @@ let rec handle_request (id : Yojson.Safe.t) (meth : string) (params : Yojson.Saf
       let i = params |> member "i" |> value_of_json in
       let v = params |> member "fieldval" |> value_of_json in
       ok (Backend_interpreter.Embedding.array_write store arrayaddr i v)
+    | "packfield" ->
+      let storagetype = params |> member "storagetype" |> value_of_json in
+      let v = params |> member "val" |> value_of_json in
+      ok (Backend_interpreter.Embedding.packfield storagetype v)
+    | "unpackfield" ->
+      let storagetype = params |> member "storagetype" |> value_of_json in
+      let sx = params |> member "sx" |> value_of_json in
+      let fieldval = params |> member "fieldval" |> value_of_json in
+      ok (Backend_interpreter.Embedding.unpackfield storagetype sx fieldval)
     | "table_grow" ->
       let store = store_param params in
       let tableaddr = params |> member "tableaddr" |> value_of_json in

@@ -637,8 +637,7 @@ let table_size (store : value) (tableaddr : value) : value =
    marshalled [store] value on the Scala side (a plain [Wasm(ALValue.ListV)]
    read, no RPC round trip needed) — only the *write* direction needs Ocaml's
    help, since WJI has no way to construct a new, updated [store] record
-   value of its own (see `docs/spec_errors.md`, `FixJsStringArrayParamPass`'s
-   own doc). *)
+   value of its own (see `docs/hardcodes.md` #36). *)
 let array_write (store : value) (arrayaddr : value) (i : value) (v : value) : value =
   match arrayaddr, i with
   | NumV (`Nat a), NumV (`Nat idx) ->
@@ -647,6 +646,24 @@ let array_write (store : value) (arrayaddr : value) (i : value) (v : value) : va
     if idx >= 0 && idx < Array.length !fields then (Array.set !fields idx v; store)
     else embedding_error
   | _ -> failwith "array_write: expected nat arrayaddr/i"
+
+(* packfield(storagetype, val) : fieldval
+   unpackfield(storagetype, sx?, fieldval) : val
+
+   Not part of embedding.rst; wjmeta-bridge conveniences calling the Core
+   Spec's own [$packfield_]/[$unpackfield_]
+   (4.0-execution.configurations.spectec), the conversions [array.set]/
+   [array.get] use, for the js-string abstract operations [ArrayCharCodeAt]/
+   [SetArrayCharCodeAt]. [sx] comes bare and is passed as [sx?]. *)
+let packfield (storagetype : value) (v : value) : value =
+  match Interpreter.call_func "packfield_" [ storagetype; v ] with
+  | Some r -> r
+  | None -> failwith "packfield: packfield_ returned no value"
+
+let unpackfield (storagetype : value) (sx : value) (fieldval : value) : value =
+  match Interpreter.call_func "unpackfield_" [ storagetype; OptV (Some sx); fieldval ] with
+  | Some r -> r
+  | None -> failwith "unpackfield: unpackfield_ returned no value"
 
 (* table_grow(store, tableaddr, n: u64, ref) : store | error
 
